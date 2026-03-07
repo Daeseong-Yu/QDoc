@@ -49,8 +49,8 @@ export function SymptomPage() {
       }
 
       navigate(`/hospitals${params.toString() ? `?${params.toString()}` : ''}`)
-    } catch {
-      setError('Unable to analyze symptoms right now. Please try again.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to analyze symptoms right now. Please try again.')
     } finally {
       setIsSubmitting(false)
     }

@@ -7,6 +7,7 @@ const SESSION_KEY = 'qdoc.auth.session'
 const SESSION_DURATION_MS = 30 * 60 * 1000
 const DEV_SESSION_DURATION_MS = 12 * 60 * 60 * 1000
 const DEV_SESSION_USER_ID = 'dev-user'
+const SESSION_EXPIRED_MESSAGE = 'Session expired. Please sign in again.'
 
 type LoginInput = {
   name: string
@@ -28,6 +29,11 @@ type AuthContextValue = {
   logout: (returnTo?: string) => void
   renewSession: () => void
   clearSessionMessage: () => void
+}
+
+type InitialAuthState = {
+  session: AuthSession | null
+  sessionMessage: string | null
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -100,6 +106,30 @@ function saveSession(session: AuthSession | null) {
   storage.setItem(SESSION_KEY, JSON.stringify(session))
 }
 
+function loadInitialAuthState(): InitialAuthState {
+  const stored = loadSession()
+
+  if (!stored) {
+    return {
+      session: null,
+      sessionMessage: null,
+    }
+  }
+
+  if (isExpired(stored)) {
+    saveSession(null)
+    return {
+      session: null,
+      sessionMessage: SESSION_EXPIRED_MESSAGE,
+    }
+  }
+
+  return {
+    session: stored,
+    sessionMessage: null,
+  }
+}
+
 function createSession(input: LoginInput): AuthSession {
   const id =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -136,49 +166,23 @@ type AuthProviderProps = {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [session, setSession] = useState<AuthSession | null>(null)
-  const [sessionMessage, setSessionMessage] = useState<string | null>(null)
-  const [hasLoadedLocalSession, setHasLoadedLocalSession] = useState(false)
-
-  useEffect(() => {
-    const stored = loadSession()
-
-    if (!stored) {
-      setHasLoadedLocalSession(true)
-      return
-    }
-
-    if (isExpired(stored)) {
-      saveSession(null)
-      setSessionMessage('Session expired. Please sign in again.')
-      setHasLoadedLocalSession(true)
-      return
-    }
-
-    setSession(stored)
-    setHasLoadedLocalSession(true)
-  }, [])
+  const [initialState] = useState(loadInitialAuthState)
+  const [session, setSession] = useState<AuthSession | null>(initialState.session)
+  const [sessionMessage, setSessionMessage] = useState<string | null>(initialState.sessionMessage)
 
   useEffect(() => {
     saveSession(session)
   }, [session])
 
   useEffect(() => {
-    if (!session || session.provider === 'auth0') {
-      return
-    }
-
-    const remainingMs = session.expiresAt - Date.now()
-    if (remainingMs <= 0) {
-      setSession(null)
-      setSessionMessage('Session expired. Please sign in again.')
+    if (!session || session.provider === 'auth0' || typeof window === 'undefined') {
       return
     }
 
     const timer = window.setTimeout(() => {
       setSession(null)
-      setSessionMessage('Session expired. Please sign in again.')
-    }, remainingMs)
+      setSessionMessage(SESSION_EXPIRED_MESSAGE)
+    }, Math.max(session.expiresAt - Date.now(), 0))
 
     return () => window.clearTimeout(timer)
   }, [session])
@@ -189,7 +193,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     () => ({
       session,
       isAuthenticated: Boolean(session),
-      isReady: hasLoadedLocalSession,
+      isReady: true,
       isDevAuthBypass: true,
       isAuth0Available: false,
       authMethod,
@@ -224,7 +228,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSessionMessage(null)
       },
     }),
-    [authMethod, hasLoadedLocalSession, session, sessionMessage],
+    [authMethod, session, sessionMessage],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

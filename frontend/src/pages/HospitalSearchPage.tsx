@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { CustomerShell } from '../components/CustomerShell'
-import { useAuth } from '../features/auth/useAuth'
 import { useOnboarding } from '../features/onboarding/useOnboarding'
 import { searchNearbyHospitals } from '../services/hospitalService'
 import type { HospitalOverview, HospitalSearchSort, OperatingStatus } from '../types/hospital'
@@ -42,28 +41,15 @@ function formatStartTime(value: string) {
 export function HospitalSearchPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { session } = useAuth()
   const { contract, completeHospitalStep } = useOnboarding()
 
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') ?? '')
-  const [departmentFilter] = useState(
-    searchParams.get('departmentName') ?? contract.recommendedDepartment,
-  )
+  const [departmentFilter] = useState(searchParams.get('departmentName') ?? contract.recommendedDepartment)
   const [sortBy, setSortBy] = useState<HospitalSearchSort>('distance')
+  const [results, setResults] = useState<HospitalOverview[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  const hospitals = useMemo(() => {
-    try {
-      setError(null)
-      return [] as HospitalOverview[]
-    } catch {
-      return [] as HospitalOverview[]
-    }
-  }, [])
-
-  const [results, setResults] = useState<HospitalOverview[]>(hospitals)
-
-  useMemo(() => {
+  useEffect(() => {
     const nextParams = new URLSearchParams()
 
     if (searchKeyword.trim()) {
@@ -76,22 +62,36 @@ export function HospitalSearchPage() {
 
     setSearchParams(nextParams, { replace: true })
 
-    void searchNearbyHospitals({
-      lat: DEMO_LOCATION.lat,
-      lng: DEMO_LOCATION.lng,
-      radiusKm: SEARCH_RADIUS_KM,
-      departmentName: departmentFilter.trim() || undefined,
-      keyword: searchKeyword.trim() || undefined,
-      sortBy,
-    })
-      .then((value) => {
-        setResults(value)
-        setError(null)
-      })
-      .catch(() => {
-        setResults([])
-        setError('Unable to load hospitals. Please try again.')
-      })
+    let cancelled = false
+
+    async function loadHospitals() {
+      try {
+        const value = await searchNearbyHospitals({
+          lat: DEMO_LOCATION.lat,
+          lng: DEMO_LOCATION.lng,
+          radiusKm: SEARCH_RADIUS_KM,
+          departmentName: departmentFilter.trim() || undefined,
+          keyword: searchKeyword.trim() || undefined,
+          sortBy,
+        })
+
+        if (!cancelled) {
+          setResults(value)
+          setError(null)
+        }
+      } catch {
+        if (!cancelled) {
+          setResults([])
+          setError('Unable to load hospitals. Please try again.')
+        }
+      }
+    }
+
+    void loadHospitals()
+
+    return () => {
+      cancelled = true
+    }
   }, [departmentFilter, searchKeyword, setSearchParams, sortBy])
 
   const quickChips = useMemo(() => {
@@ -108,11 +108,9 @@ export function HospitalSearchPage() {
 
     const params = new URLSearchParams({
       hospitalId: hospital.id,
-      patientId: 'self',
-      patientName: session?.user.name ?? 'Self',
     })
 
-    navigate(`/queue/room?${params.toString()}`)
+    navigate(`/queue/patient?${params.toString()}`)
   }
 
   return (
@@ -200,4 +198,3 @@ export function HospitalSearchPage() {
     </CustomerShell>
   )
 }
-

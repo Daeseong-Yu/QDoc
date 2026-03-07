@@ -9,6 +9,11 @@ type SearchInput = {
   sortBy: HospitalSearchSort
 }
 
+export type HospitalQueueSnapshot = Pick<
+  HospitalOverview,
+  'id' | 'name' | 'address' | 'phone' | 'operatingStatus' | 'currentWaiting' | 'estimatedWaitMin' | 'lastUpdatedAt'
+>
+
 const MOCK_HOSPITALS: HospitalOverview[] = [
   {
     id: 'h-001',
@@ -97,4 +102,35 @@ export async function searchNearbyHospitals(input: SearchInput): Promise<Hospita
   }
 
   return ranked
+}
+
+export async function getHospitalQueueSnapshotById(id: string): Promise<HospitalQueueSnapshot | null> {
+  const hospital = MOCK_HOSPITALS.find((item) => item.id === id)
+  if (!hospital) {
+    return null
+  }
+
+  return {
+    id: hospital.id,
+    name: hospital.name,
+    address: hospital.address,
+    phone: hospital.phone,
+    operatingStatus: hospital.operatingStatus,
+    currentWaiting: hospital.currentWaiting,
+    estimatedWaitMin: hospital.estimatedWaitMin,
+    lastUpdatedAt: hospital.lastUpdatedAt,
+  }
+}
+
+export async function getHospitalDepartmentsWithDoctors(hospitalId: string) {
+  const hospital = MOCK_HOSPITALS.find((item) => item.id === hospitalId)
+  if (!hospital) {
+    return []
+  }
+
+  return hospital.departments.map((department) => ({
+    id: department.id,
+    name: department.name,
+    doctors: department.doctors,
+  }))
 }

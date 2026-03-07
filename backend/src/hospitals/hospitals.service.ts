@@ -1,121 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 
+import { ACTIVE_TICKET_STATUSES, QueueStatus } from '../common/contracts'
+import { PrismaService } from '../prisma/prisma.service'
 import { HospitalSort, SearchHospitalsDto } from './dto/search-hospitals.dto'
-
-type QueueStatus = 'Open' | 'Paused' | 'Closed'
-
-type DoctorView = {
-  id: string
-  name: string
-}
-
-type DepartmentView = {
-  id: string
-  name: string
-  doctors: DoctorView[]
-}
-
-type HospitalRecord = {
-  id: string
-  name: string
-  address: string
-  phone: string
-  lat: number
-  lng: number
-  queueStatus: QueueStatus
-  currentWaiting: number
-  estimatedWaitMin: number
-  lastUpdatedAt: string
-  departments: DepartmentView[]
-}
-
-type HospitalSearchView = {
-  id: string
-  name: string
-  address: string
-  phone: string
-  lat: number
-  lng: number
-  distanceKm: number
-  estimatedWaitMin: number
-  currentWaiting: number
-  queueStatus: QueueStatus
-  lastUpdatedAt: string
-  departments: Array<{ id: string; name: string }>
-}
-
-const HOSPITALS: HospitalRecord[] = [
-  {
-    id: 'h-100',
-    name: 'Downtown Walk-In Clinic',
-    address: '120 King St W, Toronto',
-    phone: '+1-416-555-0101',
-    lat: 43.6476,
-    lng: -79.3816,
-    queueStatus: 'Open',
-    currentWaiting: 4,
-    estimatedWaitMin: 18,
-    lastUpdatedAt: new Date().toISOString(),
-    departments: [
-      {
-        id: 'dept-family',
-        name: 'Family care',
-        doctors: [
-          { id: 'doc-green', name: 'Dr. Green' },
-          { id: 'doc-kim', name: 'Dr. Kim' },
-        ],
-      },
-      {
-        id: 'dept-urgent',
-        name: 'Urgent care',
-        doctors: [{ id: 'doc-patel', name: 'Dr. Patel' }],
-      },
-    ],
-  },
-  {
-    id: 'h-101',
-    name: 'Harbourfront Medical Centre',
-    address: '55 Queens Quay W, Toronto',
-    phone: '+1-416-555-0134',
-    lat: 43.6408,
-    lng: -79.3807,
-    queueStatus: 'Open',
-    currentWaiting: 2,
-    estimatedWaitMin: 11,
-    lastUpdatedAt: new Date().toISOString(),
-    departments: [
-      {
-        id: 'dept-family-2',
-        name: 'Family care',
-        doctors: [{ id: 'doc-ross', name: 'Dr. Ross' }],
-      },
-      {
-        id: 'dept-pediatrics',
-        name: 'Pediatrics',
-        doctors: [{ id: 'doc-smith', name: 'Dr. Smith' }],
-      },
-    ],
-  },
-  {
-    id: 'h-102',
-    name: 'West End Community Clinic',
-    address: '890 Dundas St W, Toronto',
-    phone: '+1-416-555-0188',
-    lat: 43.6505,
-    lng: -79.4142,
-    queueStatus: 'Paused',
-    currentWaiting: 7,
-    estimatedWaitMin: 26,
-    lastUpdatedAt: new Date().toISOString(),
-    departments: [
-      {
-        id: 'dept-urgent-2',
-        name: 'Urgent care',
-        doctors: [{ id: 'doc-ali', name: 'Dr. Ali' }],
-      },
-    ],
-  },
-]
 
 function toRadians(value: number) {
   return (value * Math.PI) / 180
@@ -147,71 +34,182 @@ function queueStatusRank(status: QueueStatus) {
   }
 }
 
-function toSearchView(hospital: HospitalRecord, lat: number, lng: number): HospitalSearchView {
-  return {
-    id: hospital.id,
-    name: hospital.name,
-    address: hospital.address,
-    phone: hospital.phone,
-    lat: hospital.lat,
-    lng: hospital.lng,
-    distanceKm: Number(distanceKm(lat, lng, hospital.lat, hospital.lng).toFixed(2)),
-    estimatedWaitMin: hospital.estimatedWaitMin,
-    currentWaiting: hospital.currentWaiting,
-    queueStatus: hospital.queueStatus,
-    lastUpdatedAt: hospital.lastUpdatedAt,
-    departments: hospital.departments.map((department) => ({
-      id: department.id,
-      name: department.name,
-    })),
-  }
+type HospitalView = {
+  id: string
+  name: string
+  address: string
+  phone: string
+  lat: number
+  lng: number
+  queueStatus: QueueStatus
+  departments: Array<{ id: string; name: string }>
+  currentWaiting: number
+  estimatedWaitMin: number
+  lastUpdatedAt: string
+  distanceKm: number
 }
 
 @Injectable()
 export class HospitalsService {
-  search(query: SearchHospitalsDto) {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async search(query: SearchHospitalsDto) {
+    const hospitals = await this.prisma.hospital.findMany({
+      include: {
+        departments: {
+          select: {
+            id: true,
+            name: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
+        queues: {
+          include: {
+            tickets: {
+              where: {
+                status: {
+                  in: [...ACTIVE_TICKET_STATUSES],
+                },
+              },
+              select: {
+                ticketNumber: true,
+              },
+            },
+            waitSnapshots: {
+              orderBy: {
+                capturedAt: 'desc',
+              },
+              take: 1,
+              select: {
+                averageMinutes: true,
+                capturedAt: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
     const keyword = query.keyword?.trim().toLowerCase() ?? ''
     const departmentKeyword = query.departmentName?.trim().toLowerCase() ?? ''
 
-    const filtered = HOSPITALS.filter((hospital) => {
-      if (departmentKeyword) {
-        const hasDepartment = hospital.departments.some((department) =>
+    const filtered = hospitals
+      .filter((hospital) => {
+        if (!departmentKeyword) {
+          return true
+        }
+
+        return hospital.departments.some((department) =>
           department.name.toLowerCase().includes(departmentKeyword),
         )
-
-        if (!hasDepartment) {
-          return false
+      })
+      .filter((hospital) => {
+        if (!keyword) {
+          return true
         }
-      }
 
-      if (!keyword) {
-        return true
-      }
+        const departmentNames = hospital.departments.map((department) => department.name.toLowerCase())
+        return (
+          hospital.name.toLowerCase().includes(keyword) ||
+          hospital.address.toLowerCase().includes(keyword) ||
+          departmentNames.some((name) => name.includes(keyword))
+        )
+      })
+      .map<HospitalView>((hospital) => {
+        const distance = distanceKm(query.lat, query.lng, hospital.lat, hospital.lng)
+        const currentWaiting = hospital.queues.reduce((sum, queue) => sum + queue.tickets.length, 0)
+        const latestSnapshot = hospital.queues
+          .flatMap((queue) => queue.waitSnapshots)
+          .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())[0]
+        const avgMin = latestSnapshot?.averageMinutes ?? hospital.avgMin
 
-      const departmentNames = hospital.departments.map((department) => department.name.toLowerCase())
-      return (
-        hospital.name.toLowerCase().includes(keyword) ||
-        hospital.address.toLowerCase().includes(keyword) ||
-        departmentNames.some((name) => name.includes(keyword))
-      )
-    })
-      .map((hospital) => toSearchView(hospital, query.lat, query.lng))
+        return {
+          id: hospital.id,
+          name: hospital.name,
+          address: hospital.address,
+          phone: hospital.phone,
+          lat: hospital.lat,
+          lng: hospital.lng,
+          queueStatus: hospital.queueStatus as QueueStatus,
+          departments: hospital.departments,
+          currentWaiting,
+          estimatedWaitMin: currentWaiting * avgMin,
+          lastUpdatedAt: (latestSnapshot?.capturedAt ?? hospital.updatedAt).toISOString(),
+          distanceKm: Number(distance.toFixed(2)),
+        }
+      })
       .filter((hospital) => hospital.distanceKm <= query.radiusKm)
 
     return this.sortHospitals(filtered, query.sortBy)
   }
 
-  getDepartmentNames() {
-    return [...new Set(HOSPITALS.flatMap((hospital) => hospital.departments.map((department) => department.name)))].sort(
-      (a, b) => a.localeCompare(b),
-    )
+  async getDepartmentNames() {
+    const departments = await this.prisma.department.findMany({
+      distinct: ['name'],
+      orderBy: {
+        name: 'asc',
+      },
+      select: {
+        name: true,
+      },
+    })
+
+    return departments.map((department) => department.name)
   }
 
-  getHospitalById(hospitalId: string) {
-    const hospital = HOSPITALS.find((item) => item.id === hospitalId)
+  async getHospitalById(hospitalId: string) {
+    const hospital = await this.prisma.hospital.findUnique({
+      where: {
+        id: hospitalId,
+      },
+      include: {
+        departments: {
+          orderBy: {
+            name: 'asc',
+          },
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        queues: {
+          include: {
+            tickets: {
+              where: {
+                status: {
+                  in: [...ACTIVE_TICKET_STATUSES],
+                },
+              },
+              select: {
+                id: true,
+              },
+            },
+            waitSnapshots: {
+              orderBy: {
+                capturedAt: 'desc',
+              },
+              take: 1,
+              select: {
+                averageMinutes: true,
+                capturedAt: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
     if (!hospital) {
       throw new NotFoundException('Hospital not found')
     }
+
+    const currentWaiting = hospital.queues.reduce((sum, queue) => sum + queue.tickets.length, 0)
+    const latestSnapshot = hospital.queues
+      .flatMap((queue) => queue.waitSnapshots)
+      .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())[0]
+    const avgMin = latestSnapshot?.averageMinutes ?? hospital.avgMin
 
     return {
       id: hospital.id,
@@ -220,33 +218,59 @@ export class HospitalsService {
       phone: hospital.phone,
       lat: hospital.lat,
       lng: hospital.lng,
-      queueStatus: hospital.queueStatus,
-      departments: hospital.departments.map((department) => ({ id: department.id, name: department.name })),
-      currentWaiting: hospital.currentWaiting,
-      estimatedWaitMin: hospital.estimatedWaitMin,
-      lastUpdatedAt: hospital.lastUpdatedAt,
+      queueStatus: hospital.queueStatus as QueueStatus,
+      departments: hospital.departments,
+      currentWaiting,
+      estimatedWaitMin: currentWaiting * avgMin,
+      lastUpdatedAt: (latestSnapshot?.capturedAt ?? hospital.updatedAt).toISOString(),
     }
   }
 
-  getDepartments(hospitalId: string) {
-    const hospital = HOSPITALS.find((item) => item.id === hospitalId)
+  async getDepartments(hospitalId: string) {
+    const hospital = await this.prisma.hospital.findUnique({
+      where: { id: hospitalId },
+      include: {
+        departments: {
+          orderBy: {
+            name: 'asc',
+          },
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    })
+
     if (!hospital) {
       throw new NotFoundException('Hospital not found')
     }
 
     return {
       hospitalId: hospital.id,
-      departments: hospital.departments.map((department) => ({ id: department.id, name: department.name })),
+      departments: hospital.departments,
     }
   }
 
-  getDoctors(hospitalId: string, departmentId: string) {
-    const hospital = HOSPITALS.find((item) => item.id === hospitalId)
-    if (!hospital) {
-      throw new NotFoundException('Hospital not found')
-    }
+  async getDoctors(hospitalId: string, departmentId: string) {
+    const department = await this.prisma.department.findFirst({
+      where: {
+        id: departmentId,
+        hospitalId,
+      },
+      include: {
+        doctors: {
+          orderBy: {
+            name: 'asc',
+          },
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    })
 
-    const department = hospital.departments.find((item) => item.id === departmentId)
     if (!department) {
       throw new NotFoundException('Department not found in hospital')
     }
@@ -258,7 +282,7 @@ export class HospitalsService {
     }
   }
 
-  private sortHospitals(items: HospitalSearchView[], sortBy: HospitalSort) {
+  private sortHospitals(items: HospitalView[], sortBy: HospitalSort) {
     const sorted = [...items]
 
     if (sortBy === 'wait') {

@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common'
+import { Body, Controller, Headers, Post } from '@nestjs/common'
 
 import { AnalyzeSymptomsDto } from './dto/analyze-symptoms.dto'
 import { SymptomsService } from './symptoms.service'
@@ -8,8 +8,17 @@ export class SymptomsController {
   constructor(private readonly symptomsService: SymptomsService) {}
 
   @Post('analyze')
-  analyze(@Body() body: AnalyzeSymptomsDto) {
+  async analyze(@Body() body: AnalyzeSymptomsDto, @Headers('x-user-id') userId?: string) {
     const result = this.symptomsService.analyze(body.symptomText)
+
+    await this.symptomsService.saveHistory({
+      customerId: userId?.trim() || null,
+      symptomText: body.symptomText,
+      urgencyLevel: result.urgencyLevel,
+      recommendedDepartment: result.recommendedDepartment,
+      recommendation: result.recommendation,
+      confidence: result.confidence,
+    })
 
     return {
       ...result,

@@ -1,4 +1,5 @@
-import type { HospitalOverview, HospitalSearchSort } from '../types/hospital'
+import type { DepartmentInfo, HospitalOverview, HospitalSearchSort, OperatingStatus } from '../types/hospital'
+import { ApiError, apiRequest } from './apiClient'
 
 type SearchInput = {
   lat: number
@@ -14,123 +15,178 @@ export type HospitalQueueSnapshot = Pick<
   'id' | 'name' | 'address' | 'phone' | 'operatingStatus' | 'currentWaiting' | 'estimatedWaitMin' | 'lastUpdatedAt'
 >
 
-const MOCK_HOSPITALS: HospitalOverview[] = [
-  {
-    id: 'h-001',
-    name: 'Downtown Walk-In Clinic',
-    address: '123 King St W, Toronto, ON',
-    phone: '416-555-0100',
-    lat: 43.6487,
-    lng: -79.3817,
-    distanceKm: 0.7,
-    estimatedWaitMin: 12,
-    currentWaiting: 6,
-    operatingStatus: 'open',
-    lastUpdatedAt: new Date().toISOString(),
-    departments: [
-      { id: 'd-001', name: 'Family Medicine', doctors: ['Dr. Lee', 'Dr. Chen'] },
-      { id: 'd-002', name: 'Dermatology', doctors: ['Dr. Park'] },
-    ],
-  },
-  {
-    id: 'h-002',
-    name: 'Harbourfront Medical Centre',
-    address: '88 Queens Quay W, Toronto, ON',
-    phone: '416-555-0110',
-    lat: 43.6407,
-    lng: -79.3815,
-    distanceKm: 1.5,
-    estimatedWaitMin: 24,
-    currentWaiting: 11,
-    operatingStatus: 'open',
-    lastUpdatedAt: new Date().toISOString(),
-    departments: [
-      { id: 'd-003', name: 'Pediatrics', doctors: ['Dr. Brown'] },
-      { id: 'd-004', name: 'Family Medicine', doctors: ['Dr. Patel'] },
-    ],
-  },
-  {
-    id: 'h-003',
-    name: 'West End Community Clinic',
-    address: '455 Bloor St W, Toronto, ON',
-    phone: '416-555-0120',
-    lat: 43.6669,
-    lng: -79.4074,
-    distanceKm: 3.2,
-    estimatedWaitMin: 35,
-    currentWaiting: 18,
-    operatingStatus: 'paused',
-    lastUpdatedAt: new Date().toISOString(),
-    departments: [
-      { id: 'd-005', name: 'Urgent Care', doctors: ['Dr. Singh'] },
-      { id: 'd-006', name: 'Family Medicine', doctors: ['Dr. Wilson'] },
-    ],
-  },
-]
+type BackendQueueStatus = 'Open' | 'Paused' | 'Closed'
 
-function includesText(source: string, keyword?: string) {
-  if (!keyword) {
-    return true
-  }
-
-  return source.toLowerCase().includes(keyword.trim().toLowerCase())
+type BackendDepartmentSummary = {
+  id: string
+  name: string
 }
 
-export async function searchNearbyHospitals(input: SearchInput): Promise<HospitalOverview[]> {
-  const filtered = MOCK_HOSPITALS.filter((hospital) => {
-    const matchesKeyword =
-      !input.keyword ||
-      includesText(hospital.name, input.keyword) ||
-      includesText(hospital.address, input.keyword)
-
-    const matchesDepartment =
-      !input.departmentName ||
-      hospital.departments.some((department) => includesText(department.name, input.departmentName))
-
-    return matchesKeyword && matchesDepartment && hospital.distanceKm <= input.radiusKm
-  })
-
-  const ranked = [...filtered]
-
-  if (input.sortBy === 'wait') {
-    ranked.sort((a, b) => a.estimatedWaitMin - b.estimatedWaitMin)
-  } else if (input.sortBy === 'status') {
-    const score = { open: 0, closing_soon: 1, paused: 2, closed: 3 }
-    ranked.sort((a, b) => score[a.operatingStatus] - score[b.operatingStatus] || a.distanceKm - b.distanceKm)
-  } else {
-    ranked.sort((a, b) => a.distanceKm - b.distanceKm)
-  }
-
-  return ranked
+type BackendDoctor = {
+  id: string
+  name: string
 }
 
-export async function getHospitalQueueSnapshotById(id: string): Promise<HospitalQueueSnapshot | null> {
-  const hospital = MOCK_HOSPITALS.find((item) => item.id === id)
-  if (!hospital) {
-    return null
+type BackendHospitalSearchResult = {
+  id: string
+  name: string
+  address: string
+  phone: string
+  lat: number
+  lng: number
+  distanceKm: number
+  estimatedWaitMin: number
+  currentWaiting: number
+  queueStatus: BackendQueueStatus
+  lastUpdatedAt: string
+  departments: BackendDepartmentSummary[]
+}
+
+type BackendHospitalDetail = {
+  id: string
+  name: string
+  address: string
+  phone: string
+  lat: number
+  lng: number
+  queueStatus: BackendQueueStatus
+  currentWaiting: number
+  estimatedWaitMin: number
+  lastUpdatedAt: string
+  departments: BackendDepartmentSummary[]
+}
+
+type BackendDepartmentResponse = {
+  hospitalId: string
+  departments: BackendDepartmentSummary[]
+}
+
+type BackendDoctorsResponse = {
+  hospitalId: string
+  departmentId: string
+  doctors: BackendDoctor[]
+}
+
+function mapOperatingStatus(status: BackendQueueStatus): OperatingStatus {
+  switch (status) {
+    case 'Open':
+      return 'open'
+    case 'Paused':
+      return 'paused'
+    case 'Closed':
+      return 'closed'
+    default:
+      return 'closing_soon'
+  }
+}
+
+function normalizeDepartmentName(value?: string) {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return undefined
   }
 
+  switch (normalized.toLowerCase()) {
+    case 'family medicine':
+      return 'Family care'
+    case 'urgent care':
+    case 'emergency medicine':
+      return 'Urgent care'
+    case 'internal medicine':
+    case 'dermatology':
+    case 'ent':
+      return undefined
+    default:
+      return normalized
+  }
+}
+
+function mapHospitalOverview(hospital: BackendHospitalSearchResult): HospitalOverview {
   return {
     id: hospital.id,
     name: hospital.name,
     address: hospital.address,
     phone: hospital.phone,
-    operatingStatus: hospital.operatingStatus,
+    lat: hospital.lat,
+    lng: hospital.lng,
+    distanceKm: hospital.distanceKm,
+    estimatedWaitMin: hospital.estimatedWaitMin,
+    currentWaiting: hospital.currentWaiting,
+    operatingStatus: mapOperatingStatus(hospital.queueStatus),
+    lastUpdatedAt: hospital.lastUpdatedAt,
+    departments: hospital.departments.map((department) => ({
+      id: department.id,
+      name: department.name,
+      doctors: [],
+    })),
+  }
+}
+
+function mapHospitalSnapshot(hospital: BackendHospitalDetail): HospitalQueueSnapshot {
+  return {
+    id: hospital.id,
+    name: hospital.name,
+    address: hospital.address,
+    phone: hospital.phone,
+    operatingStatus: mapOperatingStatus(hospital.queueStatus),
     currentWaiting: hospital.currentWaiting,
     estimatedWaitMin: hospital.estimatedWaitMin,
     lastUpdatedAt: hospital.lastUpdatedAt,
   }
 }
 
-export async function getHospitalDepartmentsWithDoctors(hospitalId: string) {
-  const hospital = MOCK_HOSPITALS.find((item) => item.id === hospitalId)
-  if (!hospital) {
-    return []
-  }
+export async function searchNearbyHospitals(input: SearchInput): Promise<HospitalOverview[]> {
+  const hospitals = await apiRequest<BackendHospitalSearchResult[]>('/hospitals/search', {
+    query: {
+      lat: input.lat,
+      lng: input.lng,
+      radiusKm: input.radiusKm,
+      departmentName: normalizeDepartmentName(input.departmentName),
+      keyword: input.keyword?.trim() || undefined,
+      sortBy: input.sortBy,
+    },
+  })
 
-  return hospital.departments.map((department) => ({
-    id: department.id,
-    name: department.name,
-    doctors: department.doctors,
-  }))
+  return hospitals.map(mapHospitalOverview)
+}
+
+export async function getHospitalQueueSnapshotById(id: string): Promise<HospitalQueueSnapshot | null> {
+  try {
+    const hospital = await apiRequest<BackendHospitalDetail>(`/hospitals/${encodeURIComponent(id)}`)
+    return mapHospitalSnapshot(hospital)
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null
+    }
+
+    throw error
+  }
+}
+
+export async function getHospitalDepartmentsWithDoctors(hospitalId: string): Promise<DepartmentInfo[]> {
+  try {
+    const { departments } = await apiRequest<BackendDepartmentResponse>(
+      `/hospitals/${encodeURIComponent(hospitalId)}/departments`,
+    )
+
+    return Promise.all(
+      departments.map(async (department) => {
+        const detail = await apiRequest<BackendDoctorsResponse>(
+          `/hospitals/${encodeURIComponent(hospitalId)}/departments/${encodeURIComponent(department.id)}/doctors`,
+        )
+
+        return {
+          id: department.id,
+          name: department.name,
+          doctors: detail.doctors.map((doctor) => doctor.name),
+        }
+      }),
+    )
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return []
+    }
+
+    throw error
+  }
 }

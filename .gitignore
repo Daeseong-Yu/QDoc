@@ -10,6 +10,7 @@ coverage/
 # Environment files
 .env.local
 .env.*.local
+.env.example
 
 # Logs
 npm-debug.log*
@@ -24,3 +25,4 @@ pnpm-debug.log*
 *.suo
 Thumbs.db
 .DS_Store
+

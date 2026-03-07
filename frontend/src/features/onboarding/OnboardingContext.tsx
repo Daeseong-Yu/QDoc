@@ -175,7 +175,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
 
     const getEntryPath = () => {
       if (!state || !state.completed.family) {
-        return '/family'
+        return '/'
       }
 
       if (!state.completed.symptoms) {
@@ -186,7 +186,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
         return '/hospitals'
       }
 
-      return '/queue'
+      return '/queue/room'
     }
 
     const completeFamilyStep = () => {
@@ -219,6 +219,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
           selectedHospitalId: '',
           completed: {
             ...current.completed,
+            family: true,
             symptoms: true,
             hospitals: false,
           },
@@ -237,6 +238,8 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
           selectedHospitalId: hospitalId,
           completed: {
             ...current.completed,
+            family: true,
+            symptoms: true,
             hospitals: true,
           },
         }

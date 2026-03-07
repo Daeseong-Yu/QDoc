@@ -17,13 +17,12 @@ type NavItem = {
   id: CustomerMenu
   label: string
   to: string
-  icon: string
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'home', label: 'Home', to: '/', icon: '⌂' },
-  { id: 'hospitals', label: 'Find Hospitals', to: '/hospitals', icon: '+' },
-  { id: 'ai', label: 'AI Health Consult', to: '/symptoms', icon: '◍' },
+  { id: 'home', label: 'Home', to: '/' },
+  { id: 'hospitals', label: 'Find Hospitals', to: '/hospitals' },
+  { id: 'ai', label: 'AI Health Consult', to: '/symptoms' },
 ]
 
 export function CustomerShell({
@@ -67,7 +66,7 @@ export function CustomerShell({
         <form className="customer-search-form" onSubmit={handleSearchSubmit}>
           <div className="customer-search-box">
             <span className="search-icon" aria-hidden="true">
-              ⌕
+              Search
             </span>
             <input
               type="text"
@@ -83,7 +82,7 @@ export function CustomerShell({
                 aria-label="Clear search"
                 onClick={() => onSearchKeywordChange('')}
               >
-                ×
+                Clear
               </button>
             ) : null}
           </div>
@@ -107,9 +106,6 @@ export function CustomerShell({
                   className={`side-nav-item${item.id === activeMenu ? ' active' : ''}`}
                   end={item.to === '/'}
                 >
-                  <span className="side-nav-icon" aria-hidden="true">
-                    {item.icon}
-                  </span>
                   <span>{item.label}</span>
                 </NavLink>
               </li>

@@ -32,4 +32,3 @@ export type QueueEnrollErrorCode =
   | 'QUEUE_UNAVAILABLE'
   | 'DUPLICATE_ACTIVE_TICKET'
   | 'INVALID_TARGET'
-

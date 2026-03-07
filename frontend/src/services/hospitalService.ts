@@ -1,4 +1,4 @@
-import type { DepartmentInfo, HospitalOverview, HospitalSearchSort } from '../types/hospital'
+import type { HospitalOverview, HospitalSearchSort } from '../types/hospital'
 
 type SearchInput = {
   lat: number
@@ -9,143 +9,92 @@ type SearchInput = {
   sortBy: HospitalSearchSort
 }
 
-type HospitalQueueSnapshot = Pick<
-  HospitalOverview,
-  | 'id'
-  | 'name'
-  | 'address'
-  | 'phone'
-  | 'operatingStatus'
-  | 'currentWaiting'
-  | 'estimatedWaitMin'
-  | 'lastUpdatedAt'
->
-
-const DEPARTMENTS: DepartmentInfo[] = [
-  { id: 'dept-family', name: 'Family care', doctors: ['Dr. Green', 'Dr. Kim'] },
-  { id: 'dept-urgent', name: 'Urgent care', doctors: ['Dr. Patel'] },
-  { id: 'dept-pediatrics', name: 'Pediatrics', doctors: ['Dr. Smith'] },
-]
-
-const HOSPITALS: HospitalOverview[] = [
+const MOCK_HOSPITALS: HospitalOverview[] = [
   {
-    id: 'h-100',
+    id: 'h-001',
     name: 'Downtown Walk-In Clinic',
-    address: '120 King St W, Toronto',
-    phone: '+1-416-555-0101',
-    lat: 43.6476,
-    lng: -79.3816,
-    distanceKm: 0.6,
-    estimatedWaitMin: 18,
-    currentWaiting: 4,
+    address: '123 King St W, Toronto, ON',
+    phone: '416-555-0100',
+    lat: 43.6487,
+    lng: -79.3817,
+    distanceKm: 0.7,
+    estimatedWaitMin: 12,
+    currentWaiting: 6,
     operatingStatus: 'open',
     lastUpdatedAt: new Date().toISOString(),
-    departments: [DEPARTMENTS[0], DEPARTMENTS[1]],
+    departments: [
+      { id: 'd-001', name: 'Family Medicine', doctors: ['Dr. Lee', 'Dr. Chen'] },
+      { id: 'd-002', name: 'Dermatology', doctors: ['Dr. Park'] },
+    ],
   },
   {
-    id: 'h-101',
+    id: 'h-002',
     name: 'Harbourfront Medical Centre',
-    address: '55 Queens Quay W, Toronto',
-    phone: '+1-416-555-0134',
-    lat: 43.6408,
-    lng: -79.3807,
-    distanceKm: 1.4,
-    estimatedWaitMin: 11,
-    currentWaiting: 2,
+    address: '88 Queens Quay W, Toronto, ON',
+    phone: '416-555-0110',
+    lat: 43.6407,
+    lng: -79.3815,
+    distanceKm: 1.5,
+    estimatedWaitMin: 24,
+    currentWaiting: 11,
     operatingStatus: 'open',
     lastUpdatedAt: new Date().toISOString(),
-    departments: [DEPARTMENTS[0], DEPARTMENTS[2]],
+    departments: [
+      { id: 'd-003', name: 'Pediatrics', doctors: ['Dr. Brown'] },
+      { id: 'd-004', name: 'Family Medicine', doctors: ['Dr. Patel'] },
+    ],
   },
   {
-    id: 'h-102',
+    id: 'h-003',
     name: 'West End Community Clinic',
-    address: '890 Dundas St W, Toronto',
-    phone: '+1-416-555-0188',
-    lat: 43.6505,
-    lng: -79.4142,
+    address: '455 Bloor St W, Toronto, ON',
+    phone: '416-555-0120',
+    lat: 43.6669,
+    lng: -79.4074,
     distanceKm: 3.2,
-    estimatedWaitMin: 26,
-    currentWaiting: 7,
-    operatingStatus: 'closing_soon',
+    estimatedWaitMin: 35,
+    currentWaiting: 18,
+    operatingStatus: 'paused',
     lastUpdatedAt: new Date().toISOString(),
-    departments: [DEPARTMENTS[1]],
+    departments: [
+      { id: 'd-005', name: 'Urgent Care', doctors: ['Dr. Singh'] },
+      { id: 'd-006', name: 'Family Medicine', doctors: ['Dr. Wilson'] },
+    ],
   },
 ]
 
-function matchKeyword(hospital: HospitalOverview, keyword?: string) {
+function includesText(source: string, keyword?: string) {
   if (!keyword) {
     return true
   }
 
-  const normalized = keyword.trim().toLowerCase()
-  if (!normalized) {
-    return true
-  }
-
-  return [hospital.name, hospital.address, ...hospital.departments.map((department) => department.name)]
-    .join(' ')
-    .toLowerCase()
-    .includes(normalized)
-}
-
-function matchDepartment(hospital: HospitalOverview, departmentName?: string) {
-  if (!departmentName) {
-    return true
-  }
-
-  const normalized = departmentName.trim().toLowerCase()
-  if (!normalized) {
-    return true
-  }
-
-  return hospital.departments.some((department) => department.name.toLowerCase().includes(normalized))
-}
-
-function sortHospitals(items: HospitalOverview[], sortBy: HospitalSearchSort) {
-  const next = [...items]
-
-  if (sortBy === 'wait') {
-    next.sort((a, b) => a.estimatedWaitMin - b.estimatedWaitMin)
-    return next
-  }
-
-  if (sortBy === 'status') {
-    const rank = { open: 0, closing_soon: 1, paused: 2, closed: 3 } as const
-    next.sort((a, b) => rank[a.operatingStatus] - rank[b.operatingStatus] || a.distanceKm - b.distanceKm)
-    return next
-  }
-
-  next.sort((a, b) => a.distanceKm - b.distanceKm)
-  return next
+  return source.toLowerCase().includes(keyword.trim().toLowerCase())
 }
 
 export async function searchNearbyHospitals(input: SearchInput): Promise<HospitalOverview[]> {
-  const filtered = HOSPITALS.filter(
-    (hospital) => matchKeyword(hospital, input.keyword) && matchDepartment(hospital, input.departmentName),
-  )
+  const filtered = MOCK_HOSPITALS.filter((hospital) => {
+    const matchesKeyword =
+      !input.keyword ||
+      includesText(hospital.name, input.keyword) ||
+      includesText(hospital.address, input.keyword)
 
-  return sortHospitals(filtered, input.sortBy)
-}
+    const matchesDepartment =
+      !input.departmentName ||
+      hospital.departments.some((department) => includesText(department.name, input.departmentName))
 
-export async function getHospitalQueueSnapshotById(id: string): Promise<HospitalQueueSnapshot | null> {
-  const hospital = HOSPITALS.find((item) => item.id === id)
-  if (!hospital) {
-    return null
+    return matchesKeyword && matchesDepartment && hospital.distanceKm <= input.radiusKm
+  })
+
+  const ranked = [...filtered]
+
+  if (input.sortBy === 'wait') {
+    ranked.sort((a, b) => a.estimatedWaitMin - b.estimatedWaitMin)
+  } else if (input.sortBy === 'status') {
+    const score = { open: 0, closing_soon: 1, paused: 2, closed: 3 }
+    ranked.sort((a, b) => score[a.operatingStatus] - score[b.operatingStatus] || a.distanceKm - b.distanceKm)
+  } else {
+    ranked.sort((a, b) => a.distanceKm - b.distanceKm)
   }
 
-  return {
-    id: hospital.id,
-    name: hospital.name,
-    address: hospital.address,
-    phone: hospital.phone,
-    operatingStatus: hospital.operatingStatus,
-    currentWaiting: hospital.currentWaiting,
-    estimatedWaitMin: hospital.estimatedWaitMin,
-    lastUpdatedAt: hospital.lastUpdatedAt,
-  }
-}
-
-export async function getHospitalDepartmentsWithDoctors(hospitalId: string) {
-  const hospital = HOSPITALS.find((item) => item.id === hospitalId)
-  return hospital?.departments ?? []
+  return ranked
 }

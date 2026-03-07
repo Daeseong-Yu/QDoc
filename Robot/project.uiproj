@@ -1,0 +1,6 @@
+{
+  "Name": "QDoc_Robot",
+  "ProjectType": "Process",
+  "Description": "빈 프로세스",
+  "MainFile": "Main.xaml"
+}

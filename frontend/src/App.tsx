@@ -1,12 +1,11 @@
-import './index.css'
+import { AuthProvider } from './features/auth/AuthContext'
+import { AppRouter } from './routes/AppRouter'
 
 function App() {
   return (
-    <main className="app-root">
-      <div className="app-shell">
-        <h1>QDoc</h1>
-      </div>
-    </main>
+    <AuthProvider>
+      <AppRouter />
+    </AuthProvider>
   )
 }
 

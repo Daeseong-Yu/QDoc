@@ -1,10 +1,13 @@
 import { AuthProvider } from './features/auth/AuthContext'
+import { OnboardingProvider } from './features/onboarding/OnboardingContext'
 import { AppRouter } from './routes/AppRouter'
 
 function App() {
   return (
     <AuthProvider>
-      <AppRouter />
+      <OnboardingProvider>
+        <AppRouter />
+      </OnboardingProvider>
     </AuthProvider>
   )
 }

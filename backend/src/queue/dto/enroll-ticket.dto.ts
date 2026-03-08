@@ -5,12 +5,12 @@ export type QueueTargetType = (typeof QUEUE_TARGET_TYPES)[number]
 
 export class EnrollTicketDto {
   @IsString()
-  @Length(3, 50)
+  @Length(1, 50)
   hospitalId!: string
 
   @IsOptional()
   @IsString()
-  @Length(3, 50)
+  @Length(1, 50)
   departmentId?: string
 
   @IsEnum(QUEUE_TARGET_TYPES)
@@ -22,6 +22,7 @@ export class EnrollTicketDto {
 
   @IsOptional()
   @IsString()
-  @Length(3, 50)
+  @Length(1, 50)
   familyMemberId?: string
 }
+

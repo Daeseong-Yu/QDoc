@@ -10,7 +10,9 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma db push --force-reset && npm run db:seed"
+    "db:reset": "npm run db:ensure && npm run db:wipe && prisma db push --accept-data-loss --skip-generate && npm run db:seed",
+    "db:ensure": "tsx scripts/ensure-database.ts",
+    "db:wipe": "tsx scripts/reset-database.ts"
   },
   "type": "commonjs",
   "dependencies": {

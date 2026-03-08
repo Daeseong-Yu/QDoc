@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+async function createProcedure(sql: string) {
+  const escapedSql = sql.replace(/'/g, "''")
+  await prisma.$executeRawUnsafe(`EXEC(N'${escapedSql}')`)
+}
+
 async function main() {
   await prisma.notification.deleteMany()
   await prisma.patientQueue.deleteMany()
@@ -18,8 +23,8 @@ async function main() {
     ],
   })
 
-  await prisma.$executeRawUnsafe(`
-    CREATE OR ALTER PROCEDURE dbo.usp_JoinQueue
+  await createProcedure(`
+    CREATE PROCEDURE dbo.usp_JoinQueue
       @ClinicID INT,
       @PatientName NVARCHAR(50)
     AS
@@ -36,8 +41,8 @@ async function main() {
     END;
   `)
 
-  await prisma.$executeRawUnsafe(`
-    CREATE OR ALTER PROCEDURE dbo.usp_SendRank3Alert
+  await createProcedure(`
+    CREATE PROCEDURE dbo.usp_SendRank3Alert
       @ClinicID INT
     AS
     BEGIN

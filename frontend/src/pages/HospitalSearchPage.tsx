@@ -124,6 +124,10 @@ export function HospitalSearchPage() {
   }, [searchKeyword])
 
   function moveToQueueRegistration(hospital: HospitalOverview) {
+    if (hospital.operatingStatus !== 'open') {
+      return
+    }
+
     flushSync(() => {
       completeHospitalStep(hospital.id)
     })
@@ -212,8 +216,10 @@ export function HospitalSearchPage() {
                   type="button"
                   className="hospital-list-action"
                   onClick={() => moveToQueueRegistration(hospital)}
+                  disabled={hospital.operatingStatus !== 'open'}
+                  aria-disabled={hospital.operatingStatus !== 'open'}
                 >
-                  Check in
+                  {hospital.operatingStatus === 'open' ? 'Check in' : 'Unavailable'}
                 </button>
               </div>
             </article>

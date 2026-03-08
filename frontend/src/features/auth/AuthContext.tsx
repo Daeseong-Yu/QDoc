@@ -245,11 +245,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       authMethod,
       sessionMessage: auth0.errorMessage ?? sessionMessage,
       login: (input) => {
-        setSession(createSession(input))
+        const nextSession = createSession(input)
+        saveSession(nextSession)
+        setSession(nextSession)
         setSessionMessage(null)
       },
       startDevSession: () => {
-        setSession(createDevSession())
+        const nextSession = createDevSession()
+        saveSession(nextSession)
+        setSession(nextSession)
         setSessionMessage(null)
       },
       startAuth0Login: async (returnTo = '/') => {
@@ -258,12 +262,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       },
       logout: (returnTo = '/login') => {
         if (authMethod === 'auth0') {
+          saveSession(null)
           setSession(null)
           setSessionMessage(null)
           auth0.startLogout(returnTo)
           return
         }
-
+        saveSession(null)
         setSession(null)
         setSessionMessage(null)
       },
@@ -289,3 +294,5 @@ export function AuthProvider({ children }: AuthProviderProps) {
 }
 
 export { AuthContext }
+
+

@@ -1,18 +1,21 @@
-import { Body, Controller, Headers, Post } from '@nestjs/common'
+import { Body, Controller, Inject, Post, Req } from '@nestjs/common'
 
+import type { AuthenticatedRequest } from '../auth/authenticated-request'
+import { Roles } from '../auth/roles.decorator'
 import { AnalyzeSymptomsDto } from './dto/analyze-symptoms.dto'
 import { SymptomsService } from './symptoms.service'
 
 @Controller('symptoms')
 export class SymptomsController {
-  constructor(private readonly symptomsService: SymptomsService) {}
+  constructor(@Inject(SymptomsService) private readonly symptomsService: SymptomsService) {}
 
   @Post('analyze')
-  async analyze(@Body() body: AnalyzeSymptomsDto, @Headers('x-user-id') userId?: string) {
+  @Roles('patient', 'staff', 'admin')
+  async analyze(@Body() body: AnalyzeSymptomsDto, @Req() request: AuthenticatedRequest) {
     const result = this.symptomsService.analyze(body.symptomText)
 
     await this.symptomsService.saveHistory({
-      customerId: userId?.trim() || null,
+      customerId: request.user?.authUserId,
       symptomText: body.symptomText,
       urgencyLevel: result.urgencyLevel,
       recommendedDepartment: result.recommendedDepartment,
@@ -28,3 +31,5 @@ export class SymptomsController {
     }
   }
 }
+
+

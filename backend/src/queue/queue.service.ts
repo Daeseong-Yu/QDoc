@@ -2,313 +2,156 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 
+import { AuthenticatedUser } from '../auth/auth.types'
 import { ACTIVE_TICKET_STATUSES, OPEN_QUEUE_STATUS } from '../common/contracts'
 import { PrismaService } from '../prisma/prisma.service'
 import { CancelTicketDto } from './dto/cancel-ticket.dto'
 import { EnrollTicketDto } from './dto/enroll-ticket.dto'
-import { QueueGateway } from './queue.gateway'
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto'
+import { NotificationService } from './notification.service'
+import { QueueGateway } from './queue.gateway'
+import { WaitTimeService } from './wait-time.service'
 
-type UserContext = {
-  id: string
-  name: string
-}
+const ENROLL_MAX_RETRIES = 3
+const ENROLL_LOCK_TIMEOUT_MS = 8_000
+const ENROLL_LOCK_TIMEOUT_ERROR = 'QUEUE_ENROLL_LOCK_TIMEOUT'
+const ENROLL_BUSY_MESSAGE = 'Queue enrollment is busy. Please retry.'
 
-type WaitSummary = {
-  peopleAhead: number
-  avgMin: number
-  estimatedWaitMin: number
-}
-
-type PatientQueueRecord = Prisma.PatientQueueGetPayload<{
-  include: {
-    clinic: true
-  }
-}>
-
-const WAITING_DB_STATUS = 'Waiting'
-const INSIDE_DB_STATUS = 'Inside'
-const COMPLETED_DB_STATUS = 'Completed'
-const CANCELED_DB_STATUS = 'Canceled'
-
-function isRetryableEnrollError(error: unknown) {
+function hasPrismaErrorCode(error: unknown, code: string) {
   return Boolean(
     error &&
       typeof error === 'object' &&
       'code' in error &&
-      ['P2034', 'P2002'].includes(String((error as { code?: unknown }).code)),
+      (error as { code?: unknown }).code === code,
   )
 }
 
-function toDbStatus(status: string) {
-  switch (status) {
-    case 'Called':
-    case 'InService':
-      return INSIDE_DB_STATUS
-    case 'Done':
-    case 'NoShow':
-      return COMPLETED_DB_STATUS
-    case 'Cancelled':
-      return CANCELED_DB_STATUS
-    default:
-      return WAITING_DB_STATUS
+function isRetryableEnrollError(error: unknown) {
+  if (hasPrismaErrorCode(error, 'P2034')) {
+    return true
   }
-}
 
-function toApiStatus(status: string) {
-  switch (status) {
-    case INSIDE_DB_STATUS:
-      return 'InService'
-    case COMPLETED_DB_STATUS:
-      return 'Done'
-    case CANCELED_DB_STATUS:
-      return 'Cancelled'
-    default:
-      return 'Waiting'
+  if (hasPrismaErrorCode(error, 'P2002')) {
+    return true
   }
-}
 
-function isActiveDbStatus(status: string | null | undefined) {
-  return status === WAITING_DB_STATUS || status === INSIDE_DB_STATUS
+  return error instanceof Error && error.message === ENROLL_LOCK_TIMEOUT_ERROR
 }
 
 @Injectable()
 export class QueueService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly queueGateway: QueueGateway,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(WaitTimeService) private readonly waitTimeService: WaitTimeService,
+    @Inject(NotificationService) private readonly notificationService: NotificationService,
+    @Inject(QueueGateway) private readonly queueGateway: QueueGateway,
   ) {}
 
-  async listMyTickets(user: UserContext) {
-    const tickets = await this.prisma.patientQueue.findMany({
+  async enroll(user: AuthenticatedUser, input: EnrollTicketDto) {
+    if (input.targetType !== 'self') {
+      throw new BadRequestException('MVP supports self target only')
+    }
+
+    const customer = await this.getOrCreateCustomer(user)
+    const queue = await this.selectQueue(input.hospitalId, input.departmentId)
+
+    if (queue.status !== OPEN_QUEUE_STATUS) {
+      throw new BadRequestException('Queue is not accepting new registrations')
+    }
+
+    const ticket = await this.createTicketWithConcurrencyControl(queue.id, customer.id)
+
+    const wait = await this.waitTimeService.calculateTicketWait(ticket.id)
+    if (!wait) {
+      throw new NotFoundException('Unable to calculate wait time')
+    }
+
+    const notifications = await this.notificationService.evaluateStages(
+      ticket.id,
+      wait.peopleAhead,
+      wait.estimatedWaitMin,
+    )
+
+    await this.broadcastQueueSummary(queue.id)
+
+    return {
+      ticket,
+      wait,
+      notifications,
+    }
+  }
+
+  async listMyTickets(user: AuthenticatedUser) {
+    const customer = await this.getOrCreateCustomer(user)
+
+    const tickets = await this.prisma.queueTicket.findMany({
       where: {
-        patientName: user.name,
+        customerId: customer.id,
       },
       include: {
-        clinic: true,
+        queue: {
+          include: {
+            hospital: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+                queueStatus: true,
+              },
+            },
+            department: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        familyMember: {
+          select: {
+            id: true,
+            name: true,
+            relationship: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
       },
     })
 
-    return Promise.all(
+    const withWait = await Promise.all(
       tickets.map(async (ticket) => {
-        const wait = await this.calculateWait(ticket)
-        return this.toApiTicket(ticket, wait)
+        const wait = await this.waitTimeService.calculateTicketWait(ticket.id)
+
+        return {
+          ...ticket,
+          wait,
+        }
       }),
     )
+
+    return withWait
   }
 
-  async getTicket(ticketId: string) {
-    const ticket = await this.getTicketRecord(ticketId)
-    const wait = await this.calculateWait(ticket)
-    return this.toApiTicket(ticket, wait)
-  }
-
-  async enroll(user: UserContext, input: EnrollTicketDto) {
-    if (input.targetType !== 'self') {
-      throw new BadRequestException('Current queue storage supports self target only')
-    }
-
-    const clinic = await this.getClinic(input.hospitalId)
-    if (!clinic) {
-      throw new NotFoundException('Hospital not found')
-    }
-
-    if (OPEN_QUEUE_STATUS !== 'Open') {
-      throw new BadRequestException('Queue is not accepting new registrations')
-    }
-
-    const duplicate = await this.prisma.patientQueue.findFirst({
-      where: {
-        patientName: user.name,
-        status: {
-          in: [WAITING_DB_STATUS, INSIDE_DB_STATUS],
-        },
-      },
+  async getTicket(ticketId: string, user?: AuthenticatedUser) {
+    const ticket = await this.prisma.queueTicket.findUnique({
+      where: { id: ticketId },
       include: {
-        clinic: true,
-      },
-    })
-
-    if (duplicate) {
-      throw new ConflictException('You already have an active queue ticket for this target')
-    }
-
-    let created: PatientQueueRecord | null = null
-
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      try {
-        await this.prisma.$transaction(
-          async (tx) => {
-            await tx.$executeRaw`
-              EXEC dbo.usp_JoinQueue @ClinicID = ${clinic.clinicId}, @PatientName = ${user.name}
-            `
-          },
-          {
-            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-          },
-        )
-
-        created = await this.prisma.patientQueue.findFirst({
-          where: {
-            clinicId: clinic.clinicId,
-            patientName: user.name,
-            status: WAITING_DB_STATUS,
-          },
+        queue: {
           include: {
-            clinic: true,
+            hospital: true,
+            department: true,
           },
-          orderBy: {
-            queueId: 'desc',
-          },
-        })
-
-        if (created) {
-          break
-        }
-      } catch (error) {
-        if (error instanceof ConflictException) {
-          throw error
-        }
-
-        if (!isRetryableEnrollError(error) || attempt === 3) {
-          throw error
-        }
-      }
-    }
-
-    if (!created) {
-      throw new ConflictException('Queue enrollment could not be completed')
-    }
-
-    await this.syncClinicWaitCount(created.clinicId)
-    await this.generateRank3Alert(created.clinicId)
-
-    const wait = await this.calculateWait(created)
-    this.queueGateway.emitQueueUpdated(await this.createQueueSummary(created.clinicId))
-
-    return {
-      ticket: {
-        id: String(created.queueId),
-        ticketNumber: created.queueId,
-        familyMemberId: null,
-        status: toApiStatus(created.status ?? WAITING_DB_STATUS),
-        createdAt: created.createdAt.toISOString(),
-        updatedAt: created.createdAt.toISOString(),
-        cancelledReason: null,
-      },
-      wait,
-      notifications: ['Queue registration completed.'],
-    }
-  }
-
-  async cancel(ticketId: string, user: UserContext, input: CancelTicketDto) {
-    const ticket = await this.getTicketRecord(ticketId)
-    this.assertTicketAccess(ticket, user)
-
-    if (!isActiveDbStatus(ticket.status)) {
-      throw new BadRequestException('Only active tickets can be cancelled')
-    }
-
-    const updated = await this.prisma.patientQueue.update({
-      where: {
-        queueId: ticket.queueId,
-      },
-      data: {
-        status: CANCELED_DB_STATUS,
-      },
-      include: {
-        clinic: true,
-      },
-    })
-
-    await this.syncClinicWaitCount(updated.clinicId)
-    await this.generateRank3Alert(updated.clinicId)
-
-    this.queueGateway.emitTicketCancelled({
-      ticketId: String(updated.queueId),
-      queueId: this.getQueueChannelId(updated.clinicId),
-      reason: input.reason?.trim() || 'Cancelled by customer',
-      status: toApiStatus(updated.status ?? CANCELED_DB_STATUS),
-      updatedAt: new Date().toISOString(),
-    })
-    this.queueGateway.emitQueueUpdated(await this.createQueueSummary(updated.clinicId))
-
-    const wait = await this.calculateWait(updated)
-    return this.toApiTicket(updated, wait, input.reason?.trim() || 'Cancelled by customer')
-  }
-
-  async updateStatus(ticketId: string, input: UpdateTicketStatusDto) {
-    const ticket = await this.getTicketRecord(ticketId)
-    const nextStatus = toDbStatus(input.status)
-
-    const updated = await this.prisma.patientQueue.update({
-      where: {
-        queueId: ticket.queueId,
-      },
-      data: {
-        status: nextStatus,
-      },
-      include: {
-        clinic: true,
-      },
-    })
-
-    await this.syncClinicWaitCount(updated.clinicId)
-    await this.generateRank3Alert(updated.clinicId)
-
-    if (input.status === 'Called' || input.status === 'InService') {
-      this.queueGateway.emitTicketCalled({
-        ticketId: String(updated.queueId),
-        queueId: this.getQueueChannelId(updated.clinicId),
-        status: toApiStatus(updated.status ?? INSIDE_DB_STATUS),
-        updatedAt: new Date().toISOString(),
-      })
-    }
-
-    if (input.status === 'Cancelled') {
-      this.queueGateway.emitTicketCancelled({
-        ticketId: String(updated.queueId),
-        queueId: this.getQueueChannelId(updated.clinicId),
-        reason: 'Cancelled by staff',
-        status: toApiStatus(updated.status ?? CANCELED_DB_STATUS),
-        updatedAt: new Date().toISOString(),
-      })
-    }
-
-    this.queueGateway.emitQueueUpdated(await this.createQueueSummary(updated.clinicId))
-
-    const wait = await this.calculateWait(updated)
-    return {
-      ticket: this.toApiTicket(updated, wait, input.status === 'Cancelled' ? 'Cancelled by staff' : null),
-      wait,
-    }
-  }
-
-  private async getClinic(hospitalId: string) {
-    const clinicId = this.parseClinicId(hospitalId)
-    return this.prisma.clinic.findUnique({
-      where: {
-        clinicId,
-      },
-    })
-  }
-
-  private async getTicketRecord(ticketId: string) {
-    const queueId = this.parseQueueId(ticketId)
-    const ticket = await this.prisma.patientQueue.findUnique({
-      where: {
-        queueId,
-      },
-      include: {
-        clinic: true,
+        },
+        customer: true,
+        familyMember: true,
       },
     })
 
@@ -316,155 +159,286 @@ export class QueueService {
       throw new NotFoundException('Ticket not found')
     }
 
-    return ticket
-  }
-
-  private async calculateWait(ticket: {
-    queueId: number
-    clinicId: number
-    status: string | null
-  }): Promise<WaitSummary> {
-    const clinic = await this.prisma.clinic.findUnique({
-      where: {
-        clinicId: ticket.clinicId,
-      },
-      include: {
-        patientQueues: {
-          where: {
-            status: WAITING_DB_STATUS,
-          },
-          orderBy: [
-            { createdAt: 'asc' },
-            { queueId: 'asc' },
-          ],
-          select: {
-            queueId: true,
-          },
-        },
-      },
-    })
-
-    if (!clinic) {
-      throw new NotFoundException('Queue not found')
+    if (user) {
+      await this.assertTicketAccess(ticket.id, user)
     }
 
-    const avgMin = clinic.avgConsultTimeMinutes
-    if (ticket.status !== WAITING_DB_STATUS) {
-      return {
-        peopleAhead: 0,
-        avgMin,
-        estimatedWaitMin: 0,
-      }
-    }
+    const wait = await this.waitTimeService.calculateTicketWait(ticket.id)
 
-    const peopleAhead = clinic.patientQueues.filter((item) => item.queueId < ticket.queueId).length
     return {
-      peopleAhead,
-      avgMin,
-      estimatedWaitMin: peopleAhead * avgMin,
-    }
-  }
-
-  private toApiTicket(ticket: PatientQueueRecord, wait: WaitSummary, cancelledReason: string | null = null) {
-    return {
-      id: String(ticket.queueId),
-      queueId: this.getQueueChannelId(ticket.clinicId),
-      familyMemberId: null,
-      status: toApiStatus(ticket.status ?? WAITING_DB_STATUS),
-      ticketNumber: ticket.queueId,
-      cancelledReason,
-      createdAt: ticket.createdAt.toISOString(),
-      updatedAt: ticket.createdAt.toISOString(),
-      queue: {
-        id: this.getQueueChannelId(ticket.clinicId),
-        avgMin: wait.avgMin,
-        hospital: {
-          id: String(ticket.clinicId),
-          name: ticket.clinic.name ?? `Clinic ${ticket.clinicId}`,
-        },
-      },
-      familyMember: null,
+      ...ticket,
       wait,
     }
   }
 
-  private assertTicketAccess(ticket: PatientQueueRecord, user: UserContext) {
-    if ((ticket.patientName ?? '') !== user.name) {
+  async cancel(ticketId: string, user: AuthenticatedUser, input: CancelTicketDto) {
+    await this.assertTicketAccess(ticketId, user)
+
+    const ticket = await this.prisma.queueTicket.findUnique({
+      where: { id: ticketId },
+    })
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found')
+    }
+
+    if (!ACTIVE_TICKET_STATUSES.includes(ticket.status as (typeof ACTIVE_TICKET_STATUSES)[number])) {
+      throw new BadRequestException('Only active tickets can be cancelled')
+    }
+
+    const updated = await this.prisma.queueTicket.update({
+      where: {
+        id: ticketId,
+      },
+      data: {
+        status: 'Cancelled',
+        cancelledReason: input.reason?.trim() || 'Cancelled by customer',
+      },
+    })
+
+    this.queueGateway.emitTicketCancelled({
+      ticketId: updated.id,
+      queueId: updated.queueId,
+      reason: updated.cancelledReason,
+      status: updated.status,
+      updatedAt: updated.updatedAt.toISOString(),
+    })
+
+    await this.broadcastQueueSummary(updated.queueId)
+
+    return updated
+  }
+
+  async updateStatus(ticketId: string, _user: AuthenticatedUser, input: UpdateTicketStatusDto) {
+    const ticket = await this.prisma.queueTicket.findUnique({
+      where: { id: ticketId },
+    })
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found')
+    }
+
+    const updated = await this.prisma.queueTicket.update({
+      where: {
+        id: ticketId,
+      },
+      data: {
+        status: input.status,
+        calledAt: input.status === 'Called' ? new Date() : ticket.calledAt,
+        completedAt: ['Done', 'NoShow'].includes(input.status) ? new Date() : ticket.completedAt,
+      },
+    })
+
+    if (input.status === 'Called') {
+      this.queueGateway.emitTicketCalled({
+        ticketId: updated.id,
+        queueId: updated.queueId,
+        status: updated.status,
+        calledAt: updated.calledAt?.toISOString() ?? null,
+      })
+    }
+
+    const wait = await this.waitTimeService.calculateTicketWait(ticketId)
+    if (wait) {
+      await this.notificationService.evaluateStages(ticketId, wait.peopleAhead, wait.estimatedWaitMin)
+    }
+
+    await this.broadcastQueueSummary(updated.queueId)
+
+    return {
+      ticket: updated,
+      wait,
+    }
+  }
+
+  private async selectQueue(hospitalId: string, departmentId?: string) {
+    const hospital = await this.prisma.hospital.findUnique({
+      where: { id: hospitalId },
+    })
+
+    if (!hospital) {
+      throw new NotFoundException('Hospital not found')
+    }
+
+    if (hospital.queueStatus !== OPEN_QUEUE_STATUS) {
+      throw new BadRequestException('Hospital queue is currently unavailable')
+    }
+
+    if (departmentId) {
+      const byDepartment = await this.prisma.queue.findFirst({
+        where: {
+          hospitalId,
+          departmentId,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      })
+
+      if (!byDepartment) {
+        throw new NotFoundException('Queue for department not found')
+      }
+
+      return byDepartment
+    }
+
+    const queue = await this.prisma.queue.findFirst({
+      where: {
+        hospitalId,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    })
+
+    if (!queue) {
+      throw new NotFoundException('Queue not found for hospital')
+    }
+
+    return queue
+  }
+
+  private async createTicketWithConcurrencyControl(queueId: string, customerId: string) {
+    for (let attempt = 1; attempt <= ENROLL_MAX_RETRIES; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            const lockRows = await tx.$queryRaw<Array<{ lockResult: number }>>`
+              DECLARE @lockResult INT;
+              EXEC @lockResult = sp_getapplock
+                @Resource = ${`queue-enroll:${queueId}`},
+                @LockMode = 'Exclusive',
+                @LockOwner = 'Transaction',
+                @LockTimeout = ${ENROLL_LOCK_TIMEOUT_MS};
+              SELECT @lockResult AS lockResult;
+            `
+
+            const lockResult = lockRows[0]?.lockResult ?? -999
+            if (lockResult < 0) {
+              throw new Error(ENROLL_LOCK_TIMEOUT_ERROR)
+            }
+
+            const duplicate = await tx.queueTicket.findFirst({
+              where: {
+                queueId,
+                status: {
+                  in: ACTIVE_TICKET_STATUSES,
+                },
+                customerId,
+                familyMemberId: null,
+              },
+            })
+
+            if (duplicate) {
+              throw new ConflictException('You already have an active queue ticket for this target')
+            }
+
+            const latestTicket = await tx.queueTicket.findFirst({
+              where: {
+                queueId,
+              },
+              orderBy: {
+                ticketNumber: 'desc',
+              },
+              select: {
+                ticketNumber: true,
+              },
+            })
+
+            const nextTicketNumber = (latestTicket?.ticketNumber ?? 100) + 1
+
+            return tx.queueTicket.create({
+              data: {
+                queueId,
+                customerId,
+                familyMemberId: null,
+                status: 'Waiting',
+                ticketNumber: nextTicketNumber,
+              },
+            })
+          },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          },
+        )
+      } catch (error) {
+        if (error instanceof ConflictException) {
+          throw error
+        }
+
+        if (isRetryableEnrollError(error)) {
+          if (attempt < ENROLL_MAX_RETRIES) {
+            continue
+          }
+
+          throw new ConflictException(ENROLL_BUSY_MESSAGE)
+        }
+
+        throw error
+      }
+    }
+
+    throw new ConflictException(ENROLL_BUSY_MESSAGE)
+  }
+
+  private async getOrCreateCustomer(user: AuthenticatedUser) {
+    const existing = await this.prisma.customer.findFirst({
+      where: {
+        OR: [{ authUserId: user.authUserId }, { id: user.id }],
+      },
+    })
+
+    if (existing) {
+      return existing
+    }
+
+    return this.prisma.customer.create({
+      data: {
+        id: user.id,
+        authUserId: user.authUserId,
+        name: user.name,
+      },
+    })
+  }
+
+  private async assertTicketAccess(ticketId: string, user: AuthenticatedUser) {
+    if (user.roles.includes('admin') || user.roles.includes('staff')) {
+      return
+    }
+
+    const customer = await this.getOrCreateCustomer(user)
+
+    const ticket = await this.prisma.queueTicket.findUnique({
+      where: { id: ticketId },
+      select: {
+        customerId: true,
+      },
+    })
+
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found')
+    }
+
+    if (ticket.customerId !== customer.id) {
       throw new ForbiddenException('Ticket does not belong to current user')
     }
   }
 
-  private async syncClinicWaitCount(clinicId: number) {
-    const waitingCount = await this.prisma.patientQueue.count({
-      where: {
-        clinicId,
-        status: WAITING_DB_STATUS,
-      },
-    })
+  private async broadcastQueueSummary(queueId: string) {
+    const summary = await this.waitTimeService.calculateQueueSummary(queueId)
 
-    await this.prisma.clinic.update({
-      where: {
-        clinicId,
-      },
-      data: {
-        totalWaitCount: waitingCount,
-      },
-    })
-  }
-
-  private async generateRank3Alert(clinicId: number) {
-    await this.prisma.$executeRaw`
-      EXEC dbo.usp_SendRank3Alert @ClinicID = ${clinicId}
-    `
-  }
-
-  private async createQueueSummary(clinicId: number) {
-    const clinic = await this.prisma.clinic.findUnique({
-      where: {
-        clinicId,
-      },
-    })
-
-    if (!clinic) {
-      throw new NotFoundException('Hospital not found')
+    if (!summary) {
+      return
     }
 
-    const waitingCount = await this.prisma.patientQueue.count({
-      where: {
-        clinicId,
-        status: WAITING_DB_STATUS,
-      },
-    })
-
-    return {
-      queueId: this.getQueueChannelId(clinicId),
-      hospitalId: String(clinicId),
-      waitingCount,
-      avgMin: clinic.avgConsultTimeMinutes,
-      estimatedWaitMin: waitingCount * clinic.avgConsultTimeMinutes,
+    this.queueGateway.emitQueueUpdated({
+      queueId: summary.queueId,
+      hospitalId: summary.hospitalId,
+      waitingCount: summary.waitingCount,
+      avgMin: summary.avgMin,
+      estimatedWaitMin: summary.estimatedWaitMin,
       emittedAt: new Date().toISOString(),
-    }
-  }
-
-  private getQueueChannelId(clinicId: number) {
-    return `clinic-${clinicId}`
-  }
-
-  private parseClinicId(hospitalId: string) {
-    const clinicId = Number(hospitalId)
-    if (!Number.isInteger(clinicId) || clinicId <= 0) {
-      throw new NotFoundException('Hospital not found')
-    }
-
-    return clinicId
-  }
-
-  private parseQueueId(ticketId: string) {
-    const queueId = Number(ticketId)
-    if (!Number.isInteger(queueId) || queueId <= 0) {
-      throw new NotFoundException('Ticket not found')
-    }
-
-    return queueId
+    })
   }
 }
+

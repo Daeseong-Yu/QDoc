@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
 import { PrismaService } from '../prisma/prisma.service'
 
@@ -11,7 +11,7 @@ type SymptomAnalysisResult = {
 
 @Injectable()
 export class SymptomsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   analyze(symptomText: string): SymptomAnalysisResult {
     const normalized = symptomText.toLowerCase()
@@ -56,7 +56,7 @@ export class SymptomsService {
       return {
         urgencyLevel: 'medium',
         recommendedDepartment: 'ENT',
-        recommendation: 'ENT department is recommended for ear, nose, or throat symptoms.',
+        recommendation: 'ENT department is recommended for ear/nose/throat symptoms.',
         confidence: 0.77,
       }
     }
@@ -79,7 +79,7 @@ export class SymptomsService {
   }
 
   async saveHistory(input: {
-    customerId?: string | null
+    customerId?: string
     symptomText: string
     urgencyLevel: string
     recommendedDepartment: string
@@ -88,8 +88,7 @@ export class SymptomsService {
   }) {
     return this.prisma.symptomAnalysisHistory.create({
       data: {
-        id: this.createId(),
-        customerId: input.customerId ?? null,
+        customerId: input.customerId,
         symptomText: input.symptomText,
         urgencyLevel: input.urgencyLevel,
         recommendedDepartment: input.recommendedDepartment,
@@ -98,8 +97,5 @@ export class SymptomsService {
       },
     })
   }
-
-  private createId() {
-    return `symptom-${Date.now()}-${Math.round(Math.random() * 1000)}`
-  }
 }
+

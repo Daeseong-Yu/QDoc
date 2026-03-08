@@ -8,18 +8,18 @@ datasource db {
 }
 
 model Customer {
-  id            String                 @id @db.VarChar(64)
-  authUserId    String?                @unique @db.VarChar(191)
-  name          String                 @db.NVarChar(100)
-  phone         String?                @db.VarChar(32)
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
+  id            String         @id @default(cuid()) @db.VarChar(64)
+  authUserId    String?        @unique @db.VarChar(191)
+  name          String         @db.NVarChar(100)
+  phone         String?        @db.VarChar(32)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   familyMembers FamilyMember[]
   queueTickets  QueueTicket[]
 }
 
 model FamilyMember {
-  id           String        @id @db.VarChar(64)
+  id           String        @id @default(cuid()) @db.VarChar(64)
   customerId   String        @db.VarChar(64)
   name         String        @db.NVarChar(100)
   relationship String        @db.NVarChar(40)
@@ -69,7 +69,7 @@ model Doctor {
 }
 
 model Queue {
-  id            String             @id @db.VarChar(64)
+  id            String             @id @default(cuid()) @db.VarChar(64)
   hospitalId    String             @db.VarChar(64)
   departmentId  String?            @db.VarChar(64)
   status        String             @default("Open") @db.VarChar(20)
@@ -85,7 +85,7 @@ model Queue {
 }
 
 model QueueTicket {
-  id               String            @id @db.VarChar(64)
+  id               String            @id @default(cuid()) @db.VarChar(64)
   queueId          String            @db.VarChar(64)
   customerId       String            @db.VarChar(64)
   familyMemberId   String?           @db.VarChar(64)
@@ -107,7 +107,7 @@ model QueueTicket {
 }
 
 model WaitTimeSnapshot {
-  id             String   @id @db.VarChar(64)
+  id             String   @id @default(cuid()) @db.VarChar(64)
   hospitalId     String   @db.VarChar(64)
   queueId        String?  @db.VarChar(64)
   source         String   @db.VarChar(40)
@@ -121,7 +121,7 @@ model WaitTimeSnapshot {
 }
 
 model NotificationLog {
-  id       String      @id @db.VarChar(64)
+  id       String      @id @default(cuid()) @db.VarChar(64)
   ticketId String      @db.VarChar(64)
   stage    String      @db.VarChar(20)
   sentAt   DateTime    @default(now())
@@ -131,7 +131,7 @@ model NotificationLog {
 }
 
 model SymptomAnalysisHistory {
-  id                    String   @id @db.VarChar(64)
+  id                    String   @id @default(cuid()) @db.VarChar(64)
   customerId            String?  @db.VarChar(64)
   symptomText           String   @db.NVarChar(1000)
   urgencyLevel          String   @db.VarChar(20)

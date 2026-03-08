@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Inject, Injectable, NotFoundException } from '@nestjs/common'
 
 import { ACTIVE_TICKET_STATUSES, QueueStatus } from '../common/contracts'
 import { PrismaService } from '../prisma/prisma.service'
@@ -51,7 +51,7 @@ type HospitalView = {
 
 @Injectable()
 export class HospitalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async search(query: SearchHospitalsDto) {
     const hospitals = await this.prisma.hospital.findMany({
@@ -61,20 +61,17 @@ export class HospitalsService {
             id: true,
             name: true,
           },
-          orderBy: {
-            name: 'asc',
-          },
         },
         queues: {
           include: {
             tickets: {
               where: {
                 status: {
-                  in: [...ACTIVE_TICKET_STATUSES],
+                  in: ACTIVE_TICKET_STATUSES,
                 },
               },
               select: {
-                ticketNumber: true,
+                status: true,
               },
             },
             waitSnapshots: {
@@ -119,10 +116,13 @@ export class HospitalsService {
       })
       .map<HospitalView>((hospital) => {
         const distance = distanceKm(query.lat, query.lng, hospital.lat, hospital.lng)
-        const currentWaiting = hospital.queues.reduce((sum, queue) => sum + queue.tickets.length, 0)
+
+        const waiting = hospital.queues.reduce((sum, queue) => sum + queue.tickets.length, 0)
+
         const latestSnapshot = hospital.queues
           .flatMap((queue) => queue.waitSnapshots)
           .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())[0]
+
         const avgMin = latestSnapshot?.averageMinutes ?? hospital.avgMin
 
         return {
@@ -134,8 +134,8 @@ export class HospitalsService {
           lng: hospital.lng,
           queueStatus: hospital.queueStatus as QueueStatus,
           departments: hospital.departments,
-          currentWaiting,
-          estimatedWaitMin: currentWaiting * avgMin,
+          currentWaiting: waiting,
+          estimatedWaitMin: waiting * avgMin,
           lastUpdatedAt: (latestSnapshot?.capturedAt ?? hospital.updatedAt).toISOString(),
           distanceKm: Number(distance.toFixed(2)),
         }
@@ -145,20 +145,6 @@ export class HospitalsService {
     return this.sortHospitals(filtered, query.sortBy)
   }
 
-  async getDepartmentNames() {
-    const departments = await this.prisma.department.findMany({
-      distinct: ['name'],
-      orderBy: {
-        name: 'asc',
-      },
-      select: {
-        name: true,
-      },
-    })
-
-    return departments.map((department) => department.name)
-  }
-
   async getHospitalById(hospitalId: string) {
     const hospital = await this.prisma.hospital.findUnique({
       where: {
@@ -166,12 +152,12 @@ export class HospitalsService {
       },
       include: {
         departments: {
-          orderBy: {
-            name: 'asc',
-          },
           select: {
             id: true,
             name: true,
+          },
+          orderBy: {
+            name: 'asc',
           },
         },
         queues: {
@@ -179,7 +165,7 @@ export class HospitalsService {
             tickets: {
               where: {
                 status: {
-                  in: [...ACTIVE_TICKET_STATUSES],
+                  in: ACTIVE_TICKET_STATUSES,
                 },
               },
               select: {
@@ -205,10 +191,11 @@ export class HospitalsService {
       throw new NotFoundException('Hospital not found')
     }
 
-    const currentWaiting = hospital.queues.reduce((sum, queue) => sum + queue.tickets.length, 0)
+    const waiting = hospital.queues.reduce((sum, queue) => sum + queue.tickets.length, 0)
     const latestSnapshot = hospital.queues
       .flatMap((queue) => queue.waitSnapshots)
       .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())[0]
+
     const avgMin = latestSnapshot?.averageMinutes ?? hospital.avgMin
 
     return {
@@ -218,12 +205,26 @@ export class HospitalsService {
       phone: hospital.phone,
       lat: hospital.lat,
       lng: hospital.lng,
-      queueStatus: hospital.queueStatus as QueueStatus,
+      queueStatus: hospital.queueStatus,
       departments: hospital.departments,
-      currentWaiting,
-      estimatedWaitMin: currentWaiting * avgMin,
+      currentWaiting: waiting,
+      estimatedWaitMin: waiting * avgMin,
       lastUpdatedAt: (latestSnapshot?.capturedAt ?? hospital.updatedAt).toISOString(),
     }
+  }
+
+  async getDepartmentNames() {
+    const departments = await this.prisma.department.findMany({
+      distinct: ['name'],
+      orderBy: {
+        name: 'asc',
+      },
+      select: {
+        name: true,
+      },
+    })
+
+    return departments.map((department) => department.name)
   }
 
   async getDepartments(hospitalId: string) {
@@ -233,10 +234,6 @@ export class HospitalsService {
         departments: {
           orderBy: {
             name: 'asc',
-          },
-          select: {
-            id: true,
-            name: true,
           },
         },
       },
@@ -262,10 +259,6 @@ export class HospitalsService {
         doctors: {
           orderBy: {
             name: 'asc',
-          },
-          select: {
-            id: true,
-            name: true,
           },
         },
       },
@@ -301,3 +294,4 @@ export class HospitalsService {
     return sorted
   }
 }
+

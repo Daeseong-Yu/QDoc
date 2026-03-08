@@ -6,10 +6,6 @@ import { WS_EVENTS } from '../common/contracts'
 
 @WebSocketGateway({
   namespace: '/queue',
-  cors: {
-    origin: true,
-    credentials: true,
-  },
 })
 @Injectable()
 export class QueueGateway {
@@ -19,29 +15,18 @@ export class QueueGateway {
   server!: Server
 
   emitQueueUpdated(payload: Record<string, unknown>) {
-    if (!this.server) {
-      return
-    }
-
     this.server.emit(WS_EVENTS.queueUpdated, payload)
     this.logger.debug(`${WS_EVENTS.queueUpdated}: ${JSON.stringify(payload)}`)
   }
 
   emitTicketCalled(payload: Record<string, unknown>) {
-    if (!this.server) {
-      return
-    }
-
     this.server.emit(WS_EVENTS.ticketCalled, payload)
     this.logger.debug(`${WS_EVENTS.ticketCalled}: ${JSON.stringify(payload)}`)
   }
 
   emitTicketCancelled(payload: Record<string, unknown>) {
-    if (!this.server) {
-      return
-    }
-
     this.server.emit(WS_EVENTS.ticketCancelled, payload)
     this.logger.debug(`${WS_EVENTS.ticketCancelled}: ${JSON.stringify(payload)}`)
   }
 }
+

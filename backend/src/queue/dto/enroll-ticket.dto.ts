@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer'
 import { IsEnum, IsOptional, IsString, Length } from 'class-validator'
 
 export const QUEUE_TARGET_TYPES = ['self', 'family'] as const
@@ -16,6 +17,7 @@ export class EnrollTicketDto {
   @IsEnum(QUEUE_TARGET_TYPES)
   targetType!: QueueTargetType
 
+  @Type(() => String)
   @IsString()
   @Length(1, 80)
   targetName!: string

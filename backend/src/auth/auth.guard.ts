@@ -30,8 +30,9 @@ export class AuthGuard implements CanActivate {
     const authorization = request.headers.authorization
 
     if (!authorization) {
-      if (this.isDevBypassEnabled()) {
-        request.user = this.createDevUser(request)
+      const bypassUser = this.tryCreateBypassUser(request)
+      if (bypassUser) {
+        request.user = bypassUser
         return true
       }
 
@@ -58,6 +59,10 @@ export class AuthGuard implements CanActivate {
     return token
   }
 
+  private isLocalBypassEnabled() {
+    return String(this.configService.get('AUTH_LOCAL_BYPASS') ?? '').toLowerCase() === 'true'
+  }
+
   private isDevBypassEnabled() {
     const enabled = String(this.configService.get('AUTH_DEV_BYPASS') ?? '').toLowerCase() === 'true'
     const nodeEnv = (this.configService.get<string>('NODE_ENV') ?? process.env.NODE_ENV ?? 'development').toLowerCase()
@@ -70,23 +75,45 @@ export class AuthGuard implements CanActivate {
     return enabled
   }
 
-  private createDevUser(request: AuthenticatedRequest): AuthenticatedUser {
-    const roleHeader = request.headers['x-dev-role']
-    const rawRole = Array.isArray(roleHeader) ? roleHeader[0] : roleHeader
+  private isHeaderBypassEnabled() {
+    return this.isLocalBypassEnabled() || this.isDevBypassEnabled()
+  }
+
+  private tryCreateBypassUser(request: AuthenticatedRequest): AuthenticatedUser | null {
+    if (!this.isHeaderBypassEnabled()) {
+      return null
+    }
+
+    const rawRole = this.readHeader(request, 'x-local-role', 'x-dev-role')
     const role = rawRole && isUserRole(rawRole) ? rawRole : 'patient'
 
-    const userIdHeader = request.headers['x-dev-user-id']
-    const rawUserId = Array.isArray(userIdHeader) ? userIdHeader[0] : userIdHeader
+    const rawUserId = this.readHeader(request, 'x-local-user-id', 'x-dev-user-id')
+    const rawName = this.readHeader(request, 'x-local-name', 'x-dev-name')
 
-    const nameHeader = request.headers['x-dev-name']
-    const rawName = Array.isArray(nameHeader) ? nameHeader[0] : nameHeader
+    if (!rawUserId && !rawName) {
+      return null
+    }
+
+    const normalizedId = rawUserId ?? rawName?.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') ?? 'local-user'
 
     return {
-      id: rawUserId ?? 'dev-user',
-      name: rawName ?? 'Development User',
+      id: normalizedId,
+      name: rawName ?? 'QDoc User',
       roles: [role],
-      authUserId: rawUserId ?? 'dev-user',
+      authUserId: normalizedId,
     }
+  }
+
+  private readHeader(request: AuthenticatedRequest, ...headerNames: string[]) {
+    for (const headerName of headerNames) {
+      const value = request.headers[headerName]
+      const normalized = Array.isArray(value) ? value[0] : value
+      if (typeof normalized === 'string' && normalized.trim()) {
+        return normalized.trim()
+      }
+    }
+
+    return undefined
   }
 
   private async verifyToken(token: string): Promise<JWTPayload> {
@@ -135,4 +162,3 @@ export class AuthGuard implements CanActivate {
     }
   }
 }
-

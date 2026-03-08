@@ -16,7 +16,7 @@ export function LoginPage() {
   const {
     isAuthenticated,
     isAuth0Available,
-    isDevAuthBypass,
+    isLocalAuthEnabled,
     isReady,
     login,
     startAuth0Login,
@@ -31,6 +31,14 @@ export function LoginPage() {
   const [formError, setFormError] = useState<string | null>(null)
 
   const from = state.from ?? '/'
+  const infoMessage = sessionMessage ?? state.reason
+  const introText = isAuth0Available
+    ? isLocalAuthEnabled
+      ? 'Continue with Auth0 or use a local account.'
+      : 'Continue with Auth0 to access QDoc.'
+    : isLocalAuthEnabled
+      ? 'Use your local account to continue.'
+      : 'Authentication is not configured for this environment.'
 
   if (!isReady) {
     return (
@@ -47,8 +55,6 @@ export function LoginPage() {
   if (isAuthenticated) {
     return <Navigate to={from} replace />
   }
-
-  const infoMessage = sessionMessage ?? state.reason
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -73,7 +79,7 @@ export function LoginPage() {
     navigate(from, { replace: true })
   }
 
-  function handleDevSession() {
+  function handleGuestSession() {
     startDevSession()
     clearSessionMessage()
     navigate(from, { replace: true })
@@ -90,11 +96,7 @@ export function LoginPage() {
       <section className="auth-card">
         <p className="brand-kicker">QDoc</p>
         <h2>Sign in or join</h2>
-        <p className="muted">
-          {isAuth0Available
-            ? 'Continue with Auth0 for production-style sign-in, or use a local account only when dev bypass is enabled.'
-            : 'Use a local account for MVP testing. Auth0 becomes available once the frontend domain and client ID are configured.'}
-        </p>
+        <p className="muted">{introText}</p>
 
         {infoMessage ? <p className="info-banner">{infoMessage}</p> : null}
         {formError ? <p className="error-banner">{formError}</p> : null}
@@ -109,11 +111,11 @@ export function LoginPage() {
           </section>
         ) : null}
 
-        {isDevAuthBypass ? (
+        {isLocalAuthEnabled ? (
           <>
             <section className="auth-alt-card auth-alt-card-muted">
               <h3>Local account</h3>
-              <p>Available in development bypass mode for fast MVP testing.</p>
+              <p>Use your name and email to continue.</p>
             </section>
 
             <form onSubmit={handleSubmit} className="auth-form">
@@ -161,19 +163,19 @@ export function LoginPage() {
             </form>
 
             <section className="auth-alt-card">
-              <h3>Developer shortcut</h3>
-              <p>Start a local guest session without entering account details.</p>
-              <button type="button" className="ghost-button auth-alt-button" onClick={handleDevSession}>
+              <h3>Guest access</h3>
+              <p>Continue without creating a full account.</p>
+              <button type="button" className="ghost-button auth-alt-button" onClick={handleGuestSession}>
                 Continue as guest user
               </button>
             </section>
           </>
         ) : null}
 
-        {!isAuth0Available && !isDevAuthBypass ? (
+        {!isAuth0Available && !isLocalAuthEnabled ? (
           <section className="auth-alt-card auth-alt-card-muted">
             <h3>Authentication is not configured</h3>
-            <p>Set Auth0 frontend variables or enable dev bypass to continue.</p>
+            <p>Set Auth0 frontend variables or enable local auth to continue.</p>
           </section>
         ) : null}
       </section>

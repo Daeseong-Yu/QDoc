@@ -22,8 +22,9 @@ function resolveDefaultWsBaseUrl() {
   return `${window.location.protocol}//${window.location.hostname}:${apiPort}`
 }
 
-export const AUTH_BYPASS_ENABLED =
-  import.meta.env.DEV && import.meta.env.VITE_AUTH_BYPASS !== 'false'
+export const LOCAL_AUTH_ENABLED =
+  import.meta.env.VITE_LOCAL_AUTH_ENABLED === 'true' ||
+  (import.meta.env.DEV && import.meta.env.VITE_AUTH_BYPASS !== 'false')
 
 export const AUTH0_DOMAIN = import.meta.env.VITE_AUTH0_DOMAIN?.trim() ?? ''
 export const AUTH0_CLIENT_ID = import.meta.env.VITE_AUTH0_CLIENT_ID?.trim() ?? ''

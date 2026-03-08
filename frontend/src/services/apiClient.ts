@@ -1,4 +1,4 @@
-import { API_BASE_URL, AUTH_BYPASS_ENABLED } from '../app/env'
+import { API_BASE_URL, LOCAL_AUTH_ENABLED } from '../app/env'
 import type { AuthSession } from '../types/auth'
 
 const SESSION_KEY = 'qdoc.auth.session'
@@ -106,10 +106,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
   const user = getSessionUser()
 
-  if (AUTH_BYPASS_ENABLED && user) {
-    headers.set('x-dev-role', import.meta.env.VITE_DEV_ROLE ?? 'patient')
-    headers.set('x-dev-user-id', user.id)
-    headers.set('x-dev-name', user.name)
+  if (LOCAL_AUTH_ENABLED && user) {
+    headers.set('x-local-role', import.meta.env.VITE_LOCAL_ROLE ?? import.meta.env.VITE_DEV_ROLE ?? 'patient')
+    headers.set('x-local-user-id', user.id)
+    headers.set('x-local-name', user.name)
   } else {
     const accessToken = getAccessToken()
     if (accessToken && !headers.has('Authorization')) {

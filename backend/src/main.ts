@@ -20,10 +20,10 @@ async function bootstrap() {
   const isProduction = nodeEnv === 'production'
 
   if (isProduction && isTruthy(configService.get('AUTH_DEV_BYPASS'))) {
-    throw new Error('AUTH_DEV_BYPASS must be false in production environment.')
+    throw new Error('AUTH_DEV_BYPASS must be false in production environment. Use AUTH_LOCAL_BYPASS instead.')
   }
 
-  const allowedOrigins = parseAllowedOrigins(configService.get<string>('CORS_ORIGIN'))
+  const allowedOrigins = parseAllowedOrigins(configService.get<string>('CORS_ORIGIN'), nodeEnv)
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,

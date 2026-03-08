@@ -1,7 +1,7 @@
 import { createContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
-import { AUTH_BYPASS_ENABLED } from '../../app/env'
+import { LOCAL_AUTH_ENABLED } from '../../app/env'
 import type { AuthProviderKind, AuthSession } from '../../types/auth'
 import { useAuth0Bridge } from './Auth0Bridge'
 
@@ -20,7 +20,7 @@ type AuthContextValue = {
   session: AuthSession | null
   isAuthenticated: boolean
   isReady: boolean
-  isDevAuthBypass: boolean
+  isLocalAuthEnabled: boolean
   isAuth0Available: boolean
   authMethod: AuthProviderKind | null
   sessionMessage: string | null
@@ -231,7 +231,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [auth0])
 
-  const auth0SessionReady = !auth0.isEnabled || (!auth0.isLoading && (!auth0.isAuthenticated || session?.provider === 'auth0'))
+  const auth0SessionReady =
+    !auth0.isEnabled || (!auth0.isLoading && (!auth0.isAuthenticated || session?.provider === 'auth0'))
   const authMethod: AuthProviderKind | null = auth0.isAuthenticated ? 'auth0' : session?.provider ?? null
 
   const value = useMemo<AuthContextValue>(
@@ -239,7 +240,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       session,
       isAuthenticated: auth0.isAuthenticated || Boolean(session),
       isReady: hasLoadedLocalSession && auth0SessionReady,
-      isDevAuthBypass: AUTH_BYPASS_ENABLED,
+      isLocalAuthEnabled: LOCAL_AUTH_ENABLED,
       isAuth0Available: auth0.isEnabled,
       authMethod,
       sessionMessage: auth0.errorMessage ?? sessionMessage,

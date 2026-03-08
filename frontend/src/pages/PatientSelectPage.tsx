@@ -74,7 +74,7 @@ export function PatientSelectPage() {
         <section className="flow-option-list">
           <article className="flow-option-card selected">
             <div className="flow-avatar" aria-hidden="true">
-              Self
+              ◉
             </div>
             <div className="flow-meta">
               <strong>{session?.user.name ?? 'Self'}</strong>

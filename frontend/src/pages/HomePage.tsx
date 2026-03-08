@@ -63,6 +63,24 @@ export function HomePage() {
       onSearchKeywordChange={setSearchKeyword}
       onSearchSubmit={() => moveToHospitalSearch()}
     >
+      <section className="home-hero-card">
+        <div className="hero-copy">
+          <p className="hero-kicker">Need care after work?</p>
+          <h2>Find a nearby clinic and join the queue fast</h2>
+        </div>
+        <div className="hero-illustration" aria-hidden="true">
+          <div className="hero-bed">
+            <span>☎</span>
+          </div>
+        </div>
+      </section>
+
+      <div className="hero-pagination" aria-hidden="true">
+        <span className="active" />
+        <span />
+        <span />
+      </div>
+
       <section className="home-chip-row" aria-label="Quick filters">
         {QUICK_CHIPS.map((chip) => (
           <button key={chip} type="button" onClick={() => moveToHospitalSearch(chip)}>

@@ -26,7 +26,7 @@ export function RoomSelectPage() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [hospitalName, setHospitalName] = useState('Selected hospital')
   const [roomOptions, setRoomOptions] = useState<RoomOption[]>([])
-  const [selectedRoomId, setSelectedRoomId] = useState('')
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,7 +64,7 @@ export function RoomSelectPage() {
             id: department.id,
             badge,
             doctorLabel: doctorName,
-            roomLabel: `Room ${index + 1} | ${department.name}`,
+            roomLabel: `Room ${index + 1} · ${department.name}`,
           }
         })
 
@@ -75,13 +75,13 @@ export function RoomSelectPage() {
                 id: 'room-a',
                 badge: '5 people waiting',
                 doctorLabel: 'Dr. Green',
-                roomLabel: 'Room 2 | General care',
+                roomLabel: 'Room 2 · General care',
               },
               {
                 id: 'room-b',
                 badge: 'Immediate check-in',
                 doctorLabel: 'Dr. Yellow',
-                roomLabel: 'Room 4 | Family care',
+                roomLabel: 'Room 4 · Family care',
               },
             ]
 
@@ -89,22 +89,21 @@ export function RoomSelectPage() {
         setSelectedRoomId((current) => current || fallback[0].id)
       } catch {
         if (!cancelled) {
-          const fallback = [
+          setRoomOptions([
             {
               id: 'room-a',
               badge: '5 people waiting',
               doctorLabel: 'Dr. Green',
-              roomLabel: 'Room 2 | General care',
+              roomLabel: 'Room 2 · General care',
             },
             {
               id: 'room-b',
               badge: 'Immediate check-in',
               doctorLabel: 'Dr. Yellow',
-              roomLabel: 'Room 4 | Family care',
+              roomLabel: 'Room 4 · Family care',
             },
-          ]
-          setRoomOptions(fallback)
-          setSelectedRoomId(fallback[0].id)
+          ])
+          setSelectedRoomId('room-a')
           setError('Could not load room data. Showing default rooms.')
         }
       }
@@ -118,12 +117,13 @@ export function RoomSelectPage() {
   }, [hospitalId, navigate])
 
   const legalNotice = useMemo(
-    () => [
-      'Legal notice for patient identity information',
-      'This clinic collects minimum identity data for patient safety and check-in processing.',
-      'Data is used only for treatment operations under applicable regulations.',
-      'Information handling follows privacy and security policy requirements.',
-    ],
+    () =>
+      [
+        'Legal notice for patient identity information',
+        'This clinic collects minimum identity data for patient safety and check-in processing.',
+        'Data is used only for treatment operations under applicable regulations.',
+        'Information handling follows privacy and security policy requirements.',
+      ],
     [],
   )
 
@@ -176,7 +176,7 @@ export function RoomSelectPage() {
           <p className="flow-step">Queue registration</p>
           <h2>Select consultation room</h2>
           <p>
-            Hospital: <strong>{hospitalName}</strong> | Patient: <strong>{patientName}</strong>
+            Hospital: <strong>{hospitalName}</strong> · Patient: <strong>{patientName}</strong>
           </p>
         </header>
 
@@ -194,7 +194,7 @@ export function RoomSelectPage() {
                 <p>{room.roomLabel}</p>
               </div>
               <span className="flow-check" aria-hidden="true">
-                {selectedRoomId === room.id ? 'Check' : ''}
+                {selectedRoomId === room.id ? '✓' : ''}
               </span>
             </button>
           ))}

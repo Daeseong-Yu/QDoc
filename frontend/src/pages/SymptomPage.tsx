@@ -1,5 +1,6 @@
-import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
+import { flushSync } from 'react-dom'
+import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { CustomerShell } from '../components/CustomerShell'
@@ -38,9 +39,11 @@ export function SymptomPage() {
 
     try {
       const analyzed = await analyzeSymptomText(normalized)
-      completeSymptomStep({
-        symptomText: normalized,
-        recommendedDepartment: analyzed.recommendedDepartment,
+      flushSync(() => {
+        completeSymptomStep({
+          symptomText: normalized,
+          recommendedDepartment: analyzed.recommendedDepartment,
+        })
       })
 
       const params = new URLSearchParams()
@@ -49,8 +52,8 @@ export function SymptomPage() {
       }
 
       navigate(`/hospitals${params.toString() ? `?${params.toString()}` : ''}`)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to analyze symptoms right now. Please try again.')
+    } catch {
+      setError('Unable to analyze symptoms right now. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -88,3 +91,4 @@ export function SymptomPage() {
     </CustomerShell>
   )
 }
+

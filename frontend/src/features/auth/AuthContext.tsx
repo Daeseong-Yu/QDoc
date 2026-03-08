@@ -1,13 +1,14 @@
 import { createContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
+import { AUTH_BYPASS_ENABLED } from '../../app/env'
 import type { AuthProviderKind, AuthSession } from '../../types/auth'
+import { useAuth0Bridge } from './Auth0Bridge'
 
 const SESSION_KEY = 'qdoc.auth.session'
 const SESSION_DURATION_MS = 30 * 60 * 1000
 const DEV_SESSION_DURATION_MS = 12 * 60 * 60 * 1000
 const DEV_SESSION_USER_ID = 'dev-user'
-const SESSION_EXPIRED_MESSAGE = 'Session expired. Please sign in again.'
 
 type LoginInput = {
   name: string
@@ -29,11 +30,6 @@ type AuthContextValue = {
   logout: (returnTo?: string) => void
   renewSession: () => void
   clearSessionMessage: () => void
-}
-
-type InitialAuthState = {
-  session: AuthSession | null
-  sessionMessage: string | null
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -74,6 +70,10 @@ function loadSession(): AuthSession | null {
     }
 
     const provider = parsed.provider ?? 'local'
+    if (provider === 'auth0') {
+      storage.removeItem(SESSION_KEY)
+      return null
+    }
 
     return {
       provider,
@@ -104,30 +104,6 @@ function saveSession(session: AuthSession | null) {
   }
 
   storage.setItem(SESSION_KEY, JSON.stringify(session))
-}
-
-function loadInitialAuthState(): InitialAuthState {
-  const stored = loadSession()
-
-  if (!stored) {
-    return {
-      session: null,
-      sessionMessage: null,
-    }
-  }
-
-  if (isExpired(stored)) {
-    saveSession(null)
-    return {
-      session: null,
-      sessionMessage: SESSION_EXPIRED_MESSAGE,
-    }
-  }
-
-  return {
-    session: stored,
-    sessionMessage: null,
-  }
 }
 
 function createSession(input: LoginInput): AuthSession {
@@ -166,38 +142,107 @@ type AuthProviderProps = {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [initialState] = useState(loadInitialAuthState)
-  const [session, setSession] = useState<AuthSession | null>(initialState.session)
-  const [sessionMessage, setSessionMessage] = useState<string | null>(initialState.sessionMessage)
+  const auth0 = useAuth0Bridge()
+
+  const [session, setSession] = useState<AuthSession | null>(null)
+  const [sessionMessage, setSessionMessage] = useState<string | null>(null)
+  const [hasLoadedLocalSession, setHasLoadedLocalSession] = useState(false)
+
+  useEffect(() => {
+    const stored = loadSession()
+
+    if (!stored) {
+      setHasLoadedLocalSession(true)
+      return
+    }
+
+    if (isExpired(stored)) {
+      saveSession(null)
+      setSessionMessage('Session expired. Please sign in again.')
+      setHasLoadedLocalSession(true)
+      return
+    }
+
+    setSession(stored)
+    setHasLoadedLocalSession(true)
+  }, [])
 
   useEffect(() => {
     saveSession(session)
   }, [session])
 
   useEffect(() => {
-    if (!session || session.provider === 'auth0' || typeof window === 'undefined') {
+    if (!session || session.provider === 'auth0') {
+      return
+    }
+
+    const remainingMs = session.expiresAt - Date.now()
+    if (remainingMs <= 0) {
+      setSession(null)
+      setSessionMessage('Session expired. Please sign in again.')
       return
     }
 
     const timer = window.setTimeout(() => {
       setSession(null)
-      setSessionMessage(SESSION_EXPIRED_MESSAGE)
-    }, Math.max(session.expiresAt - Date.now(), 0))
+      setSessionMessage('Session expired. Please sign in again.')
+    }, remainingMs)
 
     return () => window.clearTimeout(timer)
   }, [session])
 
-  const authMethod: AuthProviderKind | null = session?.provider ?? null
+  useEffect(() => {
+    if (!auth0.isEnabled || auth0.isLoading) {
+      return
+    }
+
+    if (!auth0.isAuthenticated) {
+      setSession((current) => (current?.provider === 'auth0' ? null : current))
+      return
+    }
+
+    let cancelled = false
+
+    async function syncAuth0Session() {
+      const accessToken = await auth0.getAccessToken()
+      if (cancelled) {
+        return
+      }
+
+      const user = auth0.user
+      setSession({
+        provider: 'auth0',
+        user: {
+          id: user?.sub ?? 'auth0-user',
+          name: user?.name ?? user?.nickname ?? user?.email ?? 'QDoc User',
+          email: user?.email ?? '',
+        },
+        consentAccepted: true,
+        expiresAt: Date.now() + SESSION_DURATION_MS,
+        accessToken: accessToken ?? undefined,
+      })
+      setSessionMessage(null)
+    }
+
+    void syncAuth0Session()
+
+    return () => {
+      cancelled = true
+    }
+  }, [auth0])
+
+  const auth0SessionReady = !auth0.isEnabled || (!auth0.isLoading && (!auth0.isAuthenticated || session?.provider === 'auth0'))
+  const authMethod: AuthProviderKind | null = auth0.isAuthenticated ? 'auth0' : session?.provider ?? null
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
-      isAuthenticated: Boolean(session),
-      isReady: true,
-      isDevAuthBypass: true,
-      isAuth0Available: false,
+      isAuthenticated: auth0.isAuthenticated || Boolean(session),
+      isReady: hasLoadedLocalSession && auth0SessionReady,
+      isDevAuthBypass: AUTH_BYPASS_ENABLED,
+      isAuth0Available: auth0.isEnabled,
       authMethod,
-      sessionMessage,
+      sessionMessage: auth0.errorMessage ?? sessionMessage,
       login: (input) => {
         setSession(createSession(input))
         setSessionMessage(null)
@@ -206,10 +251,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSession(createDevSession())
         setSessionMessage(null)
       },
-      startAuth0Login: async () => {
-        setSessionMessage('Auth0 is not configured yet.')
+      startAuth0Login: async (returnTo = '/') => {
+        setSessionMessage(null)
+        await auth0.startLogin(returnTo)
       },
-      logout: () => {
+      logout: (returnTo = '/login') => {
+        if (authMethod === 'auth0') {
+          setSession(null)
+          setSessionMessage(null)
+          auth0.startLogout(returnTo)
+          return
+        }
+
         setSession(null)
         setSessionMessage(null)
       },
@@ -228,7 +281,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSessionMessage(null)
       },
     }),
-    [authMethod, session, sessionMessage],
+    [auth0, auth0SessionReady, authMethod, hasLoadedLocalSession, session, sessionMessage],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

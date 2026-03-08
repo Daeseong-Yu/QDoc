@@ -16,7 +16,7 @@ export function QueuePage() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [ticket, setTicket] = useState<QueueTicket | null>(null)
   const [hospitalPhone, setHospitalPhone] = useState('')
-  const [lastUpdatedAt, setLastUpdatedAt] = useState('')
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string>('')
   const [connectionUnstable, setConnectionUnstable] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -175,7 +175,7 @@ export function QueuePage() {
             <h3>Queue updates</h3>
             <p>Queue order can change based on hospital operations.</p>
             <p className="customer-muted">
-              Live updates: {connectionUnstable ? 'Polling fallback' : 'Connected'} | Last update{' '}
+              Live updates: {connectionUnstable ? 'Polling fallback' : 'Connected'} · Last update{' '}
               {lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString() : '-'}
             </p>
           </section>
@@ -206,3 +206,4 @@ export function QueuePage() {
     </CustomerShell>
   )
 }
+

@@ -1,17 +1,16 @@
+import { ApiError, apiRequest, getCurrentSessionUser, toApiErrorMessage } from './apiClient'
 import type { QueueEnrollErrorCode, QueueEnrollInput, QueueTicket, QueueTicketStatus } from '../types/queue'
-import { getHospitalQueueSnapshotById } from './hospitalService'
-import { ApiError, apiRequest, getStoredSession } from './apiClient'
 
-const QUEUE_TICKET_CHANGED_EVENT = 'qdoc:queue-ticket-changed'
 const ACTIVE_STATUSES: QueueTicketStatus[] = ['Waiting', 'Called', 'InService']
+const QUEUE_TICKET_CHANGED_EVENT = 'qdoc:queue-ticket-changed'
 
-type BackendWaitSummary = {
+type ApiWait = {
   peopleAhead: number
   avgMin: number
   estimatedWaitMin: number
 }
 
-type BackendQueueTicket = {
+type ApiQueueTicket = {
   id: string
   queueId: string
   familyMemberId: string | null
@@ -20,22 +19,22 @@ type BackendQueueTicket = {
   cancelledReason: string | null
   createdAt: string
   updatedAt: string
-  queue: {
+  queue?: {
     id: string
-    avgMin: number
-    hospital: {
+    avgMin?: number
+    hospital?: {
       id: string
       name: string
     }
   }
-  familyMember: {
+  familyMember?: {
     id: string
     name: string
   } | null
-  wait: BackendWaitSummary
+  wait?: ApiWait | null
 }
 
-type BackendEnrollResponse = {
+type ApiEnrollResponse = {
   ticket: {
     id: string
     ticketNumber: number
@@ -45,7 +44,7 @@ type BackendEnrollResponse = {
     updatedAt: string
     cancelledReason: string | null
   }
-  wait: BackendWaitSummary
+  wait: ApiWait
   notifications: string[]
 }
 
@@ -57,6 +56,13 @@ export class QueueServiceError extends Error {
     this.code = code
     this.name = 'QueueServiceError'
   }
+}
+
+type TicketFallback = {
+  hospitalId?: string
+  hospitalName?: string
+  targetName?: string
+  targetType?: 'self' | 'family'
 }
 
 function isActive(status: QueueTicketStatus) {
@@ -71,60 +77,60 @@ function notifyQueueTicketChanged() {
   window.dispatchEvent(new Event(QUEUE_TICKET_CHANGED_EVENT))
 }
 
-function getCurrentUserName() {
-  return getStoredSession()?.user?.name?.trim() || 'Self'
-}
+function mapTicket(record: ApiQueueTicket, fallback?: TicketFallback): QueueTicket {
+  const sessionUser = getCurrentSessionUser()
 
-function mapQueueTicket(ticket: BackendQueueTicket): QueueTicket {
+  const wait = record.wait ?? {
+    peopleAhead: 0,
+    avgMin: record.queue?.avgMin ?? 5,
+    estimatedWaitMin: 0,
+  }
+
+  const targetType =
+    fallback?.targetType ?? (record.familyMemberId || record.familyMember ? 'family' : 'self')
+
+  const targetName =
+    fallback?.targetName ??
+    (targetType === 'family' ? record.familyMember?.name ?? 'Family Member' : sessionUser?.name ?? 'Self')
+
   return {
-    id: ticket.id,
-    hospitalId: ticket.queue.hospital.id,
-    hospitalName: ticket.queue.hospital.name,
-    queueNumber: ticket.ticketNumber,
-    targetType: ticket.familyMember ? 'family' : 'self',
-    targetName: ticket.familyMember?.name ?? getCurrentUserName(),
-    familyMemberId: ticket.familyMemberId,
-    status: ticket.status,
-    peopleAhead: ticket.wait.peopleAhead,
-    avgMin: ticket.wait.avgMin || ticket.queue.avgMin,
-    estimatedWaitMin: ticket.wait.estimatedWaitMin,
-    createdAt: ticket.createdAt,
-    updatedAt: ticket.updatedAt,
-    cancelledReason: ticket.cancelledReason,
+    id: record.id,
+    hospitalId: record.queue?.hospital?.id ?? fallback?.hospitalId ?? '',
+    hospitalName: record.queue?.hospital?.name ?? fallback?.hospitalName ?? 'Hospital',
+    queueNumber: record.ticketNumber,
+    targetType,
+    targetName,
+    familyMemberId: record.familyMemberId,
+    status: record.status,
+    peopleAhead: wait.peopleAhead,
+    avgMin: wait.avgMin,
+    estimatedWaitMin: wait.estimatedWaitMin,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    cancelledReason: record.cancelledReason,
   }
 }
 
-function toQueueServiceError(error: unknown): QueueServiceError {
+function mapEnrollError(error: unknown) {
   if (!(error instanceof ApiError)) {
-    return new QueueServiceError('QUEUE_UNAVAILABLE', 'Unable to connect to queue service right now.')
+    return new QueueServiceError('INVALID_TARGET', toApiErrorMessage(error, 'Queue enrollment failed.'))
   }
 
-  const message = error.message || 'Queue request failed.'
-  const normalized = message.toLowerCase()
+  const message = toApiErrorMessage(error, 'Queue enrollment failed.')
 
-  if (error.status === 404 && normalized.includes('hospital')) {
+  if (error.status === 404) {
     return new QueueServiceError('HOSPITAL_NOT_FOUND', message)
   }
 
-  if (normalized.includes('active queue ticket') || error.status === 409) {
+  if (error.status === 409) {
     return new QueueServiceError('DUPLICATE_ACTIVE_TICKET', message)
   }
 
-  if (normalized.includes('family') || normalized.includes('target')) {
-    return new QueueServiceError('INVALID_TARGET', message)
-  }
-
-  if (
-    normalized.includes('queue') ||
-    normalized.includes('department') ||
-    normalized.includes('hospital') ||
-    error.status === 400 ||
-    error.status === 404
-  ) {
+  if (error.status === 400 && message.toLowerCase().includes('queue')) {
     return new QueueServiceError('QUEUE_UNAVAILABLE', message)
   }
 
-  return new QueueServiceError('QUEUE_UNAVAILABLE', message)
+  return new QueueServiceError('INVALID_TARGET', message)
 }
 
 export function subscribeQueueTicketChanges(handler: () => void) {
@@ -136,16 +142,15 @@ export function subscribeQueueTicketChanges(handler: () => void) {
   return () => window.removeEventListener(QUEUE_TICKET_CHANGED_EVENT, handler)
 }
 
-export async function getLatestActiveTicket(): Promise<QueueTicket | null> {
-  const tickets = await apiRequest<BackendQueueTicket[]>('/queues/my/tickets')
-  const active = tickets.find((ticket) => isActive(ticket.status))
-  return active ? mapQueueTicket(active) : null
+export async function listQueueTickets() {
+  const result = await apiRequest<ApiQueueTicket[]>('/queues/my/tickets')
+  return result.map((item) => mapTicket(item)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
 }
 
-export async function getQueueTicketById(id: string): Promise<QueueTicket | null> {
+export async function getQueueTicketById(id: string) {
   try {
-    const ticket = await apiRequest<BackendQueueTicket>(`/queues/tickets/${encodeURIComponent(id)}`)
-    return mapQueueTicket(ticket)
+    const result = await apiRequest<ApiQueueTicket>(`/queues/tickets/${encodeURIComponent(id)}`)
+    return mapTicket(result)
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return null
@@ -155,9 +160,19 @@ export async function getQueueTicketById(id: string): Promise<QueueTicket | null
   }
 }
 
-export async function enrollQueue(input: QueueEnrollInput): Promise<QueueTicket> {
+export async function getActiveTicketByHospitalId(hospitalId: string) {
+  const tickets = await listQueueTickets()
+  return tickets.find((ticket) => ticket.hospitalId === hospitalId && isActive(ticket.status)) ?? null
+}
+
+export async function getLatestActiveTicket() {
+  const tickets = await listQueueTickets()
+  return tickets.find((ticket) => isActive(ticket.status)) ?? null
+}
+
+export async function enrollQueue(input: QueueEnrollInput) {
   if (!input.targetName.trim()) {
-    throw new QueueServiceError('INVALID_TARGET', 'Please select a valid patient.')
+    throw new QueueServiceError('INVALID_TARGET', 'Please select a valid target.')
   }
 
   if (input.targetType === 'family' && !input.familyMemberId) {
@@ -165,43 +180,56 @@ export async function enrollQueue(input: QueueEnrollInput): Promise<QueueTicket>
   }
 
   try {
-    const response = await apiRequest<BackendEnrollResponse>('/queues/tickets/enroll', {
-      body: {
+    const result = await apiRequest<ApiEnrollResponse>('/queues/tickets/enroll', {
+      method: 'POST',
+      body: JSON.stringify({
         hospitalId: input.hospitalId,
         departmentId: input.departmentId,
         targetType: input.targetType,
         targetName: input.targetName,
-        familyMemberId: input.familyMemberId ?? undefined,
-      },
+        familyMemberId: input.familyMemberId,
+      }),
     })
 
-    const hydrated = await getQueueTicketById(response.ticket.id)
+    const hydrated = await getQueueTicketById(result.ticket.id)
     if (hydrated) {
       notifyQueueTicketChanged()
       return hydrated
     }
 
-    const hospital = await getHospitalQueueSnapshotById(input.hospitalId)
-    const fallback: QueueTicket = {
-      id: response.ticket.id,
-      hospitalId: input.hospitalId,
-      hospitalName: hospital?.name ?? 'Selected hospital',
-      queueNumber: response.ticket.ticketNumber,
-      targetType: input.targetType,
-      targetName: input.targetName,
-      familyMemberId: response.ticket.familyMemberId,
-      status: response.ticket.status,
-      peopleAhead: response.wait.peopleAhead,
-      avgMin: response.wait.avgMin,
-      estimatedWaitMin: response.wait.estimatedWaitMin,
-      createdAt: response.ticket.createdAt,
-      updatedAt: response.ticket.updatedAt,
-      cancelledReason: response.ticket.cancelledReason,
-    }
+    const fallbackTicket = mapTicket(
+      {
+        id: result.ticket.id,
+        queueId: '',
+        familyMemberId: result.ticket.familyMemberId,
+        status: result.ticket.status,
+        ticketNumber: result.ticket.ticketNumber,
+        cancelledReason: result.ticket.cancelledReason,
+        createdAt: result.ticket.createdAt,
+        updatedAt: result.ticket.updatedAt,
+        wait: result.wait,
+      },
+      {
+        hospitalId: input.hospitalId,
+        hospitalName: 'Hospital',
+        targetName: input.targetName,
+        targetType: input.targetType,
+      },
+    )
 
     notifyQueueTicketChanged()
-    return fallback
+    return fallbackTicket
   } catch (error) {
-    throw toQueueServiceError(error)
+    throw mapEnrollError(error)
   }
+}
+
+export async function cancelQueueTicket(ticketId: string, reason: string) {
+  await apiRequest(`/queues/tickets/${encodeURIComponent(ticketId)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  })
+
+  notifyQueueTicketChanged()
+  return getQueueTicketById(ticketId)
 }

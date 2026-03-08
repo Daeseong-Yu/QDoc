@@ -1,5 +1,5 @@
-import type { DepartmentInfo, HospitalOverview, HospitalSearchSort, OperatingStatus } from '../types/hospital'
 import { ApiError, apiRequest } from './apiClient'
+import type { DepartmentInfo, HospitalOverview, HospitalSearchSort, OperatingStatus } from '../types/hospital'
 
 type SearchInput = {
   lat: number
@@ -10,64 +10,47 @@ type SearchInput = {
   sortBy: HospitalSearchSort
 }
 
+type BaseHospital = Omit<HospitalOverview, 'distanceKm'>
+
 export type HospitalQueueSnapshot = Pick<
   HospitalOverview,
-  'id' | 'name' | 'address' | 'phone' | 'operatingStatus' | 'currentWaiting' | 'estimatedWaitMin' | 'lastUpdatedAt'
+  | 'id'
+  | 'name'
+  | 'address'
+  | 'phone'
+  | 'operatingStatus'
+  | 'currentWaiting'
+  | 'estimatedWaitMin'
+  | 'lastUpdatedAt'
 >
 
-type BackendQueueStatus = 'Open' | 'Paused' | 'Closed'
-
-type BackendDepartmentSummary = {
-  id: string
-  name: string
-}
-
-type BackendDoctor = {
-  id: string
-  name: string
-}
-
-type BackendHospitalSearchResult = {
+type ApiHospital = {
   id: string
   name: string
   address: string
   phone: string
   lat: number
   lng: number
-  distanceKm: number
+  distanceKm?: number
   estimatedWaitMin: number
   currentWaiting: number
-  queueStatus: BackendQueueStatus
+  queueStatus: 'Open' | 'Paused' | 'Closed'
   lastUpdatedAt: string
-  departments: BackendDepartmentSummary[]
+  departments: Array<{ id: string; name: string }>
 }
 
-type BackendHospitalDetail = {
-  id: string
-  name: string
-  address: string
-  phone: string
-  lat: number
-  lng: number
-  queueStatus: BackendQueueStatus
-  currentWaiting: number
-  estimatedWaitMin: number
-  lastUpdatedAt: string
-  departments: BackendDepartmentSummary[]
-}
-
-type BackendDepartmentResponse = {
+type ApiDepartmentsResponse = {
   hospitalId: string
-  departments: BackendDepartmentSummary[]
+  departments: Array<{ id: string; name: string }>
 }
 
-type BackendDoctorsResponse = {
+type ApiDoctorsResponse = {
   hospitalId: string
   departmentId: string
-  doctors: BackendDoctor[]
+  doctors: Array<{ id: string; name: string }>
 }
 
-function mapOperatingStatus(status: BackendQueueStatus): OperatingStatus {
+function mapOperatingStatus(status: ApiHospital['queueStatus']): OperatingStatus {
   switch (status) {
     case 'Open':
       return 'open'
@@ -76,84 +59,88 @@ function mapOperatingStatus(status: BackendQueueStatus): OperatingStatus {
     case 'Closed':
       return 'closed'
     default:
-      return 'closing_soon'
+      return 'closed'
   }
 }
 
-function normalizeDepartmentName(value?: string) {
-  const normalized = value?.trim()
-  if (!normalized) {
-    return undefined
-  }
-
-  switch (normalized.toLowerCase()) {
-    case 'family medicine':
-      return 'Family care'
-    case 'urgent care':
-    case 'emergency medicine':
-      return 'Urgent care'
-    case 'internal medicine':
-    case 'dermatology':
-    case 'ent':
-      return undefined
-    default:
-      return normalized
-  }
+function mapDepartments(items: Array<{ id: string; name: string }>): DepartmentInfo[] {
+  return items.map((department) => ({
+    id: department.id,
+    name: department.name,
+    doctors: [],
+  }))
 }
 
-function mapHospitalOverview(hospital: BackendHospitalSearchResult): HospitalOverview {
+function mapHospital(item: ApiHospital): HospitalOverview {
   return {
-    id: hospital.id,
-    name: hospital.name,
-    address: hospital.address,
-    phone: hospital.phone,
-    lat: hospital.lat,
-    lng: hospital.lng,
-    distanceKm: hospital.distanceKm,
-    estimatedWaitMin: hospital.estimatedWaitMin,
-    currentWaiting: hospital.currentWaiting,
-    operatingStatus: mapOperatingStatus(hospital.queueStatus),
-    lastUpdatedAt: hospital.lastUpdatedAt,
-    departments: hospital.departments.map((department) => ({
-      id: department.id,
-      name: department.name,
-      doctors: [],
-    })),
+    id: item.id,
+    name: item.name,
+    address: item.address,
+    phone: item.phone,
+    lat: item.lat,
+    lng: item.lng,
+    distanceKm: Number((item.distanceKm ?? 0).toFixed(2)),
+    estimatedWaitMin: item.estimatedWaitMin,
+    currentWaiting: item.currentWaiting,
+    operatingStatus: mapOperatingStatus(item.queueStatus),
+    lastUpdatedAt: item.lastUpdatedAt,
+    departments: mapDepartments(item.departments),
   }
 }
 
-function mapHospitalSnapshot(hospital: BackendHospitalDetail): HospitalQueueSnapshot {
-  return {
-    id: hospital.id,
-    name: hospital.name,
-    address: hospital.address,
-    phone: hospital.phone,
-    operatingStatus: mapOperatingStatus(hospital.queueStatus),
-    currentWaiting: hospital.currentWaiting,
-    estimatedWaitMin: hospital.estimatedWaitMin,
-    lastUpdatedAt: hospital.lastUpdatedAt,
-  }
+export async function getAvailableDepartments() {
+  const names = await apiRequest<string[]>('/hospitals/departments')
+  return [...names].sort((a, b) => a.localeCompare(b))
 }
 
 export async function searchNearbyHospitals(input: SearchInput): Promise<HospitalOverview[]> {
-  const hospitals = await apiRequest<BackendHospitalSearchResult[]>('/hospitals/search', {
-    query: {
-      lat: input.lat,
-      lng: input.lng,
-      radiusKm: input.radiusKm,
-      departmentName: normalizeDepartmentName(input.departmentName),
-      keyword: input.keyword?.trim() || undefined,
-      sortBy: input.sortBy,
-    },
+  const params = new URLSearchParams({
+    lat: String(input.lat),
+    lng: String(input.lng),
+    radiusKm: String(input.radiusKm),
+    sortBy: input.sortBy,
   })
 
-  return hospitals.map(mapHospitalOverview)
+  if (input.departmentName) {
+    params.set('departmentName', input.departmentName)
+  }
+
+  if (input.keyword) {
+    params.set('keyword', input.keyword)
+  }
+
+  const result = await apiRequest<ApiHospital[]>(`/hospitals/search?${params.toString()}`)
+  return result.map(mapHospital)
 }
 
 export async function getHospitalQueueSnapshotById(id: string): Promise<HospitalQueueSnapshot | null> {
   try {
-    const hospital = await apiRequest<BackendHospitalDetail>(`/hospitals/${encodeURIComponent(id)}`)
-    return mapHospitalSnapshot(hospital)
+    const hospital = await apiRequest<ApiHospital>(`/hospitals/${encodeURIComponent(id)}`)
+
+    const mapped: BaseHospital = {
+      id: hospital.id,
+      name: hospital.name,
+      address: hospital.address,
+      phone: hospital.phone,
+      lat: hospital.lat,
+      lng: hospital.lng,
+      estimatedWaitMin: hospital.estimatedWaitMin,
+      currentWaiting: hospital.currentWaiting,
+      operatingStatus: mapOperatingStatus(hospital.queueStatus),
+      lastUpdatedAt: hospital.lastUpdatedAt,
+      departments: mapDepartments(hospital.departments),
+    }
+
+    return {
+      id: mapped.id,
+      name: mapped.name,
+      address: mapped.address,
+      phone: mapped.phone,
+      operatingStatus: mapped.operatingStatus,
+      currentWaiting: mapped.currentWaiting,
+      estimatedWaitMin: mapped.estimatedWaitMin,
+      lastUpdatedAt: mapped.lastUpdatedAt,
+    }
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return null
@@ -163,30 +150,25 @@ export async function getHospitalQueueSnapshotById(id: string): Promise<Hospital
   }
 }
 
-export async function getHospitalDepartmentsWithDoctors(hospitalId: string): Promise<DepartmentInfo[]> {
-  try {
-    const { departments } = await apiRequest<BackendDepartmentResponse>(
-      `/hospitals/${encodeURIComponent(hospitalId)}/departments`,
-    )
+export async function getHospitalDepartmentsWithDoctors(hospitalId: string) {
+  const result = await apiRequest<ApiDepartmentsResponse>(
+    `/hospitals/${encodeURIComponent(hospitalId)}/departments`,
+  )
 
-    return Promise.all(
-      departments.map(async (department) => {
-        const detail = await apiRequest<BackendDoctorsResponse>(
-          `/hospitals/${encodeURIComponent(hospitalId)}/departments/${encodeURIComponent(department.id)}/doctors`,
-        )
+  const departments = await Promise.all(
+    result.departments.map(async (department) => {
+      const doctorsResult = await apiRequest<ApiDoctorsResponse>(
+        `/hospitals/${encodeURIComponent(hospitalId)}/departments/${encodeURIComponent(department.id)}/doctors`,
+      )
 
-        return {
-          id: department.id,
-          name: department.name,
-          doctors: detail.doctors.map((doctor) => doctor.name),
-        }
-      }),
-    )
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return []
-    }
+      return {
+        id: department.id,
+        name: department.name,
+        doctors: doctorsResult.doctors.map((doctor) => doctor.name),
+      }
+    }),
+  )
 
-    throw error
-  }
+  return departments
 }
+

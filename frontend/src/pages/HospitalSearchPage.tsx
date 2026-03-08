@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { CustomerShell } from '../components/CustomerShell'
+import { useAuth } from '../features/auth/useAuth'
 import { useOnboarding } from '../features/onboarding/useOnboarding'
 import { searchNearbyHospitals } from '../services/hospitalService'
 import type { HospitalOverview, HospitalSearchSort, OperatingStatus } from '../types/hospital'
@@ -41,13 +43,23 @@ function formatStartTime(value: string) {
 export function HospitalSearchPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { session } = useAuth()
   const { contract, completeHospitalStep } = useOnboarding()
 
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') ?? '')
-  const [departmentFilter] = useState(searchParams.get('departmentName') ?? contract.recommendedDepartment)
+  const [departmentFilter, setDepartmentFilter] = useState(
+    searchParams.get('departmentName') ?? contract.recommendedDepartment,
+  )
   const [sortBy, setSortBy] = useState<HospitalSearchSort>('distance')
-  const [results, setResults] = useState<HospitalOverview[]>([])
+  const [hospitals, setHospitals] = useState<HospitalOverview[]>([])
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!departmentFilter.trim() && contract.recommendedDepartment.trim()) {
+      setDepartmentFilter(contract.recommendedDepartment)
+    }
+  }, [contract.recommendedDepartment, departmentFilter])
 
   useEffect(() => {
     const nextParams = new URLSearchParams()
@@ -61,12 +73,17 @@ export function HospitalSearchPage() {
     }
 
     setSearchParams(nextParams, { replace: true })
+  }, [departmentFilter, searchKeyword, setSearchParams])
 
+  useEffect(() => {
     let cancelled = false
 
-    async function loadHospitals() {
+    async function runHospitalSearch() {
+      setIsLoading(true)
+      setError(null)
+
       try {
-        const value = await searchNearbyHospitals({
+        const result = await searchNearbyHospitals({
           lat: DEMO_LOCATION.lat,
           lng: DEMO_LOCATION.lng,
           radiusKm: SEARCH_RADIUS_KM,
@@ -76,23 +93,26 @@ export function HospitalSearchPage() {
         })
 
         if (!cancelled) {
-          setResults(value)
-          setError(null)
+          setHospitals(result)
         }
       } catch {
         if (!cancelled) {
-          setResults([])
+          setHospitals([])
           setError('Unable to load hospitals. Please try again.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false)
         }
       }
     }
 
-    void loadHospitals()
+    void runHospitalSearch()
 
     return () => {
       cancelled = true
     }
-  }, [departmentFilter, searchKeyword, setSearchParams, sortBy])
+  }, [departmentFilter, searchKeyword, sortBy])
 
   const quickChips = useMemo(() => {
     const base = ['Open now', 'Walk-in', 'Weekend', 'Evening care']
@@ -104,13 +124,17 @@ export function HospitalSearchPage() {
   }, [searchKeyword])
 
   function moveToQueueRegistration(hospital: HospitalOverview) {
-    completeHospitalStep(hospital.id)
+    flushSync(() => {
+      completeHospitalStep(hospital.id)
+    })
 
     const params = new URLSearchParams({
       hospitalId: hospital.id,
+      patientId: 'self',
+      patientName: session?.user.name ?? 'Self',
     })
 
-    navigate(`/queue/patient?${params.toString()}`)
+    navigate(`/queue/room?${params.toString()}`)
   }
 
   return (
@@ -123,7 +147,7 @@ export function HospitalSearchPage() {
       }}
     >
       <section className="hospital-top-line">
-        <h2 className="hospital-title-with-icon">Nearby Hospitals</h2>
+        <h2 className="hospital-title-with-icon">⌖ Nearby Hospitals</h2>
         <div className="hospital-top-controls">
           <label className="header-drop">
             Sort
@@ -152,15 +176,16 @@ export function HospitalSearchPage() {
       </section>
 
       {error ? <p className="customer-error">{error}</p> : null}
+      {isLoading ? <p className="customer-muted">Loading hospitals...</p> : null}
 
-      {!results.length ? (
+      {!isLoading && !hospitals.length ? (
         <section className="home-section-card">
           <p className="customer-muted">No hospitals found for this search.</p>
         </section>
       ) : null}
 
       <section className="hospital-result-list">
-        {results.map((hospital) => {
+        {hospitals.map((hospital) => {
           const reviews = 10 + (hospital.currentWaiting % 20)
           const rating = (4.2 + (hospital.currentWaiting % 4) * 0.2).toFixed(1)
 
@@ -169,13 +194,13 @@ export function HospitalSearchPage() {
               <div className="hospital-list-info">
                 <h3>{hospital.name}</h3>
                 <p className="hospital-open-line">
-                  {STATUS_TEXT[hospital.operatingStatus]} | Updates at {formatStartTime(hospital.lastUpdatedAt)}
+                  {STATUS_TEXT[hospital.operatingStatus]} · Updates at {formatStartTime(hospital.lastUpdatedAt)}
                 </p>
                 <p className="hospital-meta-line">
-                  <strong>{formatDistance(hospital.distanceKm)}</strong> | {hospital.address}
+                  <strong>{formatDistance(hospital.distanceKm)}</strong> · {hospital.address}
                 </p>
                 <p className="hospital-rating-line">
-                  Rating {rating} | {reviews} reviews | {hospital.currentWaiting} waiting
+                  ★ {rating} · {reviews} reviews · {hospital.currentWaiting} waiting
                 </p>
               </div>
 
@@ -198,3 +223,4 @@ export function HospitalSearchPage() {
     </CustomerShell>
   )
 }
+

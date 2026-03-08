@@ -1,6 +1,8 @@
+export type SymptomUrgency = 'low' | 'moderate' | 'high'
+
 export type SymptomAnalysisResult = {
   summary: string
   recommendedDepartment: string
-  urgency: 'low' | 'moderate' | 'high'
+  urgency: SymptomUrgency
   guidance: string
 }

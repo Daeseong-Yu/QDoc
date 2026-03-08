@@ -1,5 +1,5 @@
-import type { FormEvent } from 'react'
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { CustomerShell } from '../components/CustomerShell'
@@ -72,7 +72,7 @@ export function FamilyPage() {
         <section className="flow-option-list">
           <article className="flow-option-card selected">
             <div className="flow-avatar" aria-hidden="true">
-              Self
+              ◉
             </div>
             <div className="flow-meta">
               <strong>{session?.user.name ?? 'Self'}</strong>
@@ -83,13 +83,13 @@ export function FamilyPage() {
           {members.map((member) => (
             <article key={member.id} className="flow-option-card">
               <div className="flow-avatar" aria-hidden="true">
-                Fam
+                ◌
               </div>
               <div className="flow-meta">
                 <strong>{member.name}</strong>
                 <span>
                   {member.relation}
-                  {member.birthDate ? ` | ${member.birthDate}` : ''}
+                  {member.birthDate ? ` · ${member.birthDate}` : ''}
                 </span>
               </div>
               <button

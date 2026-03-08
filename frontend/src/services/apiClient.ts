@@ -1,142 +1,144 @@
-export class ApiError extends Error {
-  readonly status: number
+import { API_BASE_URL, AUTH_BYPASS_ENABLED } from '../app/env'
+import type { AuthSession } from '../types/auth'
 
-  constructor(status: number, message: string) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
-  }
-}
-
-type QueryValue = string | number | boolean | null | undefined
-
-type ApiRequestOptions = {
-  method?: string
-  query?: Record<string, QueryValue>
-  headers?: HeadersInit
-  body?: unknown
-  credentials?: RequestCredentials
-}
-
-type StoredSession = {
-  accessToken?: string
-  user?: {
-    id?: string
-    name?: string
-  }
-}
-
-const DEFAULT_API_BASE_URL = 'http://localhost:4000/api'
 const SESSION_KEY = 'qdoc.auth.session'
 
-function getApiBaseUrl() {
-  const configured = import.meta.env.VITE_API_BASE_URL?.trim()
-  const baseUrl = configured || DEFAULT_API_BASE_URL
-  return baseUrl.replace(/\/+$/, '')
+type SessionUser = {
+  id: string
+  name: string
 }
 
-export function getStoredSession() {
-  if (typeof window === 'undefined') {
-    return null
-  }
-
-  const raw = window.sessionStorage.getItem(SESSION_KEY)
+function parseSession(raw: string | null): AuthSession | null {
   if (!raw) {
     return null
   }
 
   try {
-    return JSON.parse(raw) as StoredSession
+    return JSON.parse(raw) as AuthSession
   } catch {
     return null
   }
 }
 
-function createUrl(path: string, query?: Record<string, QueryValue>) {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  const url = new URL(`${getApiBaseUrl()}${normalizedPath}`)
-
-  if (!query) {
-    return url
+function getSession(): AuthSession | null {
+  if (typeof window === 'undefined') {
+    return null
   }
 
-  Object.entries(query).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === '') {
-      return
-    }
-
-    url.searchParams.set(key, String(value))
-  })
-
-  return url
+  return parseSession(window.sessionStorage.getItem(SESSION_KEY))
 }
 
-async function extractErrorMessage(response: Response) {
+function getSessionUser(): SessionUser | null {
+  const session = getSession()
+  if (!session) {
+    return null
+  }
+
+  return {
+    id: session.user.id,
+    name: session.user.name,
+  }
+}
+
+function getAccessToken() {
+  const sessionToken = getSession()?.accessToken?.trim()
+  if (sessionToken) {
+    return sessionToken
+  }
+
+  const envToken = import.meta.env.VITE_AUTH_ACCESS_TOKEN?.trim()
+  return envToken || null
+}
+
+function resolveErrorMessage(payload: unknown) {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const body = payload as Record<string, unknown>
+  const message = body.message
+
+  if (typeof message === 'string') {
+    return message
+  }
+
+  if (Array.isArray(message) && message.length > 0) {
+    return message.join(', ')
+  }
+
+  return null
+}
+
+async function parseResponseBody(response: Response): Promise<unknown> {
   const contentType = response.headers.get('content-type') ?? ''
 
   if (contentType.includes('application/json')) {
-    try {
-      const payload = (await response.json()) as { message?: string | string[] }
-      if (Array.isArray(payload.message)) {
-        return payload.message.join(', ')
-      }
-
-      if (typeof payload.message === 'string' && payload.message.trim()) {
-        return payload.message
-      }
-    } catch {
-      return `Request failed with status ${response.status}`
-    }
+    return response.json()
   }
 
-  try {
-    const text = await response.text()
-    if (text.trim()) {
-      return text.trim()
-    }
-  } catch {
-    return `Request failed with status ${response.status}`
-  }
-
-  return `Request failed with status ${response.status}`
+  const text = await response.text()
+  return text || null
 }
 
-export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  const headers = new Headers(options.headers)
-  headers.set('Accept', 'application/json')
+export class ApiError extends Error {
+  readonly status: number
+  readonly payload: unknown
 
-  const session = getStoredSession()
-  if (session?.user?.id) {
-    headers.set('x-user-id', session.user.id)
+  constructor(status: number, payload: unknown) {
+    const message = resolveErrorMessage(payload) ?? `HTTP ${status}`
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.payload = payload
+  }
+}
+
+export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json')
   }
 
-  if (session?.user?.name) {
-    headers.set('x-user-name', session.user.name)
-  }
-
-  if (session?.accessToken && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${session.accessToken}`)
-  }
-
-  const hasBody = options.body !== undefined
-  if (hasBody && !headers.has('Content-Type')) {
+  if (init?.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(createUrl(path, options.query), {
-    method: options.method ?? (hasBody ? 'POST' : 'GET'),
+  const user = getSessionUser()
+
+  if (AUTH_BYPASS_ENABLED && user) {
+    headers.set('x-dev-role', import.meta.env.VITE_DEV_ROLE ?? 'patient')
+    headers.set('x-dev-user-id', user.id)
+    headers.set('x-dev-name', user.name)
+  } else {
+    const accessToken = getAccessToken()
+    if (accessToken && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${accessToken}`)
+    }
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
     headers,
-    body: hasBody ? JSON.stringify(options.body) : undefined,
-    credentials: options.credentials ?? 'include',
   })
 
+  const payload = await parseResponseBody(response)
+
   if (!response.ok) {
-    throw new ApiError(response.status, await extractErrorMessage(response))
+    throw new ApiError(response.status, payload)
   }
 
-  if (response.status === 204) {
-    return undefined as T
+  return payload as T
+}
+
+export function toApiErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError) {
+    return resolveErrorMessage(error.payload) ?? error.message
   }
 
-  return (await response.json()) as T
+  return fallback
+}
+
+export function getCurrentSessionUser() {
+  return getSessionUser()
 }

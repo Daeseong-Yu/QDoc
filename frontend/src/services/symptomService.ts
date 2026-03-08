@@ -1,37 +1,28 @@
-import type { SymptomAnalysisResult } from '../types/symptom'
 import { apiRequest } from './apiClient'
+import type { SymptomAnalysisResult } from '../types/symptom'
 
-type BackendSymptomAnalysis = {
+type ApiSymptomResponse = {
   urgencyLevel: 'low' | 'medium' | 'high'
   recommendedDepartment: string
   recommendation: string
-  confidence: number
-  disclaimer: string
-  analyzedAt: string
 }
 
-function mapUrgency(urgencyLevel: BackendSymptomAnalysis['urgencyLevel']): SymptomAnalysisResult['urgency'] {
-  if (urgencyLevel === 'medium') {
+function mapUrgency(value: ApiSymptomResponse['urgencyLevel']): SymptomAnalysisResult['urgency'] {
+  if (value === 'medium') {
     return 'moderate'
   }
 
-  return urgencyLevel
+  return value
 }
 
 export async function analyzeSymptomText(text: string): Promise<SymptomAnalysisResult> {
-  const normalized = text.trim()
-  if (normalized.length < 5) {
-    throw new Error('Please describe your symptoms in at least 5 characters.')
-  }
-
-  const result = await apiRequest<BackendSymptomAnalysis>('/symptoms/analyze', {
-    body: {
-      symptomText: normalized,
-    },
+  const result = await apiRequest<ApiSymptomResponse>('/symptoms/analyze', {
+    method: 'POST',
+    body: JSON.stringify({ symptomText: text }),
   })
 
   return {
-    summary: `Recommended department: ${result.recommendedDepartment}`,
+    summary: result.recommendation,
     recommendedDepartment: result.recommendedDepartment,
     urgency: mapUrgency(result.urgencyLevel),
     guidance: result.recommendation,

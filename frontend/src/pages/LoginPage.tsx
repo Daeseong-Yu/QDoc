@@ -38,7 +38,7 @@ export function LoginPage() {
         <section className="auth-card">
           <p className="brand-kicker">QDoc</p>
           <h2>Preparing sign-in</h2>
-          <p className="muted">Please wait a moment.</p>
+          <p className="muted">Please wait while QDoc restores your authentication state.</p>
         </section>
       </main>
     )
@@ -90,15 +90,19 @@ export function LoginPage() {
       <section className="auth-card">
         <p className="brand-kicker">QDoc</p>
         <h2>Sign in or join</h2>
-        <p className="muted">{isAuth0Available ? 'Choose a sign-in method to continue.' : 'Sign in to continue.'}</p>
+        <p className="muted">
+          {isAuth0Available
+            ? 'Continue with Auth0 for production-style sign-in, or use a local account only when dev bypass is enabled.'
+            : 'Use a local account for MVP testing. Auth0 becomes available once the frontend domain and client ID are configured.'}
+        </p>
 
         {infoMessage ? <p className="info-banner">{infoMessage}</p> : null}
         {formError ? <p className="error-banner">{formError}</p> : null}
 
         {isAuth0Available ? (
           <section className="auth-alt-card">
-            <h3>Secure sign-in</h3>
-            <p>Use your account to continue.</p>
+            <h3>Auth0 sign-in</h3>
+            <p>Use your hosted login flow and return to the requested page after authentication.</p>
             <button type="button" className="primary-button auth-alt-button" onClick={handleAuth0Login}>
               Continue with Auth0
             </button>
@@ -109,7 +113,7 @@ export function LoginPage() {
           <>
             <section className="auth-alt-card auth-alt-card-muted">
               <h3>Local account</h3>
-              <p>Enter your details to continue.</p>
+              <p>Available in development bypass mode for fast MVP testing.</p>
             </section>
 
             <form onSubmit={handleSubmit} className="auth-form">
@@ -148,19 +152,19 @@ export function LoginPage() {
                     setFormError(null)
                   }}
                 />
-                I agree to receive queue and visit updates.
+                I agree to data use for queue and notification purposes.
               </label>
 
               <button type="submit" className="ghost-button auth-submit-button">
-                Continue
+                Continue with local account
               </button>
             </form>
 
             <section className="auth-alt-card">
-              <h3>Guest access</h3>
-              <p>Continue without full account setup.</p>
+              <h3>Developer shortcut</h3>
+              <p>Start a local guest session without entering account details.</p>
               <button type="button" className="ghost-button auth-alt-button" onClick={handleDevSession}>
-                Continue as guest
+                Continue as guest user
               </button>
             </section>
           </>
@@ -168,8 +172,8 @@ export function LoginPage() {
 
         {!isAuth0Available && !isDevAuthBypass ? (
           <section className="auth-alt-card auth-alt-card-muted">
-            <h3>Sign-in unavailable</h3>
-            <p>Please try again later.</p>
+            <h3>Authentication is not configured</h3>
+            <p>Set Auth0 frontend variables or enable dev bypass to continue.</p>
           </section>
         ) : null}
       </section>

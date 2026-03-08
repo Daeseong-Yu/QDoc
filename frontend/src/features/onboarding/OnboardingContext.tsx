@@ -121,28 +121,29 @@ type OnboardingProviderProps = {
   children: ReactNode
 }
 
-type OnboardingSessionProviderProps = {
-  children: ReactNode
-  ownerUserId: string | null
-}
+export function OnboardingProvider({ children }: OnboardingProviderProps) {
+  const { isAuthenticated, session } = useAuth()
+  const ownerUserId = session?.user.id ?? null
 
-function OnboardingSessionProvider({ children, ownerUserId }: OnboardingSessionProviderProps) {
-  const [state, setState] = useState<OnboardingState | null>(() =>
-    ownerUserId ? loadState(ownerUserId) : null,
-  )
+  const [state, setState] = useState<OnboardingState | null>(null)
 
   useEffect(() => {
-    if (!ownerUserId) {
+    if (!isAuthenticated || !ownerUserId) {
+      setState(null)
       saveState(null)
       return
     }
 
+    setState(loadState(ownerUserId))
+  }, [isAuthenticated, ownerUserId])
+
+  useEffect(() => {
     if (!state) {
       return
     }
 
     saveState(state)
-  }, [ownerUserId, state])
+  }, [state])
 
   const value = useMemo<OnboardingContextValue>(() => {
     const contract: OnboardingSessionContract = {
@@ -174,7 +175,7 @@ function OnboardingSessionProvider({ children, ownerUserId }: OnboardingSessionP
 
     const getEntryPath = () => {
       if (!state || !state.completed.family) {
-        return '/'
+        return '/family'
       }
 
       if (!state.completed.symptoms) {
@@ -185,7 +186,7 @@ function OnboardingSessionProvider({ children, ownerUserId }: OnboardingSessionP
         return '/hospitals'
       }
 
-      return '/queue/room'
+      return '/queue'
     }
 
     const completeFamilyStep = () => {
@@ -218,7 +219,6 @@ function OnboardingSessionProvider({ children, ownerUserId }: OnboardingSessionP
           selectedHospitalId: '',
           completed: {
             ...current.completed,
-            family: true,
             symptoms: true,
             hospitals: false,
           },
@@ -237,8 +237,6 @@ function OnboardingSessionProvider({ children, ownerUserId }: OnboardingSessionP
           selectedHospitalId: hospitalId,
           completed: {
             ...current.completed,
-            family: true,
-            symptoms: true,
             hospitals: true,
           },
         }
@@ -267,17 +265,6 @@ function OnboardingSessionProvider({ children, ownerUserId }: OnboardingSessionP
   }, [state])
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>
-}
-
-export function OnboardingProvider({ children }: OnboardingProviderProps) {
-  const { isAuthenticated, session } = useAuth()
-  const ownerUserId = isAuthenticated ? session?.user.id ?? null : null
-
-  return (
-    <OnboardingSessionProvider key={ownerUserId ?? 'anonymous'} ownerUserId={ownerUserId}>
-      {children}
-    </OnboardingSessionProvider>
-  )
 }
 
 export { OnboardingContext }

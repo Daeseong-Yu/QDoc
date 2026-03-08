@@ -18,8 +18,9 @@ export function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/family" element={<FamilyPage />} />
-        <Route path="/hospitals" element={<HospitalSearchPage />} />
         <Route path="/symptoms" element={<SymptomPage />} />
+        <Route path="/hospitals" element={<HospitalSearchPage />} />
+
         <Route path="/queue/patient" element={<PatientSelectPage />} />
         <Route path="/queue/room" element={<RoomSelectPage />} />
         <Route path="/queue/status" element={<QueuePage />} />

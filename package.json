@@ -4,10 +4,13 @@
   "private": true,
   "packageManager": "pnpm@10.33.2",
   "scripts": {
-    "dev": "pnpm --filter @qdoc/web dev",
-    "build": "pnpm --filter @qdoc/web build",
-    "lint": "pnpm --filter @qdoc/web lint",
-    "typecheck": "pnpm --filter @qdoc/web typecheck",
+    "dev": "dotenv -e .env -- turbo run dev --parallel",
+    "dev:web": "dotenv -e .env -- pnpm --filter @qdoc/web dev",
+    "dev:api": "dotenv -e .env -- pnpm --filter @qdoc/api dev",
+    "dev:worker": "dotenv -e .env -- pnpm --filter @qdoc/worker dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
     "db:validate": "dotenv -e .env -- pnpm --filter @qdoc/db db:validate",
     "db:generate": "dotenv -e .env -- pnpm --filter @qdoc/db db:generate",
     "db:migrate": "dotenv -e .env -- pnpm --filter @qdoc/db db:migrate",
@@ -17,6 +20,7 @@
     "@qdoc/config": "workspace:*",
     "dotenv-cli": "^11.0.0",
     "prettier": "^3.5.3",
+    "turbo": "^2.5.4",
     "typescript": "^5.8.3"
   }
 }

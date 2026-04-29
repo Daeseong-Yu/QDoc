@@ -1,9 +1,10 @@
+import { siteSummarySchema } from "@qdoc/contracts";
 import { ClipboardList, Stethoscope } from "lucide-react";
 
-const clinicSites = [
-  { name: "Downtown Clinic", queue: "General Check-in", wait: "12 min" },
-  { name: "Northside Clinic", queue: "Walk-in Care", wait: "18 min" },
-];
+const clinicSites = siteSummarySchema.array().parse([
+  { id: "site-downtown", name: "Downtown Clinic", queueName: "General Check-in", estimatedWaitLabel: "12 min" },
+  { id: "site-northside", name: "Northside Clinic", queueName: "Walk-in Care", estimatedWaitLabel: "18 min" },
+]);
 
 export default function Home() {
   return (
@@ -21,16 +22,16 @@ export default function Home() {
 
         <div className="grid gap-4 md:grid-cols-2">
           {clinicSites.map((site) => (
-            <article key={site.name} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <article key={site.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-950">{site.name}</h2>
-                  <p className="mt-1 text-sm text-slate-600">{site.queue}</p>
+                  <p className="mt-1 text-sm text-slate-600">{site.queueName}</p>
                 </div>
                 <ClipboardList className="text-slate-500" size={22} aria-hidden="true" />
               </div>
               <p className="mt-5 text-sm text-slate-500">Estimated wait</p>
-              <p className="text-2xl font-semibold text-slate-950">{site.wait}</p>
+              <p className="text-2xl font-semibold text-slate-950">{site.estimatedWaitLabel}</p>
             </article>
           ))}
         </div>

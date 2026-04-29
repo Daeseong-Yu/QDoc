@@ -8,6 +8,9 @@
     "dev:web": "dotenv -e .env -- pnpm --filter @qdoc/web dev",
     "dev:api": "dotenv -e .env -- pnpm --filter @qdoc/api dev",
     "dev:worker": "dotenv -e .env -- pnpm --filter @qdoc/worker dev",
+    "start:web": "pnpm --filter @qdoc/web start",
+    "start:api": "pnpm --filter @qdoc/api start",
+    "start:worker": "pnpm --filter @qdoc/worker start",
     "verify:outbox": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:outbox",
     "build": "turbo run build",
     "lint": "turbo run lint",
@@ -15,6 +18,8 @@
     "db:validate": "dotenv -e .env -- pnpm --filter @qdoc/db db:validate",
     "db:generate": "dotenv -e .env -- pnpm --filter @qdoc/db db:generate",
     "db:migrate": "dotenv -e .env -- pnpm --filter @qdoc/db db:migrate",
+    "db:migrate:deploy": "pnpm --filter @qdoc/db db:migrate:deploy",
+    "db:seed:staging": "pnpm --filter @qdoc/db db:seed",
     "db:seed": "dotenv -e .env -- pnpm --filter @qdoc/db db:seed"
   },
   "devDependencies": {

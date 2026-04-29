@@ -48,11 +48,14 @@ function clearCooldown(map: Map<string, number>, key: string) {
 }
 
 function canDeliverOtp() {
-  return process.env.NODE_ENV !== "production";
+  return (
+    process.env.NODE_ENV !== "production" ||
+    (process.env.APP_ENV === "staging" && process.env.ALLOW_CONSOLE_OTP === "true")
+  );
 }
 
 function deliverOtp(email: string, code: string) {
-  if (process.env.NODE_ENV === "production") {
+  if (!canDeliverOtp()) {
     throw new Error("OTP delivery is not configured for production");
   }
 

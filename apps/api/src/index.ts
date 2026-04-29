@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { activeTicketStatuses } from "@qdoc/contracts";
 import { handleLogout, handleMe, handleOtpRequest, handleOtpVerify } from "./auth.js";
 import { sendJson } from "./http.js";
+import { handleActiveTicket, handleCheckIn, handleSiteQueues, handleSites } from "./patient.js";
 import { handleStaffQueue } from "./staff.js";
 
 const host = process.env.API_HOST ?? "127.0.0.1";
@@ -37,6 +38,30 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/me") {
       await handleMe(request, response);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/sites") {
+      await handleSites(request, response);
+      return;
+    }
+
+    const siteQueuesMatch = url.pathname.match(/^\/sites\/([^/]+)\/queues$/);
+
+    if (request.method === "GET" && siteQueuesMatch?.[1]) {
+      await handleSiteQueues(request, response, siteQueuesMatch[1]);
+      return;
+    }
+
+    const checkInMatch = url.pathname.match(/^\/sites\/([^/]+)\/check-ins$/);
+
+    if (request.method === "POST" && checkInMatch?.[1]) {
+      await handleCheckIn(request, response, checkInMatch[1]);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/patients/me/tickets/active") {
+      await handleActiveTicket(request, response);
       return;
     }
 

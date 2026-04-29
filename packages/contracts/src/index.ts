@@ -52,11 +52,13 @@ export type CurrentUser = z.infer<typeof currentUserSchema>;
 
 export const authErrorSchema = z.object({
   error: z.enum([
+    "conflict",
     "forbidden",
     "invalid_request",
     "invalid_otp",
     "internal_error",
     "otp_delivery_unavailable",
+    "queue_closed",
     "rate_limited",
     "unauthorized",
     "not_found",
@@ -78,3 +80,57 @@ export const staffQueueResponseSchema = z.object({
 });
 
 export type StaffQueueResponse = z.infer<typeof staffQueueResponseSchema>;
+
+export const patientSiteSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  queueCount: z.number().int().nonnegative(),
+});
+
+export const patientSitesResponseSchema = z.object({
+  sites: patientSiteSummarySchema.array(),
+});
+
+export type PatientSitesResponse = z.infer<typeof patientSitesResponseSchema>;
+
+export const patientQueueSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  isOpen: z.boolean(),
+});
+
+export const patientQueuesResponseSchema = z.object({
+  siteId: z.string(),
+  siteName: z.string(),
+  queues: patientQueueSummarySchema.array(),
+});
+
+export type PatientQueuesResponse = z.infer<typeof patientQueuesResponseSchema>;
+
+export const checkInInputSchema = z.object({
+  queueId: z.string().min(1),
+});
+
+export type CheckInInput = z.infer<typeof checkInInputSchema>;
+
+export const patientTicketSummarySchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  siteName: z.string(),
+  queueId: z.string(),
+  queueName: z.string(),
+  status: ticketStatusSchema,
+  createdAt: z.string().datetime(),
+});
+
+export const checkInResponseSchema = z.object({
+  ticket: patientTicketSummarySchema,
+});
+
+export type CheckInResponse = z.infer<typeof checkInResponseSchema>;
+
+export const activeTicketsResponseSchema = z.object({
+  tickets: patientTicketSummarySchema.array(),
+});
+
+export type ActiveTicketsResponse = z.infer<typeof activeTicketsResponseSchema>;

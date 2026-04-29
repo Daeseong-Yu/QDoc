@@ -4,49 +4,49 @@ const prisma = new PrismaClient();
 
 async function main() {
   const organization = await prisma.organization.upsert({
-    where: { id: "demo-org" },
+    where: { id: "qdoc-health" },
     update: {},
     create: {
-      id: "demo-org",
-      name: "QDoc Demo Health",
+      id: "qdoc-health",
+      name: "QDoc Health",
     },
   });
 
   const downtown = await prisma.site.upsert({
-    where: { id: "demo-site-downtown" },
+    where: { id: "site-downtown" },
     update: {},
     create: {
-      id: "demo-site-downtown",
-      name: "Downtown Demo Clinic",
+      id: "site-downtown",
+      name: "Downtown Clinic",
       organizationId: organization.id,
     },
   });
 
   const northside = await prisma.site.upsert({
-    where: { id: "demo-site-northside" },
+    where: { id: "site-northside" },
     update: {},
     create: {
-      id: "demo-site-northside",
-      name: "Northside Demo Clinic",
+      id: "site-northside",
+      name: "Northside Clinic",
       organizationId: organization.id,
     },
   });
 
   await prisma.queue.upsert({
-    where: { id: "demo-queue-downtown-general" },
+    where: { id: "queue-downtown-general" },
     update: {},
     create: {
-      id: "demo-queue-downtown-general",
+      id: "queue-downtown-general",
       name: "General Check-in",
       siteId: downtown.id,
     },
   });
 
   await prisma.queue.upsert({
-    where: { id: "demo-queue-northside-walkin" },
+    where: { id: "queue-northside-walkin" },
     update: {},
     create: {
-      id: "demo-queue-northside-walkin",
+      id: "queue-northside-walkin",
       name: "Walk-in Care",
       siteId: northside.id,
     },

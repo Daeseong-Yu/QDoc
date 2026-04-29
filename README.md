@@ -1,6 +1,6 @@
 # QDoc
 
-Hackathon demo for clinic check-in and queue operations.
+Hackathon project for clinic check-in and queue operations.
 
 ## Development
 
@@ -9,4 +9,4 @@ pnpm install
 pnpm dev
 ```
 
-The implementation follows the QDoc hackathon demo plan.
+The implementation follows the QDoc hackathon plan.

@@ -1,8 +1,8 @@
 import { ClipboardList, Stethoscope } from "lucide-react";
 
-const demoSites = [
-  { name: "Downtown Demo Clinic", queue: "General Check-in", wait: "12 min" },
-  { name: "Northside Demo Clinic", queue: "Walk-in Care", wait: "18 min" },
+const clinicSites = [
+  { name: "Downtown Clinic", queue: "General Check-in", wait: "12 min" },
+  { name: "Northside Clinic", queue: "Walk-in Care", wait: "18 min" },
 ];
 
 export default function Home() {
@@ -15,12 +15,12 @@ export default function Home() {
           </div>
           <div>
             <p className="text-sm font-medium uppercase tracking-wide text-slate-500">QDoc</p>
-            <h1 className="text-3xl font-semibold text-slate-950">Clinic queue demo</h1>
+            <h1 className="text-3xl font-semibold text-slate-950">Clinic queue</h1>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {demoSites.map((site) => (
+          {clinicSites.map((site) => (
             <article key={site.name} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>

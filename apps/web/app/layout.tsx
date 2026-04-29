@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "QDoc",
-  description: "Clinic check-in and queue demo",
+  description: "Clinic check-in and queue operations",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

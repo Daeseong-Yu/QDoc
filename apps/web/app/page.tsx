@@ -14,7 +14,7 @@ import {
   type PatientSiteSummary,
   type PatientTicketSummary,
 } from "@qdoc/contracts";
-import { Check, ClipboardList, Clock3, Loader2, LogOut, Mail, MapPin, RefreshCcw, Stethoscope } from "lucide-react";
+import { Bell, Check, ClipboardList, Clock3, Loader2, LogOut, Mail, MapPin, RefreshCcw, Stethoscope } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
@@ -529,6 +529,19 @@ export default function Home() {
                     <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{ticket.status}</span>
                   </div>
                   <p className="mt-3 text-xs text-slate-500">Checked in {new Date(ticket.createdAt).toLocaleTimeString()}</p>
+                  {ticket.notifications.length > 0 ? (
+                    <div className="mt-4 grid gap-2 border-t border-slate-100 pt-3">
+                      {ticket.notifications.map((notification) => (
+                        <div key={notification.id} className="flex gap-2 text-sm text-slate-700">
+                          <Bell size={15} className="mt-0.5 shrink-0 text-slate-500" aria-hidden="true" />
+                          <div>
+                            <p>{notification.message}</p>
+                            <p className="mt-1 text-xs text-slate-500">{new Date(notification.createdAt).toLocaleTimeString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>

@@ -155,6 +155,15 @@ export const checkInInputSchema = z.object({
 
 export type CheckInInput = z.infer<typeof checkInInputSchema>;
 
+export const patientNotificationSummarySchema = z.object({
+  id: z.string(),
+  channel: z.string(),
+  message: z.string(),
+  createdAt: z.string().datetime(),
+});
+
+export type PatientNotificationSummary = z.infer<typeof patientNotificationSummarySchema>;
+
 export const patientTicketSummarySchema = z.object({
   id: z.string(),
   siteId: z.string(),
@@ -163,6 +172,7 @@ export const patientTicketSummarySchema = z.object({
   queueName: z.string(),
   status: ticketStatusSchema,
   createdAt: z.string().datetime(),
+  notifications: patientNotificationSummarySchema.array(),
 });
 
 export type PatientTicketSummary = z.infer<typeof patientTicketSummarySchema>;

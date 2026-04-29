@@ -18,6 +18,12 @@ type PatientTicketRecord = {
   queueId: string;
   status: TicketStatus;
   createdAt: Date;
+  notifications?: Array<{
+    id: string;
+    channel: string;
+    message: string;
+    createdAt: Date;
+  }>;
   site: {
     name: string;
   };
@@ -35,6 +41,13 @@ function serializePatientTicket(ticket: PatientTicketRecord) {
     queueName: ticket.queue.name,
     status: ticket.status,
     createdAt: ticket.createdAt.toISOString(),
+    notifications:
+      ticket.notifications?.map((notification) => ({
+        id: notification.id,
+        channel: notification.channel,
+        message: notification.message,
+        createdAt: notification.createdAt.toISOString(),
+      })) ?? [],
   };
 }
 
@@ -244,6 +257,18 @@ export async function handleActiveTicket(request: IncomingMessage, response: Ser
       queue: {
         select: {
           name: true,
+        },
+      },
+      notifications: {
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 3,
+        select: {
+          id: true,
+          channel: true,
+          message: true,
+          createdAt: true,
         },
       },
     },

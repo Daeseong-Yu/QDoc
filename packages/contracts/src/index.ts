@@ -87,6 +87,8 @@ export const patientSiteSummarySchema = z.object({
   queueCount: z.number().int().nonnegative(),
 });
 
+export type PatientSiteSummary = z.infer<typeof patientSiteSummarySchema>;
+
 export const patientSitesResponseSchema = z.object({
   sites: patientSiteSummarySchema.array(),
 });
@@ -98,6 +100,8 @@ export const patientQueueSummarySchema = z.object({
   name: z.string(),
   isOpen: z.boolean(),
 });
+
+export type PatientQueueSummary = z.infer<typeof patientQueueSummarySchema>;
 
 export const patientQueuesResponseSchema = z.object({
   siteId: z.string(),
@@ -122,6 +126,8 @@ export const patientTicketSummarySchema = z.object({
   status: ticketStatusSchema,
   createdAt: z.string().datetime(),
 });
+
+export type PatientTicketSummary = z.infer<typeof patientTicketSummarySchema>;
 
 export const checkInResponseSchema = z.object({
   ticket: patientTicketSummarySchema,

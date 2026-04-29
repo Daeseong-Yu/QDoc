@@ -1,41 +1,540 @@
-import { siteSummarySchema } from "@qdoc/contracts";
-import { ClipboardList, Stethoscope } from "lucide-react";
+"use client";
 
-const clinicSites = siteSummarySchema.array().parse([
-  { id: "site-downtown", name: "Downtown Clinic", queueName: "General Check-in", estimatedWaitLabel: "12 min" },
-  { id: "site-northside", name: "Northside Clinic", queueName: "Walk-in Care", estimatedWaitLabel: "18 min" },
-]);
+import {
+  activeTicketsResponseSchema,
+  authErrorSchema,
+  checkInResponseSchema,
+  currentUserSchema,
+  otpRequestInputSchema,
+  otpVerifyInputSchema,
+  patientQueuesResponseSchema,
+  patientSitesResponseSchema,
+  type CurrentUser,
+  type PatientQueueSummary,
+  type PatientSiteSummary,
+  type PatientTicketSummary,
+} from "@qdoc/contracts";
+import { Check, ClipboardList, Clock3, Loader2, LogOut, Mail, MapPin, RefreshCcw, Stethoscope } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
+
+type RequestState = "idle" | "loading" | "success" | "error";
+type AuthStep = "email" | "code";
+
+type ApiError = {
+  status: number;
+  error: string;
+};
+
+async function readApiResponse<T>(response: Response, schema: z.ZodSchema<T>) {
+  const data: unknown = await response.json();
+
+  if (!response.ok) {
+    const parsedError = authErrorSchema.safeParse(data);
+    const error = new Error(parsedError.success ? parsedError.data.error : "request_failed") as Error & ApiError;
+    error.status = response.status;
+    error.error = parsedError.success ? parsedError.data.error : "request_failed";
+    throw error;
+  }
+
+  return schema.parse(data);
+}
+
+function isApiError(error: unknown): error is ApiError {
+  return error instanceof Error && "status" in error && "error" in error;
+}
+
+function getMessage(error: unknown) {
+  if (!isApiError(error)) {
+    return "Request failed. Try again.";
+  }
+
+  if (error.error === "unauthorized") {
+    return "Sign in to continue.";
+  }
+
+  if (error.error === "conflict") {
+    return "You already have an active ticket at this site.";
+  }
+
+  if (error.error === "queue_closed") {
+    return "This queue is currently closed.";
+  }
+
+  return "Request failed. Try again.";
+}
 
 export default function Home() {
-  return (
-    <main className="min-h-screen px-6 py-8 md:px-10">
-      <section className="mx-auto flex max-w-5xl flex-col gap-8">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-slate-950 text-white">
-            <Stethoscope size={22} aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-sm font-medium uppercase tracking-wide text-slate-500">QDoc</p>
-            <h1 className="text-3xl font-semibold text-slate-950">Clinic queue</h1>
-          </div>
-        </div>
+  const [sites, setSites] = useState<PatientSiteSummary[]>([]);
+  const [queues, setQueues] = useState<PatientQueueSummary[]>([]);
+  const [tickets, setTickets] = useState<PatientTicketSummary[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+  const [selectedQueueId, setSelectedQueueId] = useState<string>("");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [authStep, setAuthStep] = useState<AuthStep>("email");
+  const [sitesState, setSitesState] = useState<RequestState>("loading");
+  const [queuesState, setQueuesState] = useState<RequestState>("idle");
+  const [ticketState, setTicketState] = useState<RequestState>("idle");
+  const [authState, setAuthState] = useState<RequestState>("idle");
+  const [checkInState, setCheckInState] = useState<RequestState>("idle");
+  const [message, setMessage] = useState("");
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {clinicSites.map((site) => (
-            <article key={site.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-950">{site.name}</h2>
-                  <p className="mt-1 text-sm text-slate-600">{site.queueName}</p>
-                </div>
-                <ClipboardList className="text-slate-500" size={22} aria-hidden="true" />
+  const selectedSite = useMemo(() => {
+    return sites.find((site) => site.id === selectedSiteId) ?? null;
+  }, [selectedSiteId, sites]);
+
+  const activeSiteTicket = useMemo(() => {
+    return tickets.find((ticket) => ticket.siteId === selectedSiteId) ?? null;
+  }, [selectedSiteId, tickets]);
+
+  const clearPatientSession = useCallback(() => {
+    setCurrentUser(null);
+    setTickets([]);
+    setTicketState("idle");
+  }, []);
+
+  const loadTickets = useCallback(async () => {
+    if (!currentUser) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/patients/me/tickets/active", { cache: "no-store" });
+      const data = await readApiResponse(response, activeTicketsResponseSchema);
+      setTickets(data.tickets);
+    } catch (error) {
+      if (isApiError(error) && error.status === 401) {
+        clearPatientSession();
+      }
+
+      throw error;
+    }
+  }, [clearPatientSession, currentUser]);
+
+  const loadCurrentUser = useCallback(async () => {
+    const response = await fetch("/api/me", { cache: "no-store" });
+
+    if (response.status === 401) {
+      clearPatientSession();
+      return;
+    }
+
+    const user = await readApiResponse(response, currentUserSchema);
+    setCurrentUser(user);
+  }, [clearPatientSession]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSites() {
+      setSitesState("loading");
+
+      try {
+        const response = await fetch("/api/sites", { cache: "no-store" });
+        const data = await readApiResponse(response, patientSitesResponseSchema);
+
+        if (cancelled) {
+          return;
+        }
+
+        setSites(data.sites);
+        setSelectedSiteId((current) => current || data.sites[0]?.id || "");
+        setSitesState("success");
+      } catch (error) {
+        if (!cancelled) {
+          setSitesState("error");
+          setMessage(getMessage(error));
+        }
+      }
+    }
+
+    void loadSites();
+    loadCurrentUser().catch((error: unknown) => {
+      if (!cancelled) {
+        clearPatientSession();
+        setMessage(getMessage(error));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clearPatientSession, loadCurrentUser]);
+
+  useEffect(() => {
+    if (!selectedSiteId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadQueues() {
+      setQueuesState("loading");
+
+      try {
+        const response = await fetch(`/api/sites/${selectedSiteId}/queues`, { cache: "no-store" });
+        const data = await readApiResponse(response, patientQueuesResponseSchema);
+
+        if (cancelled) {
+          return;
+        }
+
+        setQueues(data.queues);
+        setSelectedQueueId((current) => {
+          if (data.queues.some((queue) => queue.id === current)) {
+            return current;
+          }
+
+          return data.queues[0]?.id || "";
+        });
+        setQueuesState("success");
+      } catch (error) {
+        if (!cancelled) {
+          setQueuesState("error");
+          setMessage(getMessage(error));
+        }
+      }
+    }
+
+    void loadQueues();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSiteId]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    setTicketState("loading");
+    loadTickets()
+      .then(() => {
+        setTicketState("success");
+      })
+      .catch((error: unknown) => {
+        setTicketState("error");
+        setMessage(getMessage(error));
+      });
+  }, [currentUser, loadTickets]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void loadTickets().catch((error: unknown) => {
+        if (!isApiError(error) || error.status !== 401) {
+          setMessage(getMessage(error));
+        }
+      });
+    }, 4000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [currentUser, loadTickets]);
+
+  async function requestOtp() {
+    setMessage("");
+    setAuthState("loading");
+
+    const input = otpRequestInputSchema.safeParse({ email });
+
+    if (!input.success) {
+      setAuthState("error");
+      setMessage("Enter a valid email address.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/auth/otp/request", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input.data),
+      });
+
+      await readApiResponse(response, z.object({ ok: z.literal(true) }));
+      setAuthStep("code");
+      setAuthState("success");
+      setMessage("Enter the verification code sent to your email.");
+    } catch (error) {
+      setAuthState("error");
+      setMessage(getMessage(error));
+    }
+  }
+
+  async function verifyOtp() {
+    setMessage("");
+    setAuthState("loading");
+
+    const input = otpVerifyInputSchema.safeParse({ email, code });
+
+    if (!input.success) {
+      setAuthState("error");
+      setMessage("Enter the 6-digit verification code.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/auth/otp/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input.data),
+      });
+
+      const user = await readApiResponse(response, currentUserSchema);
+      setCurrentUser(user);
+      setAuthState("success");
+      setMessage("Signed in.");
+    } catch (error) {
+      setAuthState("error");
+      setMessage(getMessage(error));
+    }
+  }
+
+  async function checkIn() {
+    if (!selectedSiteId || !selectedQueueId) {
+      return;
+    }
+
+    setMessage("");
+    setCheckInState("loading");
+
+    try {
+      const response = await fetch(`/api/sites/${selectedSiteId}/check-ins`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ queueId: selectedQueueId }),
+      });
+
+      const data = await readApiResponse(response, checkInResponseSchema);
+      setTickets((current) => [data.ticket, ...current.filter((ticket) => ticket.id !== data.ticket.id)]);
+      setCheckInState("success");
+      setMessage("Check-in complete.");
+    } catch (error) {
+      if (isApiError(error) && error.status === 401) {
+        clearPatientSession();
+      }
+
+      setCheckInState("error");
+      setMessage(getMessage(error));
+    }
+  }
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    clearPatientSession();
+    setAuthStep("email");
+    setCode("");
+    setMessage("");
+  }
+
+  return (
+    <main className="min-h-screen bg-[#f7f8fa] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="flex flex-col gap-5">
+          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-slate-950 text-white">
+                <Stethoscope size={22} aria-hidden="true" />
               </div>
-              <p className="mt-5 text-sm text-slate-500">Estimated wait</p>
-              <p className="text-2xl font-semibold text-slate-950">{site.estimatedWaitLabel}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+              <div>
+                <p className="text-sm font-medium uppercase text-slate-500">QDoc</p>
+                <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Clinic queue</h1>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void loadTickets();
+              }}
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!currentUser}
+            >
+              <RefreshCcw size={16} aria-hidden="true" />
+              Refresh
+            </button>
+          </header>
+
+          {message ? (
+            <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+              {message}
+            </div>
+          ) : null}
+
+          <section className="grid gap-3 md:grid-cols-2">
+            {sitesState === "loading" ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
+                Loading clinics...
+              </div>
+            ) : null}
+            {sites.map((site) => (
+              <button
+                key={site.id}
+                type="button"
+                onClick={() => setSelectedSiteId(site.id)}
+                className={`rounded-lg border bg-white p-5 text-left shadow-sm transition hover:border-slate-400 ${
+                  selectedSiteId === site.id ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-950">{site.name}</h2>
+                    <p className="mt-1 text-sm text-slate-600">{site.queueCount} queue available</p>
+                  </div>
+                  <MapPin className="text-slate-500" size={21} aria-hidden="true" />
+                </div>
+              </button>
+            ))}
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <ClipboardList size={21} className="text-slate-500" aria-hidden="true" />
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">{selectedSite?.name ?? "Select a clinic"}</h2>
+                <p className="text-sm text-slate-600">Choose a queue and check in.</p>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {queuesState === "loading" ? <p className="text-sm text-slate-500">Loading queues...</p> : null}
+              {queues.map((queue) => (
+                <label
+                  key={queue.id}
+                  className={`flex cursor-pointer items-center justify-between gap-4 rounded-md border p-4 ${
+                    selectedQueueId === queue.id ? "border-slate-950 bg-slate-50" : "border-slate-200"
+                  }`}
+                >
+                  <span>
+                    <span className="block font-medium text-slate-950">{queue.name}</span>
+                    <span className="text-sm text-slate-500">{queue.isOpen ? "Open" : "Closed"}</span>
+                  </span>
+                  <input
+                    type="radio"
+                    name="queue"
+                    value={queue.id}
+                    checked={selectedQueueId === queue.id}
+                    onChange={() => setSelectedQueueId(queue.id)}
+                    className="size-4 accent-slate-950"
+                  />
+                </label>
+              ))}
+            </div>
+
+            {activeSiteTicket ? (
+              <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                You are checked in for {activeSiteTicket.queueName}. Current status: {activeSiteTicket.status}.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  void checkIn();
+                }}
+                disabled={!selectedQueueId || checkInState === "loading"}
+                className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {checkInState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : <Check size={17} aria-hidden="true" />}
+                Check in
+              </button>
+            )}
+          </section>
+        </section>
+
+        <aside className="flex flex-col gap-5">
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Patient session</h2>
+                <p className="text-sm text-slate-600">{currentUser ? currentUser.email : "Sign in with email OTP."}</p>
+              </div>
+              {currentUser ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void signOut();
+                  }}
+                  className="inline-flex size-9 items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50"
+                  aria-label="Sign out"
+                >
+                  <LogOut size={17} aria-hidden="true" />
+                </button>
+              ) : (
+                <Mail size={21} className="text-slate-500" aria-hidden="true" />
+              )}
+            </div>
+
+            {!currentUser ? (
+              <div className="grid gap-3">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950"
+                />
+                {authStep === "code" ? (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    placeholder="6-digit code"
+                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950"
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    void (authStep === "email" ? requestOtp() : verifyOtp());
+                  }}
+                  disabled={authState === "loading"}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {authState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
+                  {authStep === "email" ? "Send code" : "Sign in"}
+                </button>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <Clock3 size={21} className="text-slate-500" aria-hidden="true" />
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Active tickets</h2>
+                <p className="text-sm text-slate-600">Updates every 4 seconds.</p>
+              </div>
+            </div>
+
+            {!currentUser ? <p className="text-sm text-slate-500">Sign in to view active tickets.</p> : null}
+            {currentUser && ticketState === "loading" ? <p className="text-sm text-slate-500">Loading tickets...</p> : null}
+            {currentUser && tickets.length === 0 && ticketState !== "loading" ? (
+              <p className="text-sm text-slate-500">No active tickets.</p>
+            ) : null}
+            <div className="grid gap-3">
+              {tickets.map((ticket) => (
+                <article key={ticket.id} className="rounded-md border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-950">{ticket.siteName}</h3>
+                      <p className="text-sm text-slate-600">{ticket.queueName}</p>
+                    </div>
+                    <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{ticket.status}</span>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500">Checked in {new Date(ticket.createdAt).toLocaleTimeString()}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        </aside>
+      </div>
     </main>
   );
 }

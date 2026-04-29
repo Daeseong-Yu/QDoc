@@ -26,6 +26,24 @@ type ApiError = {
   error: string;
 };
 
+const ticketStatusLabels: Record<PatientTicketSummary["status"], string> = {
+  waiting: "Waiting",
+  called: "Called",
+  in_service: "In service",
+  completed: "Completed",
+  no_show: "No-show",
+  cancelled: "Cancelled",
+};
+
+const ticketStatusStyles: Record<PatientTicketSummary["status"], string> = {
+  waiting: "bg-amber-50 text-amber-800 ring-amber-200",
+  called: "bg-sky-50 text-sky-800 ring-sky-200",
+  in_service: "bg-violet-50 text-violet-800 ring-violet-200",
+  completed: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  no_show: "bg-rose-50 text-rose-800 ring-rose-200",
+  cancelled: "bg-slate-100 text-slate-700 ring-slate-200",
+};
+
 async function readApiResponse<T>(response: Response, schema: z.ZodSchema<T>) {
   const data: unknown = await response.json();
 
@@ -428,8 +446,15 @@ export default function Home() {
             </div>
 
             {activeSiteTicket ? (
-              <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                You are checked in for {activeSiteTicket.queueName}. Current status: {activeSiteTicket.status}.
+              <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>You are checked in for {activeSiteTicket.queueName}.</span>
+                  <span
+                    className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 ${ticketStatusStyles[activeSiteTicket.status]}`}
+                  >
+                    {ticketStatusLabels[activeSiteTicket.status]}
+                  </span>
+                </div>
               </div>
             ) : (
               <button
@@ -526,7 +551,9 @@ export default function Home() {
                       <h3 className="font-semibold text-slate-950">{ticket.siteName}</h3>
                       <p className="text-sm text-slate-600">{ticket.queueName}</p>
                     </div>
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{ticket.status}</span>
+                    <span className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 ${ticketStatusStyles[ticket.status]}`}>
+                      {ticketStatusLabels[ticket.status]}
+                    </span>
                   </div>
                   <p className="mt-3 text-xs text-slate-500">Checked in {new Date(ticket.createdAt).toLocaleTimeString()}</p>
                   {ticket.notifications.length > 0 ? (

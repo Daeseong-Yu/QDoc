@@ -42,6 +42,24 @@ const boardStatuses: Array<{ status: TicketStatus; label: string }> = [
   { status: "in_service", label: "In service" },
 ];
 
+const ticketStatusLabels: Record<TicketStatus, string> = {
+  waiting: "Waiting",
+  called: "Called",
+  in_service: "In service",
+  completed: "Completed",
+  no_show: "No-show",
+  cancelled: "Cancelled",
+};
+
+const ticketStatusStyles: Record<TicketStatus, string> = {
+  waiting: "bg-amber-50 text-amber-800 ring-amber-200",
+  called: "bg-sky-50 text-sky-800 ring-sky-200",
+  in_service: "bg-violet-50 text-violet-800 ring-violet-200",
+  completed: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  no_show: "bg-rose-50 text-rose-800 ring-rose-200",
+  cancelled: "bg-slate-100 text-slate-700 ring-slate-200",
+};
+
 async function readApiResponse<T>(response: Response, schema: z.ZodSchema<T>) {
   const data: unknown = await response.json();
 
@@ -481,7 +499,9 @@ export default function StaffPage() {
                             <h4 className="font-semibold text-slate-950">{ticket.queueName}</h4>
                             <p className="mt-1 text-xs text-slate-500">Checked in {new Date(ticket.createdAt).toLocaleTimeString()}</p>
                           </div>
-                          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{ticket.status}</span>
+                          <span className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 ${ticketStatusStyles[ticket.status]}`}>
+                            {ticketStatusLabels[ticket.status]}
+                          </span>
                         </div>
 
                         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">

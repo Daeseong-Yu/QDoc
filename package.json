@@ -8,6 +8,7 @@
     "dev:web": "dotenv -e .env -- pnpm --filter @qdoc/web dev",
     "dev:api": "dotenv -e .env -- pnpm --filter @qdoc/api dev",
     "dev:worker": "dotenv -e .env -- pnpm --filter @qdoc/worker dev",
+    "verify:outbox": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:outbox",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

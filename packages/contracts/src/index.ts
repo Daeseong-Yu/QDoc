@@ -56,6 +56,7 @@ export const authErrorSchema = z.object({
     "forbidden",
     "invalid_request",
     "invalid_otp",
+    "invalid_transition",
     "internal_error",
     "otp_delivery_unavailable",
     "queue_closed",
@@ -80,6 +81,25 @@ export const staffQueueResponseSchema = z.object({
 });
 
 export type StaffQueueResponse = z.infer<typeof staffQueueResponseSchema>;
+
+export const staffTicketSummarySchema = z.object({
+  id: z.string(),
+  siteId: z.string(),
+  siteName: z.string(),
+  queueId: z.string(),
+  queueName: z.string(),
+  patientEmail: emailSchema,
+  status: ticketStatusSchema,
+  updatedAt: z.string().datetime(),
+});
+
+export type StaffTicketSummary = z.infer<typeof staffTicketSummarySchema>;
+
+export const staffTicketResponseSchema = z.object({
+  ticket: staffTicketSummarySchema,
+});
+
+export type StaffTicketResponse = z.infer<typeof staffTicketResponseSchema>;
 
 export const patientSiteSummarySchema = z.object({
   id: z.string(),

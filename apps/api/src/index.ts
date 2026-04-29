@@ -3,7 +3,7 @@ import { activeTicketStatuses } from "@qdoc/contracts";
 import { handleLogout, handleMe, handleOtpRequest, handleOtpVerify } from "./auth.js";
 import { sendJson } from "./http.js";
 import { handleActiveTicket, handleCheckIn, handleSiteQueues, handleSites } from "./patient.js";
-import { handleStaffQueue } from "./staff.js";
+import { handleStaffQueue, handleStaffTicketAction, isStaffTicketAction } from "./staff.js";
 
 const host = process.env.API_HOST ?? "127.0.0.1";
 const port = Number(process.env.API_PORT ?? "4000");
@@ -69,6 +69,18 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && staffQueueMatch?.[1]) {
       await handleStaffQueue(request, response, staffQueueMatch[1]);
+      return;
+    }
+
+    const staffTicketActionMatch = url.pathname.match(/^\/staff\/tickets\/([^/]+)\/([^/]+)$/);
+
+    if (
+      request.method === "POST" &&
+      staffTicketActionMatch?.[1] &&
+      staffTicketActionMatch[2] &&
+      isStaffTicketAction(staffTicketActionMatch[2])
+    ) {
+      await handleStaffTicketAction(request, response, staffTicketActionMatch[1], staffTicketActionMatch[2]);
       return;
     }
 

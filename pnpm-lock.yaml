@@ -115,9 +115,9 @@ importers:
 
   apps/worker:
     dependencies:
-      '@qdoc/contracts':
+      '@qdoc/db':
         specifier: workspace:*
-        version: link:../../packages/contracts
+        version: link:../../packages/db
     devDependencies:
       '@qdoc/config':
         specifier: workspace:*

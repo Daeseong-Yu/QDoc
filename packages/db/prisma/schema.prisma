@@ -135,6 +135,20 @@ model NotificationLog {
   createdAt DateTime @default(now())
 }
 
+model Outbox {
+  id          String    @id @default(cuid())
+  type        String
+  payload     Json
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  availableAt DateTime  @default(now())
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, availableAt, createdAt])
+}
+
 model AuditLog {
   id        String   @id @default(cuid())
   actorId   String?

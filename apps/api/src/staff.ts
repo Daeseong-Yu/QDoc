@@ -16,6 +16,7 @@ type StaffTicketRecord = {
   id: string;
   siteId: string;
   queueId: string;
+  userId: string;
   status: TicketStatus;
   updatedAt: Date;
   site: {
@@ -60,6 +61,23 @@ const ticketTransitionByAction: Record<StaffTicketAction, { from: TicketStatus[]
     auditAction: "ticket.cancel",
   },
 };
+
+const ticketStatusLabels: Record<TicketStatus, string> = {
+  waiting: "waiting",
+  called: "called",
+  in_service: "in service",
+  completed: "completed",
+  no_show: "no-show",
+  cancelled: "cancelled",
+};
+
+function getTicketStatusMessage(status: TicketStatus) {
+  if (status === "called") {
+    return "Your queue ticket has been called.";
+  }
+
+  return `Your queue ticket is now ${ticketStatusLabels[status]}.`;
+}
 
 function serializeStaffTicket(ticket: StaffTicketRecord) {
   return {
@@ -202,6 +220,8 @@ export async function handleStaffTicketAction(
     select: {
       id: true,
       siteId: true,
+      queueId: true,
+      userId: true,
       status: true,
     },
   });
@@ -248,6 +268,30 @@ export async function handleStaffTicketAction(
           siteId: ticket.siteId,
           fromStatus: ticket.status,
           toStatus: transition.to,
+        },
+      },
+    });
+
+    const notification = await tx.notificationLog.create({
+      data: {
+        ticketId: ticket.id,
+        channel: "in_app",
+        message: getTicketStatusMessage(transition.to),
+      },
+    });
+
+    await tx.outbox.create({
+      data: {
+        type: "ticket.status_changed",
+        payload: {
+          ticketId: ticket.id,
+          siteId: ticket.siteId,
+          queueId: ticket.queueId,
+          userId: ticket.userId,
+          notificationLogId: notification.id,
+          fromStatus: ticket.status,
+          toStatus: transition.to,
+          action: transition.auditAction,
         },
       },
     });

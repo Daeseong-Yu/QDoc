@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { activeTicketStatuses } from "@qdoc/contracts";
 import { handleLogout, handleMe, handleOtpRequest, handleOtpVerify } from "./auth.js";
 import { sendJson } from "./http.js";
+import { handleStaffQueue } from "./staff.js";
 
 const host = process.env.API_HOST ?? "127.0.0.1";
 const port = Number(process.env.API_PORT ?? "4000");
@@ -36,6 +37,13 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/me") {
       await handleMe(request, response);
+      return;
+    }
+
+    const staffQueueMatch = url.pathname.match(/^\/staff\/sites\/([^/]+)\/queue$/);
+
+    if (request.method === "GET" && staffQueueMatch?.[1]) {
+      await handleStaffQueue(request, response, staffQueueMatch[1]);
       return;
     }
 

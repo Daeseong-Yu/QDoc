@@ -52,8 +52,10 @@ export type CurrentUser = z.infer<typeof currentUserSchema>;
 
 export const authErrorSchema = z.object({
   error: z.enum([
+    "forbidden",
     "invalid_request",
     "invalid_otp",
+    "internal_error",
     "otp_delivery_unavailable",
     "rate_limited",
     "unauthorized",
@@ -62,3 +64,17 @@ export const authErrorSchema = z.object({
 });
 
 export type AuthError = z.infer<typeof authErrorSchema>;
+
+export const staffQueueSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  isOpen: z.boolean(),
+});
+
+export const staffQueueResponseSchema = z.object({
+  siteId: z.string(),
+  siteName: z.string(),
+  queues: staffQueueSummarySchema.array(),
+});
+
+export type StaffQueueResponse = z.infer<typeof staffQueueResponseSchema>;

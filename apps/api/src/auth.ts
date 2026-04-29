@@ -1,6 +1,10 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { currentUserSchema, otpRequestInputSchema, otpVerifyInputSchema } from "@qdoc/contracts";
+import {
+  currentUserSchema,
+  otpRequestInputSchema,
+  otpVerifyInputSchema,
+} from "@qdoc/contracts";
 import { prisma } from "@qdoc/db";
 import { readJson, sendJson } from "./http.js";
 import { clearSessionCookie, createSessionCookie, createSessionToken, readSession } from "./session.js";
@@ -137,6 +141,34 @@ async function loadCurrentUser(userId: string) {
     email: user.email,
     memberships: user.memberships,
   });
+}
+
+export async function getCurrentUserFromRequest(request: IncomingMessage) {
+  const session = readSession(request);
+
+  if (!session) {
+    return null;
+  }
+
+  return loadCurrentUser(session.userId);
+}
+
+export async function requireStaffMembership(request: IncomingMessage, siteId: string) {
+  const currentUser = await getCurrentUserFromRequest(request);
+
+  if (!currentUser) {
+    return { status: "unauthorized" as const };
+  }
+
+  const membership = currentUser.memberships.find((item) => {
+    return item.siteId === siteId && (item.role === "staff" || item.role === "admin");
+  });
+
+  if (!membership) {
+    return { status: "forbidden" as const, currentUser };
+  }
+
+  return { status: "ok" as const, currentUser, membership };
 }
 
 export async function handleOtpRequest(request: IncomingMessage, response: ServerResponse) {
@@ -284,14 +316,7 @@ export async function handleLogout(_request: IncomingMessage, response: ServerRe
 }
 
 export async function handleMe(request: IncomingMessage, response: ServerResponse) {
-  const session = readSession(request);
-
-  if (!session) {
-    sendJson(response, 401, { error: "unauthorized" });
-    return;
-  }
-
-  const currentUser = await loadCurrentUser(session.userId);
+  const currentUser = await getCurrentUserFromRequest(request);
 
   if (!currentUser) {
     sendJson(response, 401, { error: "unauthorized" });

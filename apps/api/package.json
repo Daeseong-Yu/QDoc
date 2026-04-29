@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@qdoc/contracts": "workspace:*"
+    "@qdoc/contracts": "workspace:*",
+    "@qdoc/db": "workspace:*"
   },
   "devDependencies": {
     "@qdoc/config": "workspace:*",

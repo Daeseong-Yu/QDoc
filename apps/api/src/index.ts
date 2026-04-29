@@ -1,24 +1,59 @@
 import { createServer } from "node:http";
 import { activeTicketStatuses } from "@qdoc/contracts";
+import { handleLogout, handleMe, handleOtpRequest, handleOtpVerify } from "./auth.js";
+import { sendJson } from "./http.js";
 
 const host = process.env.API_HOST ?? "127.0.0.1";
 const port = Number(process.env.API_PORT ?? "4000");
 
-const server = createServer((request, response) => {
-  if (request.url === "/health") {
-    response.writeHead(200, { "content-type": "application/json" });
-    response.end(
-      JSON.stringify({
+const server = createServer(async (request, response) => {
+  try {
+    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? `${host}:${port}`}`);
+
+    if (request.method === "GET" && url.pathname === "/health") {
+      sendJson(response, 200, {
         ok: true,
         service: "api",
         activeTicketStatuses,
-      }),
-    );
-    return;
-  }
+      });
+      return;
+    }
 
-  response.writeHead(404, { "content-type": "application/json" });
-  response.end(JSON.stringify({ error: "not_found" }));
+    if (request.method === "POST" && url.pathname === "/auth/otp/request") {
+      await handleOtpRequest(request, response);
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/auth/otp/verify") {
+      await handleOtpVerify(request, response);
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/auth/logout") {
+      await handleLogout(request, response);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/me") {
+      await handleMe(request, response);
+      return;
+    }
+
+    sendJson(response, 404, { error: "not_found" });
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      sendJson(response, 400, { error: "invalid_request" });
+      return;
+    }
+
+    if (error instanceof Error && error.message === "request_body_too_large") {
+      sendJson(response, 413, { error: "invalid_request" });
+      return;
+    }
+
+    console.error(error);
+    sendJson(response, 500, { error: "internal_error" });
+  }
 });
 
 server.listen(port, host, () => {

@@ -9,6 +9,7 @@ COPY apps ./apps
 COPY packages ./packages
 
 RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @qdoc/db db:generate
 RUN pnpm build
 
 ENV NODE_ENV=production

@@ -50,6 +50,8 @@ model Queue {
   tickets   Ticket[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([siteId, createdAt])
 }
 
 model User {
@@ -110,6 +112,9 @@ model Ticket {
   notifications NotificationLog[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+
+  @@index([siteId, status, createdAt])
+  @@index([siteId, status, queueId, createdAt])
 }
 
 model TicketEvent {

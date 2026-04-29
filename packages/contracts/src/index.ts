@@ -78,6 +78,18 @@ export const staffQueueResponseSchema = z.object({
   siteId: z.string(),
   siteName: z.string(),
   queues: staffQueueSummarySchema.array(),
+  tickets: z
+    .object({
+      id: z.string(),
+      siteId: z.string(),
+      siteName: z.string(),
+      queueId: z.string(),
+      queueName: z.string(),
+      status: ticketStatusSchema,
+      createdAt: z.string().datetime(),
+      updatedAt: z.string().datetime(),
+    })
+    .array(),
 });
 
 export type StaffQueueResponse = z.infer<typeof staffQueueResponseSchema>;

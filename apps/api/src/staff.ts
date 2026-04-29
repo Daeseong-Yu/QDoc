@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { staffQueueResponseSchema, staffTicketResponseSchema, type TicketStatus } from "@qdoc/contracts";
+import { activeTicketStatuses, staffQueueResponseSchema, staffTicketResponseSchema, type TicketStatus } from "@qdoc/contracts";
 import { prisma } from "@qdoc/db";
 import { sendJson } from "./http.js";
 import { getCurrentUserFromRequest, requireStaffMembership } from "./auth.js";
@@ -21,6 +21,10 @@ type StaffTicketRecord = {
   user: {
     email: string;
   };
+};
+
+type StaffQueueTicketRecord = Omit<StaffTicketRecord, "user"> & {
+  createdAt: Date;
 };
 
 const ticketTransitionByAction: Record<StaffTicketAction, { from: TicketStatus[]; to: TicketStatus; auditAction: string }> = {
@@ -64,6 +68,19 @@ function serializeStaffTicket(ticket: StaffTicketRecord) {
   };
 }
 
+function serializeStaffQueueTicket(ticket: StaffQueueTicketRecord) {
+  return {
+    id: ticket.id,
+    siteId: ticket.siteId,
+    siteName: ticket.site.name,
+    queueId: ticket.queueId,
+    queueName: ticket.queue.name,
+    status: ticket.status,
+    createdAt: ticket.createdAt.toISOString(),
+    updatedAt: ticket.updatedAt.toISOString(),
+  };
+}
+
 export async function handleStaffQueue(request: IncomingMessage, response: ServerResponse, siteId: string) {
   const auth = await requireStaffMembership(request, siteId);
 
@@ -92,6 +109,35 @@ export async function handleStaffQueue(request: IncomingMessage, response: Serve
           isOpen: true,
         },
       },
+      tickets: {
+        where: {
+          status: {
+            in: activeTicketStatuses,
+          },
+        },
+        orderBy: [
+          {
+            queue: {
+              createdAt: "asc",
+            },
+          },
+          {
+            createdAt: "asc",
+          },
+        ],
+        include: {
+          site: {
+            select: {
+              name: true,
+            },
+          },
+          queue: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -107,6 +153,7 @@ export async function handleStaffQueue(request: IncomingMessage, response: Serve
       siteId: site.id,
       siteName: site.name,
       queues: site.queues,
+      tickets: site.tickets.map(serializeStaffQueueTicket),
     }),
   );
 }

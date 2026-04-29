@@ -1,7 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { activeTicketStatuses, staffQueueResponseSchema, staffTicketResponseSchema, type TicketStatus } from "@qdoc/contracts";
+import {
+  activeTicketStatuses,
+  staffQueueResponseSchema,
+  staffTicketActionInputSchema,
+  staffTicketResponseSchema,
+  type TicketStatus,
+} from "@qdoc/contracts";
 import { prisma } from "@qdoc/db";
-import { sendJson } from "./http.js";
+import { readJson, sendJson } from "./http.js";
 import { getCurrentUserFromRequest, requireStaffMembership } from "./auth.js";
 
 type StaffTicketAction = "call" | "start-service" | "complete" | "no-show" | "cancel";
@@ -172,11 +178,18 @@ export async function handleStaffTicketAction(
     return;
   }
 
+  const input = staffTicketActionInputSchema.safeParse(await readJson(request));
+
+  if (!input.success) {
+    sendJson(response, 400, { error: "invalid_request" });
+    return;
+  }
+
   const allowedSiteIds = currentUser.memberships
     .filter((membership) => membership.role === "staff" || membership.role === "admin")
     .map((membership) => membership.siteId);
 
-  if (allowedSiteIds.length === 0) {
+  if (!allowedSiteIds.includes(input.data.siteId)) {
     sendJson(response, 403, { error: "forbidden" });
     return;
   }
@@ -184,9 +197,7 @@ export async function handleStaffTicketAction(
   const ticket = await prisma.ticket.findFirst({
     where: {
       id: ticketId,
-      siteId: {
-        in: allowedSiteIds,
-      },
+      siteId: input.data.siteId,
     },
     select: {
       id: true,

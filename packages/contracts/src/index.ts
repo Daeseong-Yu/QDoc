@@ -113,6 +113,12 @@ export const staffTicketResponseSchema = z.object({
 
 export type StaffTicketResponse = z.infer<typeof staffTicketResponseSchema>;
 
+export const staffTicketActionInputSchema = z.object({
+  siteId: z.string().min(1),
+});
+
+export type StaffTicketActionInput = z.infer<typeof staffTicketActionInputSchema>;
+
 export const patientSiteSummarySchema = z.object({
   id: z.string(),
   name: z.string(),

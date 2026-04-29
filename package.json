@@ -1,0 +1,20 @@
+{
+  "name": "qdoc",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "dev": "pnpm --filter @qdoc/web dev",
+    "build": "pnpm --filter @qdoc/web build",
+    "lint": "pnpm --filter @qdoc/web lint",
+    "typecheck": "pnpm --filter @qdoc/web typecheck",
+    "db:generate": "pnpm --filter @qdoc/db db:generate",
+    "db:migrate": "pnpm --filter @qdoc/db db:migrate",
+    "db:seed": "pnpm --filter @qdoc/db db:seed"
+  },
+  "devDependencies": {
+    "@qdoc/config": "workspace:*",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3"
+  }
+}

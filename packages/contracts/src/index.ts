@@ -39,7 +39,9 @@ export type OtpVerifyInput = z.infer<typeof otpVerifyInputSchema>;
 
 export const membershipSummarySchema = z.object({
   siteId: z.string(),
+  siteName: z.string(),
   role: z.enum(["staff", "admin"]),
+  waitingTicketCount: z.number().int().nonnegative(),
 });
 
 export const currentUserSchema = z.object({

@@ -30,6 +30,7 @@ type RequestState = "idle" | "loading" | "success" | "error";
 type AuthStep = "email" | "code";
 type StaffTicketAction = "call" | "start-service" | "complete" | "delay" | "restore" | "cancel";
 type StaffBoardTicket = StaffQueueResponse["tickets"][number];
+type StaffMembership = CurrentUser["memberships"][number];
 
 type ApiError = {
   status: number;
@@ -127,6 +128,14 @@ function getActions(ticket: StaffBoardTicket): Array<{ action: StaffTicketAction
   }
 
   return [];
+}
+
+function getMembershipWaitingCount(membership: StaffMembership, queueBoard: StaffQueueResponse | null) {
+  if (queueBoard?.siteId !== membership.siteId) {
+    return membership.waitingTicketCount;
+  }
+
+  return queueBoard.tickets.filter((ticket) => ticket.status === "waiting").length;
 }
 
 export default function StaffPage() {
@@ -462,8 +471,10 @@ export default function StaffPage() {
                       selectedSiteId === membership.siteId ? "border-slate-950 bg-slate-50" : "border-slate-200 bg-white"
                     }`}
                   >
-                    <span className="block text-slate-950">{membership.siteId}</span>
-                    <span className="text-xs uppercase text-slate-500">{membership.role}</span>
+                    <span className="block text-slate-950">{membership.siteName}</span>
+                    <span className="text-xs uppercase text-slate-500">
+                      {getMembershipWaitingCount(membership, queueBoard)} waiting · {membership.role}
+                    </span>
                   </button>
                 ))}
               </div>

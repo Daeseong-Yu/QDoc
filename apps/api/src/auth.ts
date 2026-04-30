@@ -132,6 +132,20 @@ async function loadCurrentUser(userId: string) {
         select: {
           siteId: true,
           role: true,
+          site: {
+            select: {
+              name: true,
+              _count: {
+                select: {
+                  tickets: {
+                    where: {
+                      status: "waiting",
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -144,7 +158,12 @@ async function loadCurrentUser(userId: string) {
   return currentUserSchema.parse({
     id: user.id,
     email: user.email,
-    memberships: user.memberships,
+    memberships: user.memberships.map((membership) => ({
+      siteId: membership.siteId,
+      siteName: membership.site.name,
+      role: membership.role,
+      waitingTicketCount: membership.site._count.tickets,
+    })),
   });
 }
 

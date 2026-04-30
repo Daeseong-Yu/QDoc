@@ -57,8 +57,9 @@ OTP delivery is console-based in local development. When signing in, read the ve
 Seed data:
 
 - Staff account: `staff@example.com`
-- Downtown site: `site-downtown`
-- Downtown queue: `queue-downtown-general`
+- Waterloo Clinic: `site-waterloo`, `queue-waterloo-walkin`, 19 waiting tickets
+- Kitchener Clinic: `site-kitchener`, `queue-kitchener-walkin`, 5 waiting tickets
+- University Clinic: `site-university`, `queue-university-walkin`, 0 waiting tickets
 
 ## Verification
 

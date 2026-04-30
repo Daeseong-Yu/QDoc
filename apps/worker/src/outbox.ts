@@ -1,4 +1,5 @@
 import { prisma } from "@qdoc/db";
+import { sendAlmostReadyEmail } from "./email.js";
 
 export type OutboxWorkerConfig = {
   intervalMs: number;
@@ -118,9 +119,46 @@ async function processTicketStatusChanged(item: OutboxItem) {
   }
 }
 
+async function processTicketAlmostReadyEmail(item: OutboxItem) {
+  const notificationLogId = getPayloadString(item.payload, "notificationLogId");
+  const userEmail = getPayloadString(item.payload, "userEmail");
+  const siteName = getPayloadString(item.payload, "siteName");
+  const queueName = getPayloadString(item.payload, "queueName");
+  const aheadCount = isRecord(item.payload) && typeof item.payload.aheadCount === "number" ? item.payload.aheadCount : null;
+
+  if (aheadCount === null) {
+    throw new Error("Invalid outbox payload: aheadCount");
+  }
+
+  const notification = await prisma.notificationLog.findUnique({
+    where: {
+      id: notificationLogId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!notification) {
+    throw new Error("Notification log not found");
+  }
+
+  await sendAlmostReadyEmail({
+    to: userEmail,
+    siteName,
+    queueName,
+    aheadCount,
+  });
+}
+
 async function processOutboxItem(item: OutboxItem) {
   if (item.type === "ticket.status_changed") {
     await processTicketStatusChanged(item);
+    return;
+  }
+
+  if (item.type === "ticket.almost_ready_email") {
+    await processTicketAlmostReadyEmail(item);
     return;
   }
 

@@ -94,6 +94,22 @@ function generateOtpCode() {
   return String(randomInt(100000, 1000000));
 }
 
+function getConfiguredOtpCode(email: string) {
+  const fixedOtpEnabled = process.env.ALLOW_FIXED_OTP === "true" && process.env.APP_ENV !== "production";
+  const fixedOtpEmail = process.env.FIXED_OTP_EMAIL?.trim().toLowerCase();
+  const fixedOtpCode = process.env.FIXED_OTP_CODE?.trim();
+
+  if (!fixedOtpEnabled || !fixedOtpEmail || !fixedOtpCode || !/^\d{6}$/.test(fixedOtpCode)) {
+    return null;
+  }
+
+  return email.toLowerCase() === fixedOtpEmail ? fixedOtpCode : null;
+}
+
+function getOtpCode(email: string) {
+  return getConfiguredOtpCode(email) ?? generateOtpCode();
+}
+
 async function hasTooManyPendingChallenges(email: string) {
   const pendingCount = await prisma.otpChallenge.count({
     where: {
@@ -192,7 +208,7 @@ export async function handleOtpRequest(request: IncomingMessage, response: Serve
     return;
   }
 
-  const code = generateOtpCode();
+  const code = getOtpCode(input.data.email);
   let challengeId: string | null = null;
 
   try {

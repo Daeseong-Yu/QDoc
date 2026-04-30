@@ -28,7 +28,7 @@ import { z } from "zod";
 
 type RequestState = "idle" | "loading" | "success" | "error";
 type AuthStep = "email" | "code";
-type StaffTicketAction = "call" | "start-service" | "complete" | "no-show" | "cancel";
+type StaffTicketAction = "call" | "start-service" | "complete" | "delay" | "restore" | "cancel";
 type StaffBoardTicket = StaffQueueResponse["tickets"][number];
 
 type ApiError = {
@@ -40,6 +40,7 @@ const boardStatuses: Array<{ status: TicketStatus; label: string }> = [
   { status: "waiting", label: "Waiting" },
   { status: "called", label: "Called" },
   { status: "in_service", label: "In service" },
+  { status: "delay", label: "Delayed" },
 ];
 
 const ticketStatusLabels: Record<TicketStatus, string> = {
@@ -47,7 +48,7 @@ const ticketStatusLabels: Record<TicketStatus, string> = {
   called: "Called",
   in_service: "In service",
   completed: "Completed",
-  no_show: "No-show",
+  delay: "Delayed",
   cancelled: "Cancelled",
 };
 
@@ -56,7 +57,7 @@ const ticketStatusStyles: Record<TicketStatus, string> = {
   called: "bg-sky-50 text-sky-800 ring-sky-200",
   in_service: "bg-violet-50 text-violet-800 ring-violet-200",
   completed: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  no_show: "bg-rose-50 text-rose-800 ring-rose-200",
+  delay: "bg-orange-50 text-orange-800 ring-orange-200",
   cancelled: "bg-slate-100 text-slate-700 ring-slate-200",
 };
 
@@ -109,13 +110,20 @@ function getActions(ticket: StaffBoardTicket): Array<{ action: StaffTicketAction
   if (ticket.status === "called") {
     return [
       { action: "start-service", label: "Start" },
-      { action: "no-show", label: "No-show" },
+      { action: "delay", label: "Delay" },
       { action: "cancel", label: "Cancel" },
     ];
   }
 
   if (ticket.status === "in_service") {
     return [{ action: "complete", label: "Complete" }];
+  }
+
+  if (ticket.status === "delay") {
+    return [
+      { action: "restore", label: "Restore" },
+      { action: "cancel", label: "Cancel" },
+    ];
   }
 
   return [];
@@ -476,7 +484,7 @@ export default function StaffPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-3">
+            <div className="grid gap-4 xl:grid-cols-4">
               {boardStatuses.map(({ status, label }) => (
                 <section key={status} className="min-h-[320px] rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="mb-4 flex items-center justify-between gap-3">
@@ -508,7 +516,7 @@ export default function StaffPage() {
                           {getActions(ticket).map(({ action, label: actionLabel }) => {
                             const actionKey = `${ticket.id}:${action}`;
                             const isBusy = activeAction === actionKey;
-                            const isCancel = action === "cancel" || action === "no-show";
+                            const isCancel = action === "cancel" || action === "delay";
 
                             return (
                               <button

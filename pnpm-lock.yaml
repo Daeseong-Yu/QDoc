@@ -124,6 +124,9 @@ importers:
       '@qdoc/db':
         specifier: workspace:*
         version: link:../../packages/db
+      nodemailer:
+        specifier: ^8.0.7
+        version: 8.0.7
     devDependencies:
       '@qdoc/config':
         specifier: workspace:*
@@ -131,6 +134,9 @@ importers:
       '@types/node':
         specifier: ^22.15.29
         version: 22.19.17
+      '@types/nodemailer':
+        specifier: ^8.0.0
+        version: 8.0.0
       tsx:
         specifier: ^4.19.4
         version: 4.21.0

@@ -59,9 +59,14 @@ export async function handleSites(_request: IncomingMessage, response: ServerRes
     select: {
       id: true,
       name: true,
+      distanceKm: true,
       _count: {
         select: {
-          queues: true,
+          tickets: {
+            where: {
+              status: "waiting",
+            },
+          },
         },
       },
     },
@@ -74,7 +79,8 @@ export async function handleSites(_request: IncomingMessage, response: ServerRes
       sites: sites.map((site) => ({
         id: site.id,
         name: site.name,
-        queueCount: site._count.queues,
+        waitingTicketCount: site._count.tickets,
+        distanceKm: site.distanceKm,
       })),
     }),
   );
@@ -174,6 +180,7 @@ export async function handleCheckIn(request: IncomingMessage, response: ServerRe
           queueId: queue.id,
           userId: currentUser.id,
           status: "waiting",
+          sortRank: new Date(),
           events: {
             create: {
               status: "waiting",

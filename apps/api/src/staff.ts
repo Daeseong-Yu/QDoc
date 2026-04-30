@@ -10,7 +10,7 @@ import { prisma } from "@qdoc/db";
 import { readJson, sendJson } from "./http.js";
 import { getCurrentUserFromRequest, requireStaffMembership } from "./auth.js";
 
-type StaffTicketAction = "call" | "start-service" | "complete" | "no-show" | "cancel";
+type StaffTicketAction = "call" | "start-service" | "complete" | "delay" | "restore" | "cancel";
 
 type StaffTicketRecord = {
   id: string;
@@ -50,13 +50,18 @@ const ticketTransitionByAction: Record<StaffTicketAction, { from: TicketStatus[]
     to: "completed",
     auditAction: "ticket.complete",
   },
-  "no-show": {
+  delay: {
     from: ["called"],
-    to: "no_show",
-    auditAction: "ticket.no_show",
+    to: "delay",
+    auditAction: "ticket.delay",
+  },
+  restore: {
+    from: ["delay"],
+    to: "waiting",
+    auditAction: "ticket.restore",
   },
   cancel: {
-    from: ["waiting", "called"],
+    from: ["waiting", "called", "delay"],
     to: "cancelled",
     auditAction: "ticket.cancel",
   },
@@ -67,9 +72,11 @@ const ticketStatusLabels: Record<TicketStatus, string> = {
   called: "called",
   in_service: "in service",
   completed: "completed",
-  no_show: "no-show",
+  delay: "delayed",
   cancelled: "cancelled",
 };
+
+const almostReadyMessage = "Your turn is coming up. Please stay nearby.";
 
 function getTicketStatusMessage(status: TicketStatus) {
   if (status === "called") {
@@ -144,6 +151,9 @@ export async function handleStaffQueue(request: IncomingMessage, response: Serve
             queue: {
               createdAt: "asc",
             },
+          },
+          {
+            sortRank: "asc",
           },
           {
             createdAt: "asc",
@@ -237,6 +247,30 @@ export async function handleStaffTicketAction(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    const restoreSortRank =
+      action === "restore"
+        ? await tx.ticket
+            .findFirst({
+              where: {
+                siteId: ticket.siteId,
+                queueId: ticket.queueId,
+                status: "waiting",
+              },
+              orderBy: [
+                {
+                  sortRank: "asc",
+                },
+                {
+                  createdAt: "asc",
+                },
+              ],
+              select: {
+                sortRank: true,
+              },
+            })
+            .then((frontTicket) => new Date((frontTicket?.sortRank ?? new Date()).getTime() - 1000))
+        : null;
+
     const updated = await tx.ticket.updateMany({
       where: {
         id: ticket.id,
@@ -244,6 +278,7 @@ export async function handleStaffTicketAction(
       },
       data: {
         status: transition.to,
+        ...(restoreSortRank ? { sortRank: restoreSortRank } : {}),
       },
     });
 
@@ -295,6 +330,83 @@ export async function handleStaffTicketAction(
         },
       },
     });
+
+    const queuePositions = await tx.ticket.findMany({
+      where: {
+        siteId: ticket.siteId,
+        queueId: ticket.queueId,
+        status: {
+          in: ["in_service", "called", "waiting"],
+        },
+      },
+      orderBy: [
+        {
+          sortRank: "asc",
+        },
+        {
+          createdAt: "asc",
+        },
+      ],
+      include: {
+        site: {
+          select: {
+            name: true,
+          },
+        },
+        queue: {
+          select: {
+            name: true,
+          },
+        },
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    });
+
+    const almostReadyTicket = queuePositions.find((queueTicket, index) => queueTicket.status === "waiting" && index === 2);
+
+    if (almostReadyTicket) {
+      const existingAlmostReadyNotification = await tx.notificationLog.findFirst({
+        where: {
+          ticketId: almostReadyTicket.id,
+          channel: "email",
+          message: almostReadyMessage,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existingAlmostReadyNotification) {
+        const almostReadyNotification = await tx.notificationLog.create({
+          data: {
+            ticketId: almostReadyTicket.id,
+            channel: "email",
+            message: almostReadyMessage,
+          },
+        });
+
+        await tx.outbox.create({
+          data: {
+            type: "ticket.almost_ready_email",
+            payload: {
+              ticketId: almostReadyTicket.id,
+              siteId: almostReadyTicket.siteId,
+              siteName: almostReadyTicket.site.name,
+              queueId: almostReadyTicket.queueId,
+              queueName: almostReadyTicket.queue.name,
+              userId: almostReadyTicket.userId,
+              userEmail: almostReadyTicket.user.email,
+              aheadCount: 2,
+              notificationLogId: almostReadyNotification.id,
+            },
+          },
+        });
+      }
+    }
 
     return tx.ticket.findUnique({
       where: { id: ticket.id },

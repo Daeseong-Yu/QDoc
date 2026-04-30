@@ -14,20 +14,26 @@ async function main() {
 
   const downtown = await prisma.site.upsert({
     where: { id: "site-downtown" },
-    update: {},
+    update: {
+      distanceKm: 1.2,
+    },
     create: {
       id: "site-downtown",
       name: "Downtown Clinic",
+      distanceKm: 1.2,
       organizationId: organization.id,
     },
   });
 
   const northside = await prisma.site.upsert({
     where: { id: "site-northside" },
-    update: {},
+    update: {
+      distanceKm: 3.6,
+    },
     create: {
       id: "site-northside",
       name: "Northside Clinic",
+      distanceKm: 3.6,
       organizationId: organization.id,
     },
   });

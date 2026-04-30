@@ -5,13 +5,13 @@ export const ticketStatusSchema = z.enum([
   "called",
   "in_service",
   "completed",
-  "no_show",
+  "delay",
   "cancelled",
 ]);
 
 export type TicketStatus = z.infer<typeof ticketStatusSchema>;
 
-export const activeTicketStatuses: TicketStatus[] = ["waiting", "called", "in_service"];
+export const activeTicketStatuses: TicketStatus[] = ["waiting", "called", "in_service", "delay"];
 
 export const siteSummarySchema = z.object({
   id: z.string(),
@@ -122,7 +122,8 @@ export type StaffTicketActionInput = z.infer<typeof staffTicketActionInputSchema
 export const patientSiteSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
-  queueCount: z.number().int().nonnegative(),
+  waitingTicketCount: z.number().int().nonnegative(),
+  distanceKm: z.number().nonnegative(),
 });
 
 export type PatientSiteSummary = z.infer<typeof patientSiteSummarySchema>;

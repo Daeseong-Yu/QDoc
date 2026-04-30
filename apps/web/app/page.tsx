@@ -31,7 +31,7 @@ const ticketStatusLabels: Record<PatientTicketSummary["status"], string> = {
   called: "Called",
   in_service: "In service",
   completed: "Completed",
-  no_show: "No-show",
+  delay: "Delayed",
   cancelled: "Cancelled",
 };
 
@@ -40,7 +40,7 @@ const ticketStatusStyles: Record<PatientTicketSummary["status"], string> = {
   called: "bg-sky-50 text-sky-800 ring-sky-200",
   in_service: "bg-violet-50 text-violet-800 ring-violet-200",
   completed: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  no_show: "bg-rose-50 text-rose-800 ring-rose-200",
+  delay: "bg-orange-50 text-orange-800 ring-orange-200",
   cancelled: "bg-slate-100 text-slate-700 ring-slate-200",
 };
 
@@ -403,9 +403,12 @@ export default function Home() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-950">{site.name}</h2>
-                    <p className="mt-1 text-sm text-slate-600">{site.queueCount} queue available</p>
+                    <p className="mt-1 text-sm text-slate-600">{site.waitingTicketCount} patients waiting</p>
                   </div>
-                  <MapPin className="text-slate-500" size={21} aria-hidden="true" />
+                  <div className="grid justify-items-center gap-1 text-slate-500">
+                    <MapPin size={21} aria-hidden="true" />
+                    <span className="text-xs font-medium">{site.distanceKm.toFixed(1)} km</span>
+                  </div>
                 </div>
               </button>
             ))}

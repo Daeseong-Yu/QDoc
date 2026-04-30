@@ -89,7 +89,7 @@ Staff flow:
 1. Open `/staff`.
 2. Sign in with the seeded staff account.
 3. Select a staffed site.
-4. Move tickets through call, start service, complete, no-show, or cancel actions.
+4. Move tickets through call, start service, complete, delay, restore, or cancel actions.
 5. Each ticket state change writes `ticket_event`, `audit_log`, `notification_log`, and `outbox` records.
 
 Worker flow:

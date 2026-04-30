@@ -51,6 +51,9 @@ services:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in .env.staging}
       ALLOW_CONSOLE_OTP: ${ALLOW_CONSOLE_OTP:-false}
+      ALLOW_FIXED_OTP: ${ALLOW_FIXED_OTP:-false}
+      FIXED_OTP_EMAIL: ${FIXED_OTP_EMAIL:-}
+      FIXED_OTP_CODE: ${FIXED_OTP_CODE:-}
       API_HOST: 0.0.0.0
       API_PORT: 4000
       APP_URL: ${APP_URL:?Set APP_URL in .env.staging}
@@ -87,6 +90,13 @@ services:
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in .env.staging}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:?Set EMAIL_PROVIDER in .env.staging}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-2525}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env.staging}
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.staging}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL in .env.staging}

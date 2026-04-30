@@ -87,6 +87,7 @@ export const staffQueueResponseSchema = z.object({
       siteName: z.string(),
       queueId: z.string(),
       queueName: z.string(),
+      patientEmail: z.string().min(1),
       status: ticketStatusSchema,
       createdAt: z.string().datetime(),
       updatedAt: z.string().datetime(),
@@ -102,7 +103,7 @@ export const staffTicketSummarySchema = z.object({
   siteName: z.string(),
   queueId: z.string(),
   queueName: z.string(),
-  patientEmail: emailSchema,
+  patientEmail: z.string().min(1),
   status: ticketStatusSchema,
   updatedAt: z.string().datetime(),
 });

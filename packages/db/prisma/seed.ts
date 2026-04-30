@@ -19,7 +19,7 @@ const clinics = [
   },
   {
     id: "site-university",
-    name: "University Clinic",
+    name: "Dental Clinic",
     queueId: "queue-university-walkin",
     distanceKm: 2.4,
     waitingCount: 0,
@@ -29,7 +29,7 @@ const clinics = [
 const legacySiteIds = ["site-downtown", "site-northside"];
 
 function getPatientEmail(siteId: string, index: number) {
-  return `${siteId.replace("site-", "")}-patient-${String(index + 1).padStart(2, "0")}@example.com`;
+  return `customer${String(index + 1).padStart(2, "0")}.${siteId.replace("site-", "")}@example.com`;
 }
 
 function getSeededTicketId(siteId: string, index: number) {

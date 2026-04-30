@@ -32,6 +32,9 @@ type StaffTicketRecord = {
 
 type StaffQueueTicketRecord = Omit<StaffTicketRecord, "user"> & {
   createdAt: Date;
+  user: {
+    email: string;
+  };
 };
 
 const ticketTransitionByAction: Record<StaffTicketAction, { from: TicketStatus[]; to: TicketStatus; auditAction: string }> = {
@@ -78,6 +81,26 @@ const ticketStatusLabels: Record<TicketStatus, string> = {
 
 const almostReadyMessage = "Your turn is coming up. Please stay nearby.";
 
+function maskEmail(email: string) {
+  const atIndex = email.lastIndexOf("@");
+
+  if (atIndex <= 0) {
+    return "masked";
+  }
+
+  const localPart = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1);
+
+  if (localPart.length <= 1) {
+    return `*@${domain}`;
+  }
+
+  const visiblePrefix = localPart.length === 2 ? localPart.slice(0, 1) : localPart.slice(0, 2);
+  const maskedPart = "*".repeat(localPart.length - visiblePrefix.length);
+
+  return `${visiblePrefix}${maskedPart}@${domain}`;
+}
+
 function getTicketStatusMessage(status: TicketStatus) {
   if (status === "called") {
     return "Your queue ticket has been called.";
@@ -93,7 +116,7 @@ function serializeStaffTicket(ticket: StaffTicketRecord) {
     siteName: ticket.site.name,
     queueId: ticket.queueId,
     queueName: ticket.queue.name,
-    patientEmail: ticket.user.email,
+    patientEmail: maskEmail(ticket.user.email),
     status: ticket.status,
     updatedAt: ticket.updatedAt.toISOString(),
   };
@@ -106,6 +129,7 @@ function serializeStaffQueueTicket(ticket: StaffQueueTicketRecord) {
     siteName: ticket.site.name,
     queueId: ticket.queueId,
     queueName: ticket.queue.name,
+    patientEmail: maskEmail(ticket.user.email),
     status: ticket.status,
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
@@ -168,6 +192,11 @@ export async function handleStaffQueue(request: IncomingMessage, response: Serve
           queue: {
             select: {
               name: true,
+            },
+          },
+          user: {
+            select: {
+              email: true,
             },
           },
         },
@@ -365,6 +394,33 @@ export async function handleStaffTicketAction(
         },
       },
     });
+
+    for (const [positionIndex, queueTicket] of queuePositions.entries()) {
+      if (queueTicket.status !== "waiting" || positionIndex > 2) {
+        continue;
+      }
+
+      const existingInAppAlmostReadyNotification = await tx.notificationLog.findFirst({
+        where: {
+          ticketId: queueTicket.id,
+          channel: "in_app",
+          message: almostReadyMessage,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existingInAppAlmostReadyNotification) {
+        await tx.notificationLog.create({
+          data: {
+            ticketId: queueTicket.id,
+            channel: "in_app",
+            message: almostReadyMessage,
+          },
+        });
+      }
+    }
 
     const almostReadyTicket = queuePositions.find((queueTicket, index) => queueTicket.status === "waiting" && index === 2);
 

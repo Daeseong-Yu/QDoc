@@ -59,7 +59,7 @@ Seed data:
 - Staff account: `staff@example.com`
 - Waterloo Clinic: `site-waterloo`, `queue-waterloo-walkin`, 19 waiting tickets
 - Kitchener Clinic: `site-kitchener`, `queue-kitchener-walkin`, 5 waiting tickets
-- University Clinic: `site-university`, `queue-university-walkin`, 0 waiting tickets
+- Dental Clinic: `site-university`, `queue-university-walkin`, 0 waiting tickets
 
 ## Verification
 

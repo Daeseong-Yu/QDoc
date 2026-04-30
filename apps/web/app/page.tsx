@@ -44,6 +44,8 @@ const ticketStatusStyles: Record<PatientTicketSummary["status"], string> = {
   cancelled: "bg-slate-100 text-slate-700 ring-slate-200",
 };
 
+const patientReadyMessage = "Your turn is coming up. Please stay nearby.";
+
 async function readApiResponse<T>(response: Response, schema: z.ZodSchema<T>) {
   const data: unknown = await response.json();
 
@@ -106,6 +108,22 @@ export default function Home() {
   const activeSiteTicket = useMemo(() => {
     return tickets.find((ticket) => ticket.siteId === selectedSiteId) ?? null;
   }, [selectedSiteId, tickets]);
+
+  const latestReadyNotification = useMemo(() => {
+    return (
+      tickets
+        .flatMap((ticket) =>
+          ticket.notifications
+            .filter((notification) => notification.message === patientReadyMessage)
+            .map((notification) => ({
+              ...notification,
+              siteName: ticket.siteName,
+              queueName: ticket.queueName,
+            })),
+        )
+        .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt))[0] ?? null
+    );
+  }, [tickets]);
 
   const clearPatientSession = useCallback(() => {
     setCurrentUser(null);
@@ -382,6 +400,19 @@ export default function Home() {
           {message ? (
             <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
               {message}
+            </div>
+          ) : null}
+
+          {latestReadyNotification ? (
+            <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
+              <Bell size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="font-semibold">{latestReadyNotification.message}</p>
+                <p className="mt-1 text-xs text-amber-800">
+                  {latestReadyNotification.siteName} · {latestReadyNotification.queueName} ·{" "}
+                  {new Date(latestReadyNotification.createdAt).toLocaleTimeString()}
+                </p>
+              </div>
             </div>
           ) : null}
 

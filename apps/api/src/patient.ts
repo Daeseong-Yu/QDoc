@@ -267,6 +267,9 @@ export async function handleActiveTicket(request: IncomingMessage, response: Ser
         },
       },
       notifications: {
+        where: {
+          channel: "in_app",
+        },
         orderBy: {
           createdAt: "desc",
         },

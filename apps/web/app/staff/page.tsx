@@ -516,6 +516,7 @@ export default function StaffPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <h4 className="font-semibold text-slate-950">{ticket.queueName}</h4>
+                            <p className="mt-1 text-sm text-slate-600">{ticket.patientEmail}</p>
                             <p className="mt-1 text-xs text-slate-500">Checked in {new Date(ticket.createdAt).toLocaleTimeString()}</p>
                           </div>
                           <span className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 ${ticketStatusStyles[ticket.status]}`}>

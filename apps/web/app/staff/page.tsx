@@ -130,12 +130,12 @@ function getActions(ticket: StaffBoardTicket): Array<{ action: StaffTicketAction
   return [];
 }
 
-function getMembershipWaitingCount(membership: StaffMembership, queueBoard: StaffQueueResponse | null) {
-  if (queueBoard?.siteId !== membership.siteId) {
+function getMembershipWaitingCount(membership: StaffMembership, activeQueueBoard: StaffQueueResponse | null) {
+  if (activeQueueBoard?.siteId !== membership.siteId) {
     return membership.waitingTicketCount;
   }
 
-  return queueBoard.tickets.filter((ticket) => ticket.status === "waiting").length;
+  return activeQueueBoard.tickets.filter((ticket) => ticket.status === "waiting").length;
 }
 
 export default function StaffPage() {
@@ -155,11 +155,17 @@ export default function StaffPage() {
     return currentUser?.memberships.filter((membership) => membership.role === "staff" || membership.role === "admin") ?? [];
   }, [currentUser]);
 
+  const selectedMembership = useMemo(() => {
+    return staffMemberships.find((membership) => membership.siteId === selectedSiteId) ?? null;
+  }, [selectedSiteId, staffMemberships]);
+
+  const activeQueueBoard = queueBoard?.siteId === selectedSiteId ? queueBoard : null;
+
   const ticketsByStatus = useMemo(() => {
     return Object.fromEntries(
-      boardStatuses.map(({ status }) => [status, queueBoard?.tickets.filter((ticket) => ticket.status === status) ?? []]),
+      boardStatuses.map(({ status }) => [status, activeQueueBoard?.tickets.filter((ticket) => ticket.status === status) ?? []]),
     ) as Record<TicketStatus, StaffBoardTicket[]>;
-  }, [queueBoard]);
+  }, [activeQueueBoard]);
 
   const clearStaffSession = useCallback(() => {
     boardRequestId.current += 1;
@@ -232,6 +238,7 @@ export default function StaffPage() {
       return;
     }
 
+    setQueueBoard(null);
     setBoardState("loading");
     loadBoard()
       .then((applied) => {
@@ -325,7 +332,7 @@ export default function StaffPage() {
   }
 
   async function applyAction(ticketId: string, action: StaffTicketAction) {
-    const ticket = queueBoard?.tickets.find((item) => item.id === ticketId);
+    const ticket = activeQueueBoard?.tickets.find((item) => item.id === ticketId);
 
     if (!ticket || ticket.siteId !== selectedSiteId) {
       setMessage("Refresh the board before changing this ticket.");
@@ -358,11 +365,11 @@ export default function StaffPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f8fa] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f4fbfb] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-slate-950 text-white">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-[#10b9c4] text-white">
               <Stethoscope size={22} aria-hidden="true" />
             </div>
             <div>
@@ -375,7 +382,7 @@ export default function StaffPage() {
             onClick={() => {
               void loadBoard();
             }}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] shadow-sm hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!currentUser || !selectedSiteId}
           >
             <RefreshCcw size={16} aria-hidden="true" />
@@ -403,13 +410,13 @@ export default function StaffPage() {
                     onClick={() => {
                       void signOut();
                     }}
-                    className="inline-flex size-9 items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50"
+                    className="inline-flex size-9 items-center justify-center rounded-md border border-[#b9eaee] text-[#087884] hover:bg-[#eefbfc]"
                     aria-label="Sign out"
                   >
                     <LogOut size={17} aria-hidden="true" />
                   </button>
                 ) : (
-                  <Mail size={21} className="text-slate-500" aria-hidden="true" />
+                  <Mail size={21} className="text-[#0a8f9c]" aria-hidden="true" />
                 )}
               </div>
 
@@ -420,7 +427,7 @@ export default function StaffPage() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="staff@example.com"
-                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950"
+                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
                   />
                   {authStep === "code" ? (
                     <input
@@ -429,7 +436,7 @@ export default function StaffPage() {
                       value={code}
                       onChange={(event) => setCode(event.target.value)}
                       placeholder="6-digit code"
-                      className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950"
+                      className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
                     />
                   ) : null}
                   <button
@@ -438,7 +445,7 @@ export default function StaffPage() {
                       void (authStep === "email" ? requestOtp() : verifyOtp());
                     }}
                     disabled={authState === "loading"}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
                   >
                     {authState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
                     {authStep === "email" ? "Send code" : "Sign in"}
@@ -449,7 +456,7 @@ export default function StaffPage() {
 
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4 flex items-center gap-3">
-                <ClipboardList size={21} className="text-slate-500" aria-hidden="true" />
+                <ClipboardList size={21} className="text-[#0a8f9c]" aria-hidden="true" />
                 <div>
                   <h2 className="text-lg font-semibold text-slate-950">Sites</h2>
                   <p className="text-sm text-slate-600">Choose a staffed location.</p>
@@ -468,12 +475,12 @@ export default function StaffPage() {
                       setSelectedSiteId(membership.siteId);
                     }}
                     className={`rounded-md border px-3 py-3 text-left text-sm font-medium ${
-                      selectedSiteId === membership.siteId ? "border-slate-950 bg-slate-50" : "border-slate-200 bg-white"
+                      selectedSiteId === membership.siteId ? "border-[#10b9c4] bg-[#eefbfc]" : "border-slate-200 bg-white"
                     }`}
                   >
                     <span className="block text-slate-950">{membership.siteName}</span>
                     <span className="text-xs uppercase text-slate-500">
-                      {getMembershipWaitingCount(membership, queueBoard)} waiting · {membership.role}
+                      {getMembershipWaitingCount(membership, activeQueueBoard)} waiting · {membership.role}
                     </span>
                   </button>
                 ))}
@@ -485,12 +492,12 @@ export default function StaffPage() {
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-950">{queueBoard?.siteName ?? "Queue board"}</h2>
+                  <h2 className="text-xl font-semibold text-slate-950">{activeQueueBoard?.siteName ?? selectedMembership?.siteName ?? "Queue board"}</h2>
                   <p className="text-sm text-slate-600">Updates every 4 seconds.</p>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-600">
                   <Activity size={17} aria-hidden="true" />
-                  {boardState === "loading" ? "Loading" : `${queueBoard?.tickets.length ?? 0} active tickets`}
+                  {boardState === "loading" ? "Loading" : `${activeQueueBoard?.tickets.length ?? 0} active tickets`}
                 </div>
               </div>
             </div>
@@ -503,7 +510,7 @@ export default function StaffPage() {
                       <h3 className="font-semibold text-slate-950">{label}</h3>
                       <p className="text-sm text-slate-500">{ticketsByStatus[status].length} tickets</p>
                     </div>
-                    <Bell size={19} className="text-slate-400" aria-hidden="true" />
+                    <Bell size={19} className="text-[#7ccfd6]" aria-hidden="true" />
                   </div>
 
                   <div className="grid gap-3">
@@ -512,19 +519,19 @@ export default function StaffPage() {
                     ) : null}
 
                     {ticketsByStatus[status].map((ticket) => (
-                      <article key={ticket.id} className="rounded-md border border-slate-200 p-4">
+                      <article key={ticket.id} className="min-w-0 rounded-md border border-slate-200 p-4">
                         <div className="flex items-start justify-between gap-3">
-                          <div>
+                          <div className="min-w-0">
                             <h4 className="font-semibold text-slate-950">{ticket.queueName}</h4>
-                            <p className="mt-1 text-sm text-slate-600">{ticket.patientEmail}</p>
+                            <p className="mt-1 break-all text-sm text-slate-600">{ticket.patientEmail}</p>
                             <p className="mt-1 text-xs text-slate-500">Checked in {new Date(ticket.createdAt).toLocaleTimeString()}</p>
                           </div>
-                          <span className={`rounded-md px-2 py-1 text-xs font-semibold ring-1 ${ticketStatusStyles[ticket.status]}`}>
+                          <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold ring-1 ${ticketStatusStyles[ticket.status]}`}>
                             {ticketStatusLabels[ticket.status]}
                           </span>
                         </div>
 
-                        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                        <div className="mt-4 grid min-w-0 gap-2">
                           {getActions(ticket).map(({ action, label: actionLabel }) => {
                             const actionKey = `${ticket.id}:${action}`;
                             const isBusy = activeAction === actionKey;
@@ -538,10 +545,10 @@ export default function StaffPage() {
                                   void applyAction(ticket.id, action);
                                 }}
                                 disabled={Boolean(activeAction)}
-                                className={`inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
+                                className={`inline-flex min-h-9 w-full min-w-0 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold leading-tight disabled:cursor-not-allowed disabled:opacity-60 ${
                                   isCancel
-                                    ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                                    : "bg-slate-950 text-white hover:bg-slate-800"
+                                    ? "border border-[#b9eaee] bg-white text-[#087884] hover:bg-[#eefbfc]"
+                                    : "bg-[#10b9c4] text-white hover:bg-[#0ea5b2]"
                                 }`}
                               >
                                 {isBusy ? (

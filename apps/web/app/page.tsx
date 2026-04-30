@@ -371,12 +371,12 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f8fa] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f4fbfb] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex flex-col gap-5">
           <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-slate-950 text-white">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-[#10b9c4] text-white">
                 <Stethoscope size={22} aria-hidden="true" />
               </div>
               <div>
@@ -389,7 +389,7 @@ export default function Home() {
               onClick={() => {
                 void loadTickets();
               }}
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] shadow-sm hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!currentUser}
             >
               <RefreshCcw size={16} aria-hidden="true" />
@@ -404,11 +404,11 @@ export default function Home() {
           ) : null}
 
           {latestReadyNotification ? (
-            <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
+            <div className="flex gap-3 rounded-lg border border-[#b9eaee] bg-[#e9fbfc] px-4 py-3 text-sm text-[#075966] shadow-sm">
               <Bell size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
               <div>
                 <p className="font-semibold">{latestReadyNotification.message}</p>
-                <p className="mt-1 text-xs text-amber-800">
+                <p className="mt-1 text-xs text-[#087884]">
                   {latestReadyNotification.siteName} · {latestReadyNotification.queueName} ·{" "}
                   {new Date(latestReadyNotification.createdAt).toLocaleTimeString()}
                 </p>
@@ -427,8 +427,8 @@ export default function Home() {
                 key={site.id}
                 type="button"
                 onClick={() => setSelectedSiteId(site.id)}
-                className={`rounded-lg border bg-white p-5 text-left shadow-sm transition hover:border-slate-400 ${
-                  selectedSiteId === site.id ? "border-slate-950 ring-2 ring-slate-950/10" : "border-slate-200"
+                className={`rounded-lg border bg-white p-5 text-left shadow-sm transition hover:border-[#10b9c4] ${
+                  selectedSiteId === site.id ? "border-[#10b9c4] ring-2 ring-[#10b9c4]/15" : "border-slate-200"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -436,7 +436,7 @@ export default function Home() {
                     <h2 className="text-lg font-semibold text-slate-950">{site.name}</h2>
                     <p className="mt-1 text-sm text-slate-600">{site.waitingTicketCount} patients waiting</p>
                   </div>
-                  <div className="grid justify-items-center gap-1 text-slate-500">
+                  <div className="grid justify-items-center gap-1 text-[#0a8f9c]">
                     <MapPin size={21} aria-hidden="true" />
                     <span className="text-xs font-medium">{site.distanceKm.toFixed(1)} km</span>
                   </div>
@@ -447,7 +447,7 @@ export default function Home() {
 
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-3">
-              <ClipboardList size={21} className="text-slate-500" aria-hidden="true" />
+              <ClipboardList size={21} className="text-[#0a8f9c]" aria-hidden="true" />
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">{selectedSite?.name ?? "Select a clinic"}</h2>
                 <p className="text-sm text-slate-600">Choose a queue and check in.</p>
@@ -460,7 +460,7 @@ export default function Home() {
                 <label
                   key={queue.id}
                   className={`flex cursor-pointer items-center justify-between gap-4 rounded-md border p-4 ${
-                    selectedQueueId === queue.id ? "border-slate-950 bg-slate-50" : "border-slate-200"
+                    selectedQueueId === queue.id ? "border-[#10b9c4] bg-[#eefbfc]" : "border-slate-200"
                   }`}
                 >
                   <span>
@@ -473,7 +473,7 @@ export default function Home() {
                     value={queue.id}
                     checked={selectedQueueId === queue.id}
                     onChange={() => setSelectedQueueId(queue.id)}
-                    className="size-4 accent-slate-950"
+                    className="size-4 accent-[#10b9c4]"
                   />
                 </label>
               ))}
@@ -497,7 +497,7 @@ export default function Home() {
                   void checkIn();
                 }}
                 disabled={!selectedQueueId || checkInState === "loading"}
-                className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {checkInState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : <Check size={17} aria-hidden="true" />}
                 Check in
@@ -519,13 +519,13 @@ export default function Home() {
                   onClick={() => {
                     void signOut();
                   }}
-                  className="inline-flex size-9 items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50"
+                  className="inline-flex size-9 items-center justify-center rounded-md border border-[#b9eaee] text-[#087884] hover:bg-[#eefbfc]"
                   aria-label="Sign out"
                 >
                   <LogOut size={17} aria-hidden="true" />
                 </button>
               ) : (
-                <Mail size={21} className="text-slate-500" aria-hidden="true" />
+                <Mail size={21} className="text-[#0a8f9c]" aria-hidden="true" />
               )}
             </div>
 
@@ -536,7 +536,7 @@ export default function Home() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
-                  className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950"
+                  className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
                 />
                 {authStep === "code" ? (
                   <input
@@ -545,7 +545,7 @@ export default function Home() {
                     value={code}
                     onChange={(event) => setCode(event.target.value)}
                     placeholder="6-digit code"
-                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-slate-950"
+                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
                   />
                 ) : null}
                 <button
@@ -554,7 +554,7 @@ export default function Home() {
                     void (authStep === "email" ? requestOtp() : verifyOtp());
                   }}
                   disabled={authState === "loading"}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
                   {authState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
                   {authStep === "email" ? "Send code" : "Sign in"}
@@ -565,7 +565,7 @@ export default function Home() {
 
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-3">
-              <Clock3 size={21} className="text-slate-500" aria-hidden="true" />
+              <Clock3 size={21} className="text-[#0a8f9c]" aria-hidden="true" />
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">Active tickets</h2>
                 <p className="text-sm text-slate-600">Updates every 4 seconds.</p>

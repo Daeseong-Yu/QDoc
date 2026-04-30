@@ -360,13 +360,11 @@ export async function handleStaffTicketAction(
       },
     });
 
-    const queuePositions = await tx.ticket.findMany({
+    const waitingTickets = await tx.ticket.findMany({
       where: {
         siteId: ticket.siteId,
         queueId: ticket.queueId,
-        status: {
-          in: ["in_service", "called", "waiting"],
-        },
+        status: "waiting",
       },
       orderBy: [
         {
@@ -395,11 +393,7 @@ export async function handleStaffTicketAction(
       },
     });
 
-    for (const [positionIndex, queueTicket] of queuePositions.entries()) {
-      if (queueTicket.status !== "waiting" || positionIndex > 2) {
-        continue;
-      }
-
+    for (const queueTicket of waitingTickets.slice(0, 3)) {
       const existingInAppAlmostReadyNotification = await tx.notificationLog.findFirst({
         where: {
           ticketId: queueTicket.id,
@@ -422,7 +416,7 @@ export async function handleStaffTicketAction(
       }
     }
 
-    const almostReadyTicket = queuePositions.find((queueTicket, index) => queueTicket.status === "waiting" && index === 2);
+    const almostReadyTicket = waitingTickets[2];
 
     if (almostReadyTicket) {
       const existingAlmostReadyNotification = await tx.notificationLog.findFirst({

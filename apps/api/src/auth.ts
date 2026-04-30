@@ -6,6 +6,7 @@ import {
   otpVerifyInputSchema,
 } from "@qdoc/contracts";
 import { prisma } from "@qdoc/db";
+import { canDeliverOtp, deliverOtp, OtpDeliveryError } from "./email.js";
 import { readJson, sendJson } from "./http.js";
 import { clearSessionCookie, createSessionCookie, createSessionToken, readSession } from "./session.js";
 
@@ -45,21 +46,6 @@ function reserveCooldown(map: Map<string, number>, key: string, ttlMs: number) {
 
 function clearCooldown(map: Map<string, number>, key: string) {
   map.delete(key);
-}
-
-function canDeliverOtp() {
-  return (
-    process.env.NODE_ENV !== "production" ||
-    (process.env.APP_ENV === "staging" && process.env.ALLOW_CONSOLE_OTP === "true")
-  );
-}
-
-function deliverOtp(email: string, code: string) {
-  if (!canDeliverOtp()) {
-    throw new Error("OTP delivery is not configured for production");
-  }
-
-  console.log(`QDoc OTP for ${email}: ${code}`);
 }
 
 function getSessionSecret() {
@@ -207,19 +193,34 @@ export async function handleOtpRequest(request: IncomingMessage, response: Serve
   }
 
   const code = generateOtpCode();
+  let challengeId: string | null = null;
 
   try {
-    await prisma.otpChallenge.create({
+    const challenge = await prisma.otpChallenge.create({
       data: {
         email: input.data.email,
         codeHash: hashOtp(input.data.email, code),
         expiresAt: new Date(Date.now() + otpTtlMs),
       },
     });
+    challengeId = challenge.id;
 
-    deliverOtp(input.data.email, code);
+    await deliverOtp(input.data.email, code);
   } catch (error) {
-    clearCooldown(otpRequestCooldowns, requestCooldownKey);
+    if (challengeId) {
+      await prisma.otpChallenge.delete({ where: { id: challengeId } }).catch(() => undefined);
+    }
+
+    if (error instanceof OtpDeliveryError) {
+      console.error("OTP delivery failed", { provider: process.env.EMAIL_PROVIDER ?? "console" });
+      sendJson(response, 503, { error: "otp_delivery_unavailable" });
+      return;
+    }
+
+    if (!challengeId) {
+      clearCooldown(otpRequestCooldowns, requestCooldownKey);
+    }
+
     throw error;
   } finally {
     releaseRequestEmail(input.data.email);

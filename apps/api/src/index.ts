@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { activeTicketStatuses } from "@qdoc/contracts";
 import { handleLogout, handleMe, handleOtpRequest, handleOtpVerify } from "./auth.js";
+import { getEmailDeliveryHealth } from "./email.js";
 import { sendJson } from "./http.js";
 import { handleActiveTicket, handleCheckIn, handleSiteQueues, handleSites } from "./patient.js";
 import { handleStaffQueue, handleStaffTicketAction, isStaffTicketAction } from "./staff.js";
@@ -13,10 +14,12 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", `http://${request.headers.host ?? `${host}:${port}`}`);
 
     if (request.method === "GET" && url.pathname === "/health") {
-      sendJson(response, 200, {
-        ok: true,
+      const emailDelivery = getEmailDeliveryHealth();
+      sendJson(response, emailDelivery.ok ? 200 : 503, {
+        ok: emailDelivery.ok,
         service: "api",
         activeTicketStatuses,
+        emailDelivery,
       });
       return;
     }

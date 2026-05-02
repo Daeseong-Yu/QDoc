@@ -28,6 +28,12 @@ QDoc is implemented as a production-shaped TypeScript monorepo:
 - `packages/db`: Prisma schema, migrations, seed data, and Prisma client access.
 - `packages/config`, `packages/ui`: shared TypeScript config and UI package scaffolding.
 
+### Architecture
+
+![QDoc Infrastructure](./docs/assets/infrastructure.svg)
+
+QDoc is deployed as a small Docker Compose stack with Caddy as the public reverse proxy, a Next.js web app, a Node API server, PostgreSQL, Redis, and a background worker. The waiting queue is backed by ticket rows in PostgreSQL, while notification jobs use a database-backed outbox that the worker polls and processes. Redis is provisioned in the runtime for future realtime, cache, or coordination work, but it is not on the current queue or notification processing path.
+
 The core database model includes organizations, clinic sites, queues, users, staff memberships, OTP challenges, tickets, ticket events, notification logs, outbox rows, and audit logs. Ticket ordering uses a `sortRank` field instead of only `createdAt`, which lets a delayed patient be restored to the front of the waiting queue in a controlled way.
 
 ### Challenges

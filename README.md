@@ -60,7 +60,7 @@ The core database model includes organizations, clinic sites, queues, users, sta
 - Next.js 15, React 19, Tailwind CSS, lucide-react
 - Node HTTP API with shared Zod contracts
 - PostgreSQL, Prisma, Prisma migrations and seed data
-- Database-backed outbox worker with SMTP or console email delivery
+- Database-backed outbox worker with SMTP or local console email delivery
 - Docker Compose for local PostgreSQL and Redis
 - Docker/Caddy staging deployment files
 

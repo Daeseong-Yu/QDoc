@@ -50,7 +50,7 @@
 
   <rect x="135" y="475" width="220" height="105" class="muted" />
   <text x="245" y="512" text-anchor="middle" class="label">Redis</text>
-  <text x="245" y="540" text-anchor="middle" class="small">Provisioned</text>
+  <text x="245" y="540" text-anchor="middle" class="small">OTP rate limits</text>
   <text x="245" y="563" text-anchor="middle" class="tiny">Future realtime/cache</text>
 
   <rect x="890" y="260" width="180" height="95" class="muted" />

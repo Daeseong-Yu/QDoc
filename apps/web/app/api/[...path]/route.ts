@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const forwardedRequestHeaders = new Set(["accept", "accept-language", "content-type", "cookie", "user-agent"]);
+const internalClientIpHeader = "x-qdoc-client-ip";
 
 function getApiBaseUrl() {
   if (process.env.API_BASE_URL) {
@@ -40,6 +41,24 @@ function getTargetUrl(request: NextRequest, path: string[]) {
   return target;
 }
 
+function getClientIp(request: NextRequest) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+
+  if (forwardedFor) {
+    const forwardedIp = forwardedFor
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .at(-1);
+
+    if (forwardedIp) {
+      return forwardedIp.slice(0, 128);
+    }
+  }
+
+  return request.headers.get("x-real-ip")?.trim().slice(0, 128) || null;
+}
+
 function getForwardedHeaders(request: NextRequest) {
   const headers = new Headers();
 
@@ -48,6 +67,12 @@ function getForwardedHeaders(request: NextRequest) {
       headers.set(key, value);
     }
   });
+
+  const clientIp = getClientIp(request);
+
+  if (clientIp) {
+    headers.set(internalClientIpHeader, clientIp);
+  }
 
   return headers;
 }

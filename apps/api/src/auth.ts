@@ -8,6 +8,7 @@ import {
 import { prisma } from "@qdoc/db";
 import { canDeliverOtp, deliverOtp, OtpDeliveryError } from "./email.js";
 import { readJson, sendJson } from "./http.js";
+import { checkOtpRequestRateLimit, checkOtpVerifyRateLimit } from "./rate-limit.js";
 import { clearSessionCookie, createSessionCookie, createSessionToken, readSession } from "./session.js";
 
 const otpTtlMs = 10 * 60 * 1000;
@@ -18,6 +19,16 @@ const maxPendingChallenges = 5;
 const otpRequestCooldowns = new Map<string, number>();
 const otpVerifyCooldowns = new Map<string, number>();
 const otpRequestEmailsInFlight = new Set<string>();
+
+function getHeaderValue(request: IncomingMessage, name: string) {
+  const value = request.headers[name.toLowerCase()];
+
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
+}
 
 function pruneExpiredEntries(map: Map<string, number>) {
   const now = Date.now();
@@ -30,7 +41,33 @@ function pruneExpiredEntries(map: Map<string, number>) {
 }
 
 function getRequesterKey(request: IncomingMessage) {
+  const proxiedClientIp = getHeaderValue(request, "x-qdoc-client-ip")?.trim();
+
+  if (proxiedClientIp && proxiedClientIp.length <= 128) {
+    return proxiedClientIp;
+  }
+
   return request.socket.remoteAddress ?? "unknown";
+}
+
+function maskEmail(email: string) {
+  const atIndex = email.lastIndexOf("@");
+
+  if (atIndex <= 0) {
+    return "masked";
+  }
+
+  const localPart = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1);
+
+  if (localPart.length <= 1) {
+    return `*@${domain}`;
+  }
+
+  const visiblePrefix = localPart.length === 2 ? localPart.slice(0, 1) : localPart.slice(0, 2);
+  const maskedPart = "*".repeat(localPart.length - visiblePrefix.length);
+
+  return `${visiblePrefix}${maskedPart}@${domain}`;
 }
 
 function reserveCooldown(map: Map<string, number>, key: string, ttlMs: number) {
@@ -215,6 +252,17 @@ export async function handleOtpRequest(request: IncomingMessage, response: Serve
     return;
   }
 
+  const redisRateLimit = await checkOtpRequestRateLimit(input.data.email, getRequesterKey(request));
+
+  if (!redisRateLimit.allowed) {
+    console.warn("OTP request rate limited", {
+      policy: redisRateLimit.policy,
+      email: maskEmail(input.data.email),
+    });
+    sendJson(response, 429, { error: "rate_limited" }, { "retry-after": String(redisRateLimit.retryAfterSeconds) });
+    return;
+  }
+
   if (!reserveRequestEmail(input.data.email)) {
     sendJson(response, 429, { error: "rate_limited" });
     return;
@@ -276,6 +324,17 @@ export async function handleOtpVerify(request: IncomingMessage, response: Server
 
   if (!reserveCooldown(otpVerifyCooldowns, verifyCooldownKey, otpVerifyCooldownMs)) {
     sendJson(response, 429, { error: "rate_limited" });
+    return;
+  }
+
+  const redisRateLimit = await checkOtpVerifyRateLimit(input.data.email, getRequesterKey(request));
+
+  if (!redisRateLimit.allowed) {
+    console.warn("OTP verify rate limited", {
+      policy: redisRateLimit.policy,
+      email: maskEmail(input.data.email),
+    });
+    sendJson(response, 429, { error: "rate_limited" }, { "retry-after": String(redisRateLimit.retryAfterSeconds) });
     return;
   }
 

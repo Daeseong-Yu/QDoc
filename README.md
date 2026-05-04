@@ -32,7 +32,7 @@ QDoc is implemented as a production-shaped TypeScript monorepo:
 
 ![QDoc Infrastructure](./docs/assets/infrastructure.svg)
 
-QDoc is deployed as a small Docker Compose stack with Caddy as the public reverse proxy, a Next.js web app, a Node API server, PostgreSQL, Redis, and a background worker. The waiting queue is backed by ticket rows in PostgreSQL, while notification jobs use a database-backed outbox that the worker polls and processes. Redis is provisioned in the runtime for future realtime, cache, or coordination work, but it is not on the current queue or notification processing path.
+QDoc is deployed as a small Docker Compose stack with Caddy as the public reverse proxy, a Next.js web app, a Node API server, PostgreSQL, Redis, and a background worker. The waiting queue is backed by ticket rows in PostgreSQL, while notification jobs use a database-backed outbox that the worker polls and processes. Redis is used for OTP abuse-control counters and remains available for future realtime, cache, or coordination work.
 
 The core database model includes organizations, clinic sites, queues, users, staff memberships, OTP challenges, tickets, ticket events, notification logs, outbox rows, and audit logs. Ticket ordering uses a `sortRank` field instead of only `createdAt`, which lets a delayed patient be restored to the front of the waiting queue in a controlled way.
 
@@ -88,6 +88,12 @@ Worker flow:
 1. Staff ticket actions create pending outbox rows.
 2. `apps/worker` claims pending or stale processing rows.
 3. The worker marks rows as `processed`, retries failed rows with backoff, or marks them `failed` after max attempts.
+
+OTP abuse controls:
+
+1. OTP request and verification attempts keep the existing in-process cooldowns.
+2. When `REDIS_URL` is configured, API adds Redis TTL counters for email, client IP, and client IP plus email combinations.
+3. Redis keys use hashed identifiers instead of raw email addresses.
 
 ## Local Setup
 

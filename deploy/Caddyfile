@@ -1,7 +1,6 @@
+# Host Caddy snippet for staging.
+# Install this block in /etc/caddy/Caddyfile on the host.
 {$APP_DOMAIN} {
   encode zstd gzip
-  reverse_proxy web:3000 {
-    header_up X-Forwarded-For {remote_host}
-    header_up X-Real-IP {remote_host}
-  }
+  reverse_proxy 127.0.0.1:{$QDOC_WEB_PORT}
 }

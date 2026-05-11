@@ -1,0 +1,151 @@
+name: Build staging artifact and deploy with SSM
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qdoc-staging
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  QDOC_IMAGE_NAME: qdoc-app
+  QDOC_SSM_DOCUMENT_NAME: ${{ vars.QDOC_SSM_DOCUMENT_NAME || 'QDoc-StagingDeploy' }}
+
+jobs:
+  build:
+    name: Build staging artifact
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Build Docker image
+        run: |
+          set -euo pipefail
+          docker build \
+            --platform linux/amd64 \
+            --label app=qdoc \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "${QDOC_IMAGE_NAME}:${GITHUB_SHA}" \
+            .
+
+      - name: Save Docker image artifact
+        run: |
+          set -euo pipefail
+          docker save "${QDOC_IMAGE_NAME}:${GITHUB_SHA}" | gzip > "qdoc-app-${GITHUB_SHA}.tar.gz"
+          sha256sum "qdoc-app-${GITHUB_SHA}.tar.gz" | sed "s#qdoc-app-${GITHUB_SHA}.tar.gz#qdoc-app.tar.gz#" > qdoc-app.tar.gz.sha256
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qdoc-staging-image-${{ github.sha }}
+          path: |
+            qdoc-app-${{ github.sha }}.tar.gz
+            qdoc-app.tar.gz.sha256
+          retention-days: 3
+          if-no-files-found: error
+
+  deploy:
+    name: Upload artifact and trigger EC2 deploy
+    runs-on: ubuntu-24.04
+    needs: build
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: qdoc-staging-image-${{ github.sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: qdoc-${{ github.run_id }}
+          mask-aws-account-id: true
+
+      - name: Upload artifact to S3
+        run: |
+          set -euo pipefail
+          aws s3 cp "qdoc-app-${GITHUB_SHA}.tar.gz" \
+            "s3://${{ secrets.QDOC_DEPLOY_BUCKET }}/staging/${GITHUB_SHA}/qdoc-app.tar.gz" \
+            --no-progress
+          aws s3 cp qdoc-app.tar.gz.sha256 \
+            "s3://${{ secrets.QDOC_DEPLOY_BUCKET }}/staging/${GITHUB_SHA}/qdoc-app.tar.gz.sha256" \
+            --no-progress
+
+      - name: Deploy on EC2 with SSM
+        run: |
+          set -euo pipefail
+          ARTIFACT_URI="s3://${{ secrets.QDOC_DEPLOY_BUCKET }}/staging/${GITHUB_SHA}/qdoc-app.tar.gz"
+          EXPECTED_SHA256="$(cut -d ' ' -f1 qdoc-app.tar.gz.sha256)"
+
+          COMMAND_ID="$(
+            aws ssm send-command \
+              --document-name "${QDOC_SSM_DOCUMENT_NAME}" \
+              --instance-ids "${{ secrets.QDOC_STAGING_INSTANCE_ID }}" \
+              --comment "Deploy QDoc ${GITHUB_SHA}" \
+              --parameters "{\"artifactUri\":[\"${ARTIFACT_URI}\"],\"imageTag\":[\"${GITHUB_SHA}\"],\"sourceRef\":[\"${GITHUB_SHA}\"],\"expectedSha256\":[\"${EXPECTED_SHA256}\"]}" \
+              --query "Command.CommandId" \
+              --output text
+          )"
+
+          set +e
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.QDOC_STAGING_INSTANCE_ID }}"
+          WAIT_EXIT=$?
+          set -e
+
+          INVOCATION_STATUS="$(
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "${{ secrets.QDOC_STAGING_INSTANCE_ID }}" \
+              --query Status \
+              --output text
+          )"
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ secrets.QDOC_STAGING_INSTANCE_ID }}" \
+            --query "{Status:Status,StatusDetails:StatusDetails,ResponseCode:ResponseCode}" \
+            --output json
+
+          if [ "$WAIT_EXIT" -ne 0 ] || [ "$INVOCATION_STATUS" != "Success" ]; then
+            exit 1
+          fi

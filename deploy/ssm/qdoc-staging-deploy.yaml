@@ -1,0 +1,26 @@
+schemaVersion: "2.2"
+description: Deploy QDoc staging artifact from S3.
+parameters:
+  artifactUri:
+    type: String
+    description: S3 URI for the qdoc-app image artifact.
+    allowedPattern: "^s3://[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]/staging/[0-9a-f]{40}/qdoc-app\\.tar\\.gz$"
+  imageTag:
+    type: String
+    description: Docker image tag generated from the Git commit SHA.
+    allowedPattern: "^[0-9a-f]{40}$"
+  sourceRef:
+    type: String
+    description: Git commit SHA to check out before running Compose.
+    allowedPattern: "^[0-9a-f]{40}$"
+  expectedSha256:
+    type: String
+    description: Expected SHA-256 digest for the compressed image artifact.
+    allowedPattern: "^[0-9a-f]{64}$"
+mainSteps:
+  - action: aws:runShellScript
+    name: deploy
+    inputs:
+      timeoutSeconds: "900"
+      runCommand:
+        - /opt/qdoc/deploy/deploy-from-s3.sh "{{ artifactUri }}" "{{ imageTag }}" "{{ sourceRef }}" "{{ expectedSha256 }}"

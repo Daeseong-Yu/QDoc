@@ -32,7 +32,7 @@ QDoc is implemented as a production-shaped TypeScript monorepo:
 
 ![QDoc Infrastructure](./docs/assets/infrastructure.svg)
 
-QDoc is deployed as a small Docker Compose stack with Caddy as the public reverse proxy, a Next.js web app, a Node API server, PostgreSQL, Redis, and a background worker. The waiting queue is backed by ticket rows in PostgreSQL, while notification jobs use a database-backed outbox that the worker polls and processes. Redis is used for OTP abuse-control counters and remains available for future realtime, cache, or coordination work.
+QDoc is deployed on a small EC2 instance behind host-level Caddy. GitHub Actions builds the application image, uploads the compressed image artifact to S3, and triggers Systems Manager Run Command so the host only downloads and runs the image. The Docker Compose stack runs the Next.js web app, Node API server, PostgreSQL, Redis, migration/seed jobs, and a background worker; only the web app is published to the host loopback interface for Caddy to proxy. The waiting queue is backed by ticket rows in PostgreSQL, while notification jobs use a database-backed outbox that the worker polls and processes. Redis is used for OTP abuse-control counters and remains available for future realtime, cache, or coordination work.
 
 The core database model includes organizations, clinic sites, queues, users, staff memberships, OTP challenges, tickets, ticket events, notification logs, outbox rows, and audit logs. Ticket ordering uses a `sortRank` field instead of only `createdAt`, which lets a delayed patient be restored to the front of the waiting queue in a controlled way.
 
@@ -62,7 +62,8 @@ The core database model includes organizations, clinic sites, queues, users, sta
 - PostgreSQL, Prisma, Prisma migrations and seed data
 - Database-backed outbox worker with SMTP or local console email delivery
 - Docker Compose for local PostgreSQL and Redis
-- Docker/Caddy staging deployment files
+- Docker Compose staging deployment behind host Caddy
+- GitHub Actions, S3, and AWS Systems Manager for external image build and low-resource host deployment
 
 ## Core Flows
 
@@ -158,3 +159,82 @@ pnpm verify:outbox
 ```
 
 `pnpm verify:outbox` creates scoped verification rows, runs the worker outbox processor against those rows only, checks processed/retry/failed transitions, and removes the rows it created.
+
+## AWS EC2 Staging Deployment
+
+The staging setup assumes another host-level Caddy process already owns public ports `80` and `443`. QDoc should not start its own public Caddy container on that host. The EC2 instance is intentionally kept out of the build path: GitHub Actions builds the Docker image, stores it in S3, and asks Systems Manager to run the host-side deployment script.
+
+Host networking:
+
+- DNS: point the staging domain to the EC2 public IPv4 address, preferably an Elastic IP.
+- Security group: allow inbound `80` and `443` from the internet, allow inbound `22` only from the operator's public IP if SSH is still needed, and do not expose the web loopback port, API, PostgreSQL, or Redis publicly.
+- Host Caddy: add the QDoc virtual host to `/etc/caddy/Caddyfile` and proxy it to the web container loopback port. Either replace the placeholders before saving the file or set matching Caddy environment variables:
+
+```caddy
+{$APP_DOMAIN} {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:{$QDOC_WEB_PORT}
+}
+```
+
+- Compose: `compose.staging.yaml` publishes only `web` to `127.0.0.1:${QDOC_WEB_PORT}`. API, PostgreSQL, Redis, worker, migrate, and seed remain on the private Docker network.
+- Environment: set `APP_DOMAIN`, `APP_URL`, `QDOC_APP_IMAGE`, `QDOC_WEB_BIND=127.0.0.1`, `QDOC_WEB_PORT`, SMTP credentials, `SESSION_SECRET`, `QDOC_DB_SECRET`, and a matching `DATABASE_URL` in `.env.staging`.
+
+Apply Caddy changes:
+
+```bash
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+One-time AWS setup for S3 + Systems Manager deployment:
+
+- Create a private S3 bucket for deployment artifacts. Keep S3 Block Public Access enabled, enable server-side encryption, and add a lifecycle rule that expires old `staging/` artifacts.
+- Attach an EC2 instance profile with `AmazonSSMManagedInstanceCore` and scoped `s3:GetObject` permission for the deployment artifact prefix.
+- Confirm SSM Agent is running on the instance and the instance appears as a managed node in Systems Manager.
+- Install Docker, Docker Compose, Git, gzip, sha256sum, flock, AWS CLI, and Caddy on the EC2 host. Use a Docker Compose version that supports `up --wait`.
+- Create a GitHub Actions OIDC IAM role scoped to this repository and branch. Grant it only the permissions required to upload the artifact and send/read the SSM command for the staging instance.
+- Register the custom SSM command document from `deploy/ssm/qdoc-staging-deploy.yaml`. The workflow uses `QDoc-StagingDeploy` by default.
+- Add GitHub environment secrets `AWS_DEPLOY_ROLE_ARN`, `QDOC_DEPLOY_BUCKET`, and `QDOC_STAGING_INSTANCE_ID`; add environment variables `AWS_REGION` and optionally `QDOC_SSM_DOCUMENT_NAME`.
+
+Create the SSM document once, then update it when `deploy/ssm/qdoc-staging-deploy.yaml` changes:
+
+```bash
+aws ssm create-document \
+  --name QDoc-StagingDeploy \
+  --document-type Command \
+  --document-format YAML \
+  --content file://deploy/ssm/qdoc-staging-deploy.yaml
+
+aws ssm update-document \
+  --name QDoc-StagingDeploy \
+  --document-version '$LATEST' \
+  --document-format YAML \
+  --content file://deploy/ssm/qdoc-staging-deploy.yaml
+```
+
+Install or refresh the host-side deploy script. The EC2 checkout must be able to fetch the target commit, because the deploy script checks out the same source ref as the image tag before running Compose:
+
+```bash
+sudo mkdir -p /opt
+sudo git clone <repository-url> /opt/qdoc
+sudo chmod +x /opt/qdoc/deploy/deploy-from-s3.sh
+```
+
+Deploy manually through SSM if needed:
+
+```bash
+sudo /opt/qdoc/deploy/deploy-from-s3.sh s3://<artifact-bucket>/staging/<git-sha>/qdoc-app.tar.gz <git-sha> <git-sha> <artifact-sha256>
+```
+
+The deploy script runs as root through SSM, serializes deployments with a host lock, downloads `qdoc-app.tar.gz.sha256` from the same S3 prefix, verifies the image artifact against the workflow-provided digest before loading it into Docker, forces the web bind to loopback, and waits for Compose services to become healthy.
+
+Verify the path before testing in a browser:
+
+```bash
+curl -I "http://127.0.0.1:${QDOC_WEB_PORT}"
+curl -Iv https://qdoc.example.com
+docker compose -f compose.staging.yaml --env-file .env.staging ps
+docker compose -f compose.staging.yaml --env-file .env.staging logs -f web api worker
+```

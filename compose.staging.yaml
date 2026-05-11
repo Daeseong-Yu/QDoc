@@ -1,25 +1,6 @@
 services:
-  caddy:
-    image: caddy:2.8.4-alpine
-    restart: unless-stopped
-    depends_on:
-      web:
-        condition: service_healthy
-    environment:
-      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.staging}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-
   web:
-    image: qdoc-app:deploy
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${QDOC_APP_IMAGE:?Set QDOC_APP_IMAGE in .env.staging or the shell}
     restart: unless-stopped
     depends_on:
       api:
@@ -27,6 +8,8 @@ services:
     environment:
       NODE_ENV: production
       API_BASE_URL: http://api:4000
+    ports:
+      - "${QDOC_WEB_BIND:-127.0.0.1}:${QDOC_WEB_PORT:-13000}:3000"
     command: ["pnpm", "start:web"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null 2>&1"]
@@ -35,10 +18,7 @@ services:
       retries: 6
 
   api:
-    image: qdoc-app:deploy
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${QDOC_APP_IMAGE:?Set QDOC_APP_IMAGE in .env.staging or the shell}
     restart: unless-stopped
     depends_on:
       seed:
@@ -75,10 +55,7 @@ services:
       retries: 6
 
   worker:
-    image: qdoc-app:deploy
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${QDOC_APP_IMAGE:?Set QDOC_APP_IMAGE in .env.staging or the shell}
     restart: unless-stopped
     depends_on:
       seed:
@@ -106,10 +83,7 @@ services:
     command: ["pnpm", "start:worker"]
 
   migrate:
-    image: qdoc-app:deploy
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${QDOC_APP_IMAGE:?Set QDOC_APP_IMAGE in .env.staging or the shell}
     restart: "no"
     depends_on:
       postgres:
@@ -121,10 +95,7 @@ services:
     command: ["pnpm", "db:migrate:deploy"]
 
   seed:
-    image: qdoc-app:deploy
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${QDOC_APP_IMAGE:?Set QDOC_APP_IMAGE in .env.staging or the shell}
     restart: "no"
     depends_on:
       migrate:
@@ -162,7 +133,5 @@ services:
       retries: 10
 
 volumes:
-  caddy-data:
-  caddy-config:
   postgres-data:
   redis-data:

@@ -4,6 +4,9 @@ node_modules
 .vercel
 dist
 coverage
+playwright-report
+test-results
+.playwright
 .env
 .env.*
 !.env.example

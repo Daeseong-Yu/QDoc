@@ -50,7 +50,7 @@ The core database model includes organizations, clinic sites, queues, users, sta
 - Add SMS/push notifications and more configurable notification thresholds.
 - Replace polling with SSE for faster live queue updates.
 - Add richer staff roles, queue closing controls, and multi-department clinic support.
-- Add Playwright end-to-end tests for the patient and staff flows.
+- Expand Playwright coverage for edge cases such as closed queues, duplicate check-ins, and cancelled tickets.
 - Add observability dashboards for queue wait times, notification failures, and staff actions.
 - Integrate with clinic EMR/EHR systems after the core queue workflow is stable.
 
@@ -156,9 +156,18 @@ pnpm lint
 pnpm build
 pnpm db:validate
 pnpm verify:outbox
+pnpm e2e
 ```
 
 `pnpm verify:outbox` creates scoped verification rows, runs the worker outbox processor against those rows only, checks processed/retry/failed transitions, and removes the rows it created.
+
+Install the Playwright Chromium browser once before running E2E tests locally:
+
+```bash
+pnpm e2e:install
+```
+
+`pnpm e2e` starts the API and web dev servers with a test-only fixed OTP, resets isolated E2E rows in the local database, and verifies patient OTP login, check-in, active ticket status updates, staff OTP login, call/start/complete, and delay/restore. The fixed OTP is enabled only inside the Playwright `webServer` environment with `APP_ENV=test`, `EMAIL_PROVIDER=console`, and `ALLOW_FIXED_OTP=true`; normal local, staging, and production runs still use the configured environment. E2E refuses to run against a non-local `DATABASE_URL` unless `QDOC_ALLOW_E2E_REMOTE_DB=true` is explicitly set for an isolated test database.
 
 ## AWS EC2 Staging Deployment
 

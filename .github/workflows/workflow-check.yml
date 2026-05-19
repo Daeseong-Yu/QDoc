@@ -1,0 +1,24 @@
+name: Workflow Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  workflow-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Check QDoc workflow metadata
+        run: |
+          if [ ! -f .ai/scripts/validate_workflow.py ] || [ ! -f .ai/scripts/execute.py ]; then
+            echo "::notice::.ai workflow scripts are not committed; skipping workflow metadata check."
+            exit 0
+          fi
+
+          python3 .ai/scripts/validate_workflow.py
+          python3 .ai/scripts/execute.py qdoc-mvp --check

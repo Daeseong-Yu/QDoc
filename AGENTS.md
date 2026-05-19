@@ -1,0 +1,116 @@
+# Project: QDoc
+
+This repository is the source of truth for QDoc implementation, deployment automation, and agentic execution state.
+
+## Repository
+
+- Repository path: `.`
+- External planning source used to initialize this workflow: `../../codex/QDoc`
+- Workflow template source used to initialize this workflow: `../workflow`
+- Product docs: `.ai/core/PRD.md`, `.ai/core/ARCHITECTURE.md`, `.ai/core/ADR.md`
+- Phase registry: `.ai/phases/index.json`
+- Phase plans: `.ai/phases/{task}/*`
+- Current task, if present: `.ai/execution/current.md`
+
+## Stack
+
+- Application: TypeScript monorepo managed with pnpm workspace and Turborepo.
+- Frontend: Next.js App Router, React, Tailwind CSS, shadcn-style UI primitives, lucide-react.
+- Backend: Node HTTP API using shared Zod contracts; QDoc plan allows NestJS-style module boundaries where useful.
+- Worker: Node/TypeScript worker that processes database-backed outbox jobs.
+- Data: PostgreSQL, Prisma schema/migrations/seed, Redis for OTP abuse-control counters and future coordination.
+- Hosting: Small EC2 instance behind host-level Caddy; Docker Compose runs web, api, worker, PostgreSQL, and Redis.
+- Automation: GitHub Actions builds artifacts, uploads to S3, and deploys through AWS Systems Manager Run Command.
+- Observability: Health endpoints, service/container logs, deployment command output, and future queue/notification metrics.
+
+## Critical Architecture Rules
+
+- Use `.` as the working directory for future Codex work on implementation.
+- Do not update `../../codex/QDoc` or `../workflow` unless the user explicitly asks for those repositories to change.
+- Do not change selected architecture, public URLs, public API contracts, data schemas, deployment flow, or secret handling without explicit approval.
+- Keep frontend, API, worker, database, contracts, UI, and config responsibilities separated by the existing monorepo boundaries.
+- Never commit tokens, deploy hooks, API keys, credentials, OTP values from real environments, SMTP secrets, AWS keys, or other secrets.
+- Public endpoints must stay limited to documented API paths and must validate external input.
+- Preserve backward compatibility unless the user explicitly approves a breaking change.
+- Update `.ai/core` docs and `.ai/phases` plans before changing public APIs, deployment flow, secret handling, or data storage structure.
+- EC2 deployment must keep build work off the low-resource host; GitHub Actions should produce the deployable artifact.
+
+## Work Process
+
+Before non-trivial implementation:
+
+1. Read `.ai/core/PRD.md`.
+2. Read `.ai/core/ARCHITECTURE.md`.
+3. Read `.ai/core/ADR.md`.
+4. Check `.ai/execution/current.md` if it exists.
+5. Otherwise, follow `.ai/phases/index.json`, the relevant task index, and the relevant phase document.
+
+Current task priority:
+
+1. User's latest instruction
+2. `.ai/execution/current.md`
+3. `.ai/phases/index.json`
+4. Relevant `.ai/phases/{task}/index.json`
+5. Relevant phase document
+6. `.ai/core/ADR.md`
+7. `.ai/core/ARCHITECTURE.md`
+8. `.ai/core/PRD.md`
+
+Do not treat archived or completed phase files as current instructions unless explicitly asked.
+
+## Planning Rules
+
+- Keep implementation and planning changes in this repository.
+- Do not expand scope beyond the active phase without approval.
+- If a required change conflicts with existing core docs, update the docs first or clearly explain the conflict.
+- Each step must be independently executable and include concrete verification criteria.
+- Completed steps can be used as context, but new implementation should target the active step.
+
+## Commit Unit Rules
+
+- When a step, phase, or task implementation and verification are complete, check `git status`, changed file names, and the relevant diff scope before moving to the next step.
+- Treat this commit-unit check as change-scope classification, not as a full pre-commit security review.
+- If the current changes form a coherent commit unit, propose the commit to the user before starting the next step. Do not commit unless explicitly requested.
+- Before running an actual `git commit`, perform the `precommit-security-review` security and operations review.
+- Do not leave previous step/task changes in the worktree and mix them with the next step. If one file contains changes from multiple steps/tasks, tell the user that hunk-level staging or split commits are needed.
+
+## Security Rules
+
+- Never print, log, commit, or expose secrets.
+- Do not place secrets in generated static files, client bundles, public JSON, logs, examples, screenshots, or workflow output.
+- Do not expose API, PostgreSQL, Redis, or internal container ports publicly on EC2.
+- Keep Caddy as the public ingress boundary for staging/production unless an approved architecture change replaces it.
+- Public API routes must define method, path, input, output, auth, and abuse-prevention assumptions.
+- Infrastructure and repository settings require manual configuration in the operating account.
+
+## Verification
+
+Workflow structure:
+
+```bash
+python3 .ai/scripts/validate_workflow.py
+python3 .ai/scripts/execute.py qdoc-mvp --check
+```
+
+Repository hygiene:
+
+```bash
+git diff --check
+```
+
+Project checks:
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm build
+pnpm db:validate
+pnpm verify:outbox
+```
+
+## Notes
+
+- Keep this file focused on stable project rules.
+- Keep temporary or current implementation details in `.ai/execution/current.md`.
+- Keep durable project context in `.ai/core`.
+- Keep detailed phase sequencing in `.ai/phases/{task}/index.json`.

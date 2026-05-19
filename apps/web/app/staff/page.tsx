@@ -212,6 +212,30 @@ export default function StaffPage() {
     }
   }, [clearStaffSession, currentUser, selectedSiteId]);
 
+  const refreshBoard = useCallback(
+    async (showLoading = true) => {
+      if (!currentUser || !selectedSiteId) {
+        return;
+      }
+
+      if (showLoading) {
+        setBoardState("loading");
+      }
+
+      try {
+        const applied = await loadBoard();
+
+        if (applied) {
+          setBoardState("success");
+        }
+      } catch (error) {
+        setBoardState("error");
+        setMessage(getMessage(error));
+      }
+    },
+    [currentUser, loadBoard, selectedSiteId],
+  );
+
   const loadCurrentUser = useCallback(async () => {
     const response = await fetch("/api/me", { cache: "no-store" });
 
@@ -239,18 +263,8 @@ export default function StaffPage() {
     }
 
     setQueueBoard(null);
-    setBoardState("loading");
-    loadBoard()
-      .then((applied) => {
-        if (applied) {
-          setBoardState("success");
-        }
-      })
-      .catch((error: unknown) => {
-        setBoardState("error");
-        setMessage(getMessage(error));
-      });
-  }, [currentUser, loadBoard, selectedSiteId]);
+    void refreshBoard();
+  }, [currentUser, refreshBoard, selectedSiteId]);
 
   useEffect(() => {
     if (!currentUser || !selectedSiteId) {
@@ -258,17 +272,13 @@ export default function StaffPage() {
     }
 
     const timer = window.setInterval(() => {
-      void loadBoard().catch((error: unknown) => {
-        if (!isApiError(error) || error.status !== 401) {
-          setMessage(getMessage(error));
-        }
-      });
+      void refreshBoard(false);
     }, 4000);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [currentUser, loadBoard, selectedSiteId]);
+  }, [currentUser, refreshBoard, selectedSiteId]);
 
   async function requestOtp() {
     setMessage("");
@@ -350,7 +360,11 @@ export default function StaffPage() {
         body: JSON.stringify({ siteId: selectedSiteId }),
       });
       await readApiResponse(response, staffTicketResponseSchema);
-      await loadBoard();
+      const applied = await loadBoard();
+
+      if (applied) {
+        setBoardState("success");
+      }
     } catch (error) {
       setMessage(getMessage(error));
     } finally {
@@ -380,7 +394,7 @@ export default function StaffPage() {
           <button
             type="button"
             onClick={() => {
-              void loadBoard();
+              void refreshBoard();
             }}
             className="inline-flex h-10 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] shadow-sm hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!currentUser || !selectedSiteId}
@@ -469,6 +483,11 @@ export default function StaffPage() {
                     key={membership.siteId}
                     type="button"
                     onClick={() => {
+                      if (membership.siteId === selectedSiteId) {
+                        void refreshBoard();
+                        return;
+                      }
+
                       boardRequestId.current += 1;
                       setQueueBoard(null);
                       setBoardState("loading");

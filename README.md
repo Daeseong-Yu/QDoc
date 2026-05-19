@@ -169,6 +169,14 @@ pnpm e2e:install
 
 `pnpm e2e` starts the API and web dev servers with a test-only fixed OTP, resets isolated E2E rows in the local database, and verifies patient OTP login, check-in, active ticket status updates, staff OTP login, call/start/complete, and delay/restore. The fixed OTP is enabled only inside the Playwright `webServer` environment with `APP_ENV=test`, `EMAIL_PROVIDER=console`, and `ALLOW_FIXED_OTP=true`; normal local, staging, and production runs still use the configured environment. E2E refuses to run against a non-local `DATABASE_URL` unless `QDOC_ALLOW_E2E_REMOTE_DB=true` is explicitly set for an isolated test database.
 
+Manual core-flow staging checklist:
+
+1. Patient requests an email OTP, signs in, selects a clinic queue, checks in, and sees an active ticket.
+2. Staff signs in at `/staff` with a seeded staff account and can see the same site queue.
+3. Staff calls the patient ticket, starts service, and completes it; the patient status panel reflects each state change after polling.
+4. Staff delays a waiting ticket and restores it; the restored ticket returns to the front of the waiting queue.
+5. Worker logs show outbox jobs being processed, or `QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh` passes against staging.
+
 ## AWS EC2 Staging Deployment
 
 The staging setup assumes another host-level Caddy process already owns public ports `80` and `443`. QDoc should not start its own public Caddy container on that host. The EC2 instance is intentionally kept out of the build path: GitHub Actions builds the Docker image, stores it in S3, and asks Systems Manager to run the host-side deployment script.
@@ -188,6 +196,35 @@ Host networking:
 
 - Compose: `compose.staging.yaml` publishes only `web` to `127.0.0.1:${QDOC_WEB_PORT}`. API, PostgreSQL, Redis, worker, migrate, and seed remain on the private Docker network.
 - Environment: set `APP_DOMAIN`, `APP_URL`, `QDOC_APP_IMAGE`, `QDOC_WEB_BIND=127.0.0.1`, `QDOC_WEB_PORT`, SMTP credentials, `SESSION_SECRET`, `QDOC_DB_SECRET`, and a matching `DATABASE_URL` in `.env.staging`.
+
+Staging environment variables:
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `APP_DOMAIN` | yes | Public hostname served by host Caddy. |
+| `APP_URL` | yes | Public origin, for example `https://qdoc.example.com`. |
+| `APP_ENV` | yes | Use `staging` for staging. |
+| `QDOC_APP_IMAGE` | yes | Docker image tag loaded from the S3 artifact, normally `qdoc-app:<git-sha>`. |
+| `QDOC_WEB_BIND` | yes | Must remain `127.0.0.1`; the deploy script rejects public binds. |
+| `QDOC_WEB_PORT` | yes | Host loopback port Caddy proxies to, for example `13000`. |
+| `DATABASE_URL` | yes | Internal PostgreSQL URL matching the Compose database service. |
+| `POSTGRES_DB`, `POSTGRES_USER`, `QDOC_DB_SECRET` | yes | PostgreSQL bootstrap settings. |
+| `REDIS_URL` | yes | Internal Redis URL used for OTP rate-limit counters. |
+| `SESSION_SECRET` | yes | Long random secret; never commit the value. |
+| `EMAIL_PROVIDER` | yes | Use `smtp` for staging unless console delivery is explicitly allowed. |
+| `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | yes for SMTP | SMTP sender and credentials; never print or commit secrets. |
+| `ALLOW_CONSOLE_OTP`, `ALLOW_FIXED_OTP` | yes | Keep both `false` in normal staging. |
+| `WORKER_POLL_INTERVAL_MS`, `WORKER_OUTBOX_BATCH_SIZE`, `WORKER_OUTBOX_MAX_ATTEMPTS` | no | Optional worker tuning values. |
+
+GitHub staging environment settings:
+
+| Name | Type | Notes |
+| --- | --- | --- |
+| `AWS_REGION` | variable | Region for S3 and Systems Manager. |
+| `QDOC_SSM_DOCUMENT_NAME` | variable | Optional; defaults to `QDoc-StagingDeploy`. |
+| `AWS_DEPLOY_ROLE_ARN` | secret | OIDC role assumed by GitHub Actions. |
+| `QDOC_DEPLOY_BUCKET` | secret | Private S3 artifact bucket. |
+| `QDOC_STAGING_INSTANCE_ID` | secret | EC2 managed-instance ID used by SSM. |
 
 Apply Caddy changes:
 
@@ -247,3 +284,42 @@ curl -Iv https://qdoc.example.com
 docker compose -f compose.staging.yaml --env-file .env.staging ps
 docker compose -f compose.staging.yaml --env-file .env.staging logs -f web api worker
 ```
+
+Or run the bundled staging verifier from the EC2 checkout:
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh
+```
+
+The verifier checks the Compose service state, healthchecks for web/API/PostgreSQL/Redis, the loopback web endpoint, API health from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` also runs the scoped outbox processor verification against the staging database.
+
+Useful SSM and host checks:
+
+```bash
+aws ssm list-command-invocations --command-id <command-id> --details
+aws ssm get-command-invocation --command-id <command-id> --instance-id <instance-id>
+docker compose -f compose.staging.yaml --env-file .env.staging ps
+docker compose -f compose.staging.yaml --env-file .env.staging logs --tail=200 web api worker
+curl -fsSI "http://127.0.0.1:${QDOC_WEB_PORT}"
+curl -fsSI https://qdoc.example.com
+```
+
+Rollback:
+
+1. Pick a previously verified 40-character Git SHA whose `staging/<sha>/qdoc-app.tar.gz` and `.sha256` files still exist in the private deployment bucket.
+2. Confirm the EC2 checkout can fetch that SHA.
+3. Re-run the SSM document with `artifactUri`, `imageTag`, `sourceRef`, and `expectedSha256` for the known-good artifact, or run `deploy/deploy-from-s3.sh` manually on the host with those four values.
+4. Run `QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh`.
+5. If the rollback crosses database migrations, check the migration contents first. The current MVP deploy path only runs forward Prisma deploy migrations and does not implement automatic down migrations.
+
+Artifact retention:
+
+- GitHub Actions keeps the compressed image workflow artifact for 3 days.
+- Configure the private S3 bucket lifecycle to keep `staging/` artifacts for 14 days, with at least the last known-good artifact available until the next deploy is verified.
+- The EC2 deploy script prunes unused Docker images after a successful Compose update, but rollback should use the S3 artifact as the source of truth.
+- Keep database backup and restore procedures outside this repo until the operating AWS account and retention policy are finalized.
+
+Deployment artifact review:
+
+The single Docker image artifact is still acceptable for the MVP because web, API, worker, migrate, and seed are built from the same monorepo revision and the EC2 host performs no build work. Split artifacts can be revisited when independent service scaling, image size, rollout isolation, or separate security boundaries become more important than the added release orchestration.

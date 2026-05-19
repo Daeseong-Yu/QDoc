@@ -14,6 +14,7 @@
     "e2e": "dotenv -e .env -- playwright test",
     "e2e:install": "playwright install chromium",
     "verify:outbox": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:outbox",
+    "verify:staging": "bash deploy/verify-staging.sh",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

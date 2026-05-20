@@ -40,7 +40,7 @@ function pruneExpiredEntries(map: Map<string, number>) {
   }
 }
 
-function getRequesterKey(request: IncomingMessage) {
+export function getRequesterKey(request: IncomingMessage) {
   const proxiedClientIp = getHeaderValue(request, "x-qdoc-client-ip")?.trim();
 
   if (proxiedClientIp && proxiedClientIp.length <= 128) {

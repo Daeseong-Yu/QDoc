@@ -3,8 +3,9 @@ import { activeTicketStatuses } from "@qdoc/contracts";
 import { handleLogout, handleMe, handleOtpRequest, handleOtpVerify } from "./auth.js";
 import { getEmailDeliveryHealth } from "./email.js";
 import { sendJson } from "./http.js";
-import { handleActiveTicket, handleCheckIn, handleSiteQueues, handleSites } from "./patient.js";
-import { handleStaffQueue, handleStaffTicketAction, isStaffTicketAction } from "./staff.js";
+import { handleMapConfig, handleMapUsage } from "./maps.js";
+import { handleActiveTicket, handleActiveTicketEvents, handleCheckIn, handleSiteQueues, handleSites } from "./patient.js";
+import { handleStaffQueue, handleStaffQueueEvents, handleStaffTicketAction, isStaffTicketAction } from "./staff.js";
 
 const host = process.env.API_HOST ?? "127.0.0.1";
 const port = Number(process.env.API_PORT ?? "4000");
@@ -49,6 +50,16 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/maps/config") {
+      await handleMapConfig(request, response);
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/maps/usage") {
+      await handleMapUsage(request, response);
+      return;
+    }
+
     const siteQueuesMatch = url.pathname.match(/^\/sites\/([^/]+)\/queues$/);
 
     if (request.method === "GET" && siteQueuesMatch?.[1]) {
@@ -65,6 +76,18 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/patients/me/tickets/active") {
       await handleActiveTicket(request, response);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/patients/me/tickets/active/events") {
+      await handleActiveTicketEvents(request, response);
+      return;
+    }
+
+    const staffQueueEventsMatch = url.pathname.match(/^\/staff\/sites\/([^/]+)\/queue\/events$/);
+
+    if (request.method === "GET" && staffQueueEventsMatch?.[1]) {
+      await handleStaffQueueEvents(request, response, staffQueueEventsMatch[1]);
       return;
     }
 

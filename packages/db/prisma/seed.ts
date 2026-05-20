@@ -8,6 +8,13 @@ const clinics = [
     name: "Waterloo Clinic",
     queueId: "queue-waterloo-walkin",
     distanceKm: 1.2,
+    addressLine1: "170 University Ave W",
+    city: "Waterloo",
+    region: "ON",
+    postalCode: "N2L 3E9",
+    country: "CA",
+    latitude: 43.4723,
+    longitude: -80.5449,
     waitingCount: 19,
   },
   {
@@ -15,6 +22,13 @@ const clinics = [
     name: "Kitchener Clinic",
     queueId: "queue-kitchener-walkin",
     distanceKm: 4.8,
+    addressLine1: "835 King St W",
+    city: "Kitchener",
+    region: "ON",
+    postalCode: "N2G 1E3",
+    country: "CA",
+    latitude: 43.4553,
+    longitude: -80.5112,
     waitingCount: 5,
   },
   {
@@ -22,6 +36,13 @@ const clinics = [
     name: "Dental Clinic",
     queueId: "queue-university-walkin",
     distanceKm: 2.4,
+    addressLine1: "200 University Ave W",
+    city: "Waterloo",
+    region: "ON",
+    postalCode: "N2L 3G1",
+    country: "CA",
+    latitude: 43.4715,
+    longitude: -80.5454,
     waitingCount: 0,
   },
 ] as const;
@@ -235,12 +256,30 @@ async function main() {
       update: {
         name: clinic.name,
         distanceKm: clinic.distanceKm,
+        addressLine1: clinic.addressLine1,
+        city: clinic.city,
+        region: clinic.region,
+        postalCode: clinic.postalCode,
+        country: clinic.country,
+        latitude: clinic.latitude,
+        longitude: clinic.longitude,
+        locationSource: "seed",
+        locationVerifiedAt: new Date("2026-05-20T00:00:00.000Z"),
         organizationId: organization.id,
       },
       create: {
         id: clinic.id,
         name: clinic.name,
         distanceKm: clinic.distanceKm,
+        addressLine1: clinic.addressLine1,
+        city: clinic.city,
+        region: clinic.region,
+        postalCode: clinic.postalCode,
+        country: clinic.country,
+        latitude: clinic.latitude,
+        longitude: clinic.longitude,
+        locationSource: "seed",
+        locationVerifiedAt: new Date("2026-05-20T00:00:00.000Z"),
         organizationId: organization.id,
       },
     });
@@ -271,6 +310,28 @@ async function main() {
 
     await seedClinicTickets(site.id, clinic.queueId, clinic.waitingCount);
   }
+
+  await prisma.mapProviderConfig.upsert({
+    where: { provider: "mapbox" },
+    update: {},
+    create: {
+      provider: "mapbox",
+      isEnabled: false,
+      monthlyMapLoadLimit: 0,
+      hardStopEnabled: true,
+    },
+  });
+
+  await prisma.mapProviderConfig.upsert({
+    where: { provider: "google" },
+    update: {},
+    create: {
+      provider: "google",
+      isEnabled: false,
+      monthlyMapLoadLimit: 0,
+      hardStopEnabled: true,
+    },
+  });
 }
 
 main()

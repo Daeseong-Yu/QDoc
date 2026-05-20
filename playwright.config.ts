@@ -47,6 +47,10 @@ const sharedEnv = {
     "qdoc-e2e-session-secret-at-least-32-characters",
   DATABASE_URL: databaseUrl,
   REDIS_URL: process.env.E2E_REDIS_URL ?? "",
+  MAP_PROVIDER: process.env.MAP_PROVIDER ?? "mapbox",
+  MAPBOX_PUBLIC_TOKEN:
+    process.env.MAPBOX_PUBLIC_TOKEN ?? "pk.qdoc-e2e-mapbox-public-token",
+  MAP_MONTHLY_MAP_LOAD_LIMIT: process.env.MAP_MONTHLY_MAP_LOAD_LIMIT ?? "1",
 };
 
 export default defineConfig({

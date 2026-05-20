@@ -60,6 +60,8 @@ export const authErrorSchema = z.object({
     "invalid_otp",
     "invalid_transition",
     "internal_error",
+    "map_budget_exhausted",
+    "map_provider_disabled",
     "otp_delivery_unavailable",
     "queue_closed",
     "rate_limited",
@@ -122,11 +124,24 @@ export const staffTicketActionInputSchema = z.object({
 
 export type StaffTicketActionInput = z.infer<typeof staffTicketActionInputSchema>;
 
+export const siteLocationSchema = z.object({
+  addressLine1: z.string().nullable(),
+  city: z.string().nullable(),
+  region: z.string().nullable(),
+  postalCode: z.string().nullable(),
+  country: z.string().nullable(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+});
+
+export type SiteLocation = z.infer<typeof siteLocationSchema>;
+
 export const patientSiteSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   waitingTicketCount: z.number().int().nonnegative(),
   distanceKm: z.number().nonnegative(),
+  location: siteLocationSchema,
 });
 
 export type PatientSiteSummary = z.infer<typeof patientSiteSummarySchema>;
@@ -192,3 +207,40 @@ export const activeTicketsResponseSchema = z.object({
 });
 
 export type ActiveTicketsResponse = z.infer<typeof activeTicketsResponseSchema>;
+
+export const mapProviderSchema = z.enum(["mapbox", "google"]);
+
+export type MapProvider = z.infer<typeof mapProviderSchema>;
+
+export const mapUsageTypeSchema = z.enum(["map_load"]);
+
+export type MapUsageType = z.infer<typeof mapUsageTypeSchema>;
+
+export const mapConfigResponseSchema = z.object({
+  provider: mapProviderSchema.nullable(),
+  isEnabled: z.boolean(),
+  canLoad: z.boolean(),
+  publicToken: z.string().nullable(),
+  remainingMapLoads: z.number().int().nonnegative(),
+  resetAt: z.string().datetime(),
+  reason: z.enum(["provider_disabled", "token_missing", "budget_exhausted", "available"]),
+});
+
+export type MapConfigResponse = z.infer<typeof mapConfigResponseSchema>;
+
+export const mapUsageInputSchema = z.object({
+  usageType: mapUsageTypeSchema.default("map_load"),
+});
+
+export type MapUsageInput = z.infer<typeof mapUsageInputSchema>;
+
+export const mapUsageResponseSchema = z.object({
+  provider: mapProviderSchema,
+  usageType: mapUsageTypeSchema,
+  accepted: z.literal(true),
+  publicToken: z.string(),
+  remainingMapLoads: z.number().int().nonnegative(),
+  resetAt: z.string().datetime(),
+});
+
+export type MapUsageResponse = z.infer<typeof mapUsageResponseSchema>;

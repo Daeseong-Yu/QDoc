@@ -23,6 +23,7 @@ type RateLimitResult =
 const redisTimeoutMs = 1000;
 const redisRateLimitScript =
   "local current = redis.call('INCR', KEYS[1]); if current == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; return current";
+const localRateLimitCounters = new Map<string, { count: number; expiresAt: number }>();
 
 function getRedisUrl() {
   return process.env.REDIS_URL;
@@ -246,6 +247,72 @@ async function checkPolicies(policies: RateLimitPolicy[]): Promise<RateLimitResu
   }
 
   return { allowed: true };
+}
+
+function checkLocalPolicies(policies: RateLimitPolicy[]): RateLimitResult {
+  const now = Date.now();
+
+  for (const [key, counter] of localRateLimitCounters) {
+    if (counter.expiresAt <= now) {
+      localRateLimitCounters.delete(key);
+    }
+  }
+
+  for (const policy of policies) {
+    const existing = localRateLimitCounters.get(policy.key);
+    const counter =
+      existing && existing.expiresAt > now
+        ? { count: existing.count + 1, expiresAt: existing.expiresAt }
+        : { count: 1, expiresAt: now + policy.windowSeconds * 1000 };
+
+    localRateLimitCounters.set(policy.key, counter);
+
+    if (counter.count > policy.limit) {
+      return {
+        allowed: false,
+        policy: policy.name,
+        retryAfterSeconds: Math.max(1, Math.ceil((counter.expiresAt - now) / 1000)),
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
+function getPositiveIntegerEnv(name: string, fallback: number) {
+  const value = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+export async function checkMapUsageRateLimit(requesterKey: string): Promise<RateLimitResult> {
+  const requesterKeyPart = getStableKeyPart(requesterKey);
+  const policies: RateLimitPolicy[] = [
+    {
+      name: "map_usage_ip_minute",
+      key: `qdoc:rate:map-usage:ip:${requesterKeyPart}:60`,
+      limit: getPositiveIntegerEnv("MAP_USAGE_RATE_LIMIT_PER_MINUTE", 30),
+      windowSeconds: 60,
+    },
+    {
+      name: "map_usage_ip_hour",
+      key: `qdoc:rate:map-usage:ip:${requesterKeyPart}:3600`,
+      limit: getPositiveIntegerEnv("MAP_USAGE_RATE_LIMIT_PER_HOUR", 300),
+      windowSeconds: 3600,
+    },
+  ];
+
+  if (!getRedisUrl()) {
+    return checkLocalPolicies(policies);
+  }
+
+  try {
+    return await checkPolicies(policies);
+  } catch (error) {
+    console.error("Redis map usage rate limit unavailable", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return checkLocalPolicies(policies);
+  }
 }
 
 export async function checkOtpRequestRateLimit(email: string, requesterKey: string): Promise<RateLimitResult> {

@@ -65,6 +65,10 @@ async function resetE2eData() {
     await prisma.auditLog.deleteMany({ where: { actorId: user.id } });
   }
 
+  await prisma.mapUsagePeriod.deleteMany({ where: { provider: "mapbox" } });
+  await prisma.mapProviderConfigAudit.deleteMany({
+    where: { provider: "mapbox" },
+  });
   await prisma.otpChallenge.deleteMany({ where: { email: e2eEmail } });
   await prisma.membership.deleteMany({ where: { siteId: e2eSiteId } });
   await prisma.queue.deleteMany({ where: { siteId: e2eSiteId } });
@@ -87,6 +91,15 @@ async function resetE2eData() {
       organizationId: e2eOrgId,
       name: e2eSiteName,
       distanceKm: 0,
+      addressLine1: "1 E2E Way",
+      city: "Waterloo",
+      region: "ON",
+      postalCode: "N2L 3G1",
+      country: "CA",
+      latitude: 43.4643,
+      longitude: -80.5204,
+      locationSource: "e2e",
+      locationVerifiedAt: new Date("2026-05-20T00:00:00.000Z"),
     },
   });
   await prisma.queue.create({
@@ -102,6 +115,20 @@ async function resetE2eData() {
       siteId: e2eSiteId,
       userId: e2eUser.id,
       role: "admin",
+    },
+  });
+  await prisma.mapProviderConfig.upsert({
+    where: { provider: "mapbox" },
+    update: {
+      isEnabled: true,
+      monthlyMapLoadLimit: 1,
+      hardStopEnabled: true,
+    },
+    create: {
+      provider: "mapbox",
+      isEnabled: true,
+      monthlyMapLoadLimit: 1,
+      hardStopEnabled: true,
     },
   });
 }
@@ -161,6 +188,91 @@ test.beforeEach(async () => {
 
 test.afterAll(async () => {
   await prisma.$disconnect();
+});
+
+test("enforces the monthly map load guard before exposing provider usage", async ({
+  request,
+}) => {
+  const initialConfig = await request.get("/api/maps/config");
+  await expect(initialConfig).toBeOK();
+  await expect(initialConfig.json()).resolves.toMatchObject({
+    provider: "mapbox",
+    canLoad: true,
+    publicToken: null,
+    remainingMapLoads: 1,
+    reason: "available",
+  });
+
+  const acceptedUsage = await request.post("/api/maps/usage", {
+    data: { usageType: "map_load" },
+  });
+  await expect(acceptedUsage).toBeOK();
+  await expect(acceptedUsage.json()).resolves.toMatchObject({
+    provider: "mapbox",
+    usageType: "map_load",
+    accepted: true,
+    publicToken: "pk.qdoc-e2e-mapbox-public-token",
+    remainingMapLoads: 0,
+  });
+
+  const rejectedUsage = await request.post("/api/maps/usage", {
+    data: { usageType: "map_load" },
+  });
+  expect(rejectedUsage.status()).toBe(409);
+  await expect(rejectedUsage.json()).resolves.toMatchObject({
+    error: "map_budget_exhausted",
+  });
+
+  const exhaustedConfig = await request.get("/api/maps/config");
+  await expect(exhaustedConfig).toBeOK();
+  await expect(exhaustedConfig.json()).resolves.toMatchObject({
+    provider: "mapbox",
+    canLoad: false,
+    publicToken: null,
+    remainingMapLoads: 0,
+    reason: "budget_exhausted",
+  });
+});
+
+test("loads the patient map around the browser location without provider SDK when guarded off", async ({
+  page,
+  context,
+}) => {
+  await prisma.mapProviderConfig.update({
+    where: { provider: "mapbox" },
+    data: {
+      isEnabled: true,
+      monthlyMapLoadLimit: 1,
+      hardStopEnabled: false,
+    },
+  });
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({
+    latitude: 43.465,
+    longitude: -80.522,
+  });
+
+  const providerRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = request.url();
+
+    if (url.includes("api.mapbox.com") || url.includes("maps.googleapis.com")) {
+      providerRequests.push(url);
+    }
+  });
+
+  await page.goto("/");
+  await expect(
+    page.getByText("Centered on your current area."),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Provider map disabled by budget guard"),
+  ).toBeVisible();
+  const clinicCard = page
+    .locator("button")
+    .filter({ has: page.getByRole("heading", { name: e2eSiteName }) });
+  await expect(clinicCard).toContainText("0.2 km");
+  expect(providerRequests).toHaveLength(0);
 });
 
 test("covers patient check-in and staff queue transitions", async ({ page }) => {

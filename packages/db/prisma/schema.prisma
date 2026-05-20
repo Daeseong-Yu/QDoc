@@ -21,6 +21,15 @@ enum MembershipRole {
   admin
 }
 
+enum MapProvider {
+  mapbox
+  google
+}
+
+enum MapUsageType {
+  map_load
+}
+
 model Organization {
   id        String   @id @default(cuid())
   name      String
@@ -30,16 +39,25 @@ model Organization {
 }
 
 model Site {
-  id             String         @id @default(cuid())
-  organizationId String
-  name           String
-  distanceKm     Float          @default(0)
-  organization   Organization   @relation(fields: [organizationId], references: [id])
-  queues         Queue[]
-  memberships    Membership[]
-  tickets        Ticket[]
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id                 String         @id @default(cuid())
+  organizationId     String
+  name               String
+  distanceKm         Float          @default(0)
+  addressLine1       String?
+  city               String?
+  region             String?
+  postalCode         String?
+  country            String?
+  latitude           Float?
+  longitude          Float?
+  locationSource     String?
+  locationVerifiedAt DateTime?
+  organization       Organization   @relation(fields: [organizationId], references: [id])
+  queues             Queue[]
+  memberships        Membership[]
+  tickets            Ticket[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 }
 
 model Queue {
@@ -159,4 +177,47 @@ model AuditLog {
   metadata  Json?
   actor     User?    @relation(fields: [actorId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model MapProviderConfig {
+  id                  String      @id @default(cuid())
+  provider            MapProvider @unique
+  isEnabled           Boolean     @default(false)
+  monthlyMapLoadLimit Int         @default(0)
+  hardStopEnabled     Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+}
+
+model MapProviderConfigAudit {
+  id                             String      @id @default(cuid())
+  provider                       MapProvider
+  action                         String
+  actorId                        String?
+  isEnabledBefore                Boolean?
+  isEnabledAfter                 Boolean?
+  monthlyMapLoadLimitBefore      Int?
+  monthlyMapLoadLimitAfter       Int?
+  hardStopEnabledBefore          Boolean?
+  hardStopEnabledAfter           Boolean?
+  metadata                       Json?
+  createdAt                      DateTime    @default(now())
+
+  @@index([provider, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model MapUsagePeriod {
+  id            String       @id @default(cuid())
+  provider      MapProvider
+  usageType     MapUsageType @default(map_load)
+  periodStart   DateTime
+  limit         Int
+  used          Int          @default(0)
+  hardStoppedAt DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([provider, usageType, periodStart])
+  @@index([provider, usageType, periodStart])
 }

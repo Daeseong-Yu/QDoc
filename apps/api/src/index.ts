@@ -5,6 +5,7 @@ import { getEmailDeliveryHealth } from "./email.js";
 import { sendJson } from "./http.js";
 import { handleMapConfig, handleMapUsage } from "./maps.js";
 import { handleActiveTicket, handleActiveTicketEvents, handleCheckIn, handleSiteQueues, handleSites } from "./patient.js";
+import { handleReadiness } from "./readiness.js";
 import { handleStaffQueue, handleStaffQueueEvents, handleStaffTicketAction, isStaffTicketAction } from "./staff.js";
 
 const host = process.env.API_HOST ?? "127.0.0.1";
@@ -22,6 +23,11 @@ const server = createServer(async (request, response) => {
         activeTicketStatuses,
         emailDelivery,
       });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/ready") {
+      await handleReadiness(response);
       return;
     }
 

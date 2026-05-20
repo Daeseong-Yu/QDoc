@@ -1,5 +1,6 @@
 import { prisma } from "@qdoc/db";
 import { sendAlmostReadyEmail } from "./email.js";
+import { logOperationalEvent, maskIdentifier } from "./ops-log.js";
 
 export type OutboxWorkerConfig = {
   intervalMs: number;
@@ -166,7 +167,7 @@ async function processOutboxItem(item: OutboxItem) {
 }
 
 async function markOutboxProcessed(item: OutboxItem) {
-  await prisma.outbox.updateMany({
+  const processed = await prisma.outbox.updateMany({
     where: {
       id: item.id,
       status: "processing",
@@ -177,6 +178,14 @@ async function markOutboxProcessed(item: OutboxItem) {
       processedAt: new Date(),
     },
   });
+
+  if (processed.count === 1) {
+    logOperationalEvent("info", "qdoc.outbox_processed", {
+      id: maskIdentifier(item.id),
+      type: item.type,
+      attempts: item.attempts,
+    });
+  }
 }
 
 async function markOutboxFailed(item: OutboxItem, config: OutboxWorkerConfig, error: unknown) {
@@ -200,8 +209,8 @@ async function markOutboxFailed(item: OutboxItem, config: OutboxWorkerConfig, er
     return;
   }
 
-  console.error("Outbox item failed", {
-    id: item.id,
+  logOperationalEvent("error", "qdoc.outbox_failed", {
+    id: maskIdentifier(item.id),
     type: item.type,
     attempts,
     willRetry: shouldRetry,
@@ -277,7 +286,9 @@ export function startOutboxWorker(config: OutboxWorkerConfig = getOutboxWorkerCo
         activeBatch = processOutboxBatch(config);
         await activeBatch;
       } catch (error) {
-        console.error("Outbox worker poll failed", error);
+        logOperationalEvent("error", "qdoc.outbox_poll_failed", {
+          error: error instanceof Error ? error.message : "unknown",
+        });
       } finally {
         activeBatch = null;
       }

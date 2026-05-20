@@ -9,6 +9,7 @@ import {
 import { prisma } from "@qdoc/db";
 import { readJson, sendJson } from "./http.js";
 import { getCurrentUserFromRequest, requireStaffMembership } from "./auth.js";
+import { logOperationalEvent, maskIdentifier } from "./ops-log.js";
 import { streamSnapshots } from "./sse.js";
 
 type StaffTicketAction = "call" | "start-service" | "complete" | "delay" | "restore" | "cancel";
@@ -518,6 +519,16 @@ export async function handleStaffTicketAction(
     sendJson(response, 409, { error: "conflict" });
     return;
   }
+
+  logOperationalEvent("info", "qdoc.queue_transition", {
+    ticketId: maskIdentifier(ticket.id),
+    siteId: ticket.siteId,
+    queueId: ticket.queueId,
+    actorId: maskIdentifier(currentUser.id),
+    action,
+    fromStatus: ticket.status,
+    toStatus: transition.to,
+  });
 
   sendJson(
     response,

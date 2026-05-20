@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createConnection, type Socket } from "node:net";
+import { logOperationalEvent } from "./ops-log.js";
 
 type RedisReply = number | string | null;
 
@@ -249,6 +250,33 @@ async function checkPolicies(policies: RateLimitPolicy[]): Promise<RateLimitResu
   return { allowed: true };
 }
 
+export async function checkRedisHealth() {
+  if (!getRedisUrl()) {
+    return {
+      ok: false,
+      configured: false,
+      status: "redis_url_missing",
+    };
+  }
+
+  try {
+    const replies = await sendRedisCommands([["PING"]]);
+    const pong = replies?.[0];
+
+    return {
+      ok: pong === "PONG",
+      configured: true,
+      status: pong === "PONG" ? "ready" : "unexpected_response",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      configured: true,
+      status: error instanceof Error ? error.message.slice(0, 120) : "unknown_error",
+    };
+  }
+}
+
 function checkLocalPolicies(policies: RateLimitPolicy[]): RateLimitResult {
   const now = Date.now();
 
@@ -308,7 +336,8 @@ export async function checkMapUsageRateLimit(requesterKey: string): Promise<Rate
   try {
     return await checkPolicies(policies);
   } catch (error) {
-    console.error("Redis map usage rate limit unavailable", {
+    logOperationalEvent("error", "qdoc.redis_rate_limit_unavailable", {
+      policyGroup: "map_usage",
       error: error instanceof Error ? error.message : "unknown",
     });
     return checkLocalPolicies(policies);
@@ -354,7 +383,8 @@ export async function checkOtpRequestRateLimit(email: string, requesterKey: stri
       },
     ]);
   } catch (error) {
-    console.error("Redis OTP request rate limit unavailable", {
+    logOperationalEvent("error", "qdoc.redis_rate_limit_unavailable", {
+      policyGroup: "otp_request",
       error: error instanceof Error ? error.message : "unknown",
     });
     return { allowed: true };
@@ -388,7 +418,8 @@ export async function checkOtpVerifyRateLimit(email: string, requesterKey: strin
       },
     ]);
   } catch (error) {
-    console.error("Redis OTP verify rate limit unavailable", {
+    logOperationalEvent("error", "qdoc.redis_rate_limit_unavailable", {
+      policyGroup: "otp_verify",
       error: error instanceof Error ? error.message : "unknown",
     });
     return { allowed: true };

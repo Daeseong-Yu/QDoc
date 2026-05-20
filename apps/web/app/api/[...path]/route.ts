@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const forwardedRequestHeaders = new Set(["accept", "accept-language", "content-type", "cookie", "user-agent"]);
 const internalClientIpHeader = "x-qdoc-client-ip";
+const privateApiPaths = new Set(["ready"]);
 
 function getApiBaseUrl() {
   if (process.env.API_BASE_URL) {
@@ -80,6 +81,10 @@ function getForwardedHeaders(request: NextRequest) {
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
   let target: URL;
+
+  if (privateApiPaths.has(path[0] ?? "")) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
 
   try {
     target = getTargetUrl(request, path);

@@ -1,4 +1,5 @@
 import nodemailer, { type Transporter } from "nodemailer";
+import { logOperationalEvent } from "./ops-log.js";
 
 type EmailProvider = "console" | "smtp";
 
@@ -91,7 +92,9 @@ export async function sendAlmostReadyEmail(input: {
       throw new Error("Console EMAIL_PROVIDER is not allowed in production");
     }
 
-    console.log("Queue almost ready email", {
+    logOperationalEvent("info", "qdoc.notification_delivery_succeeded", {
+      channel: "email",
+      provider,
       to: maskEmail(input.to),
       siteName: input.siteName,
       queueName: input.queueName,
@@ -106,11 +109,30 @@ export async function sendAlmostReadyEmail(input: {
 
   const aheadText = input.aheadCount === 0 ? "You are next." : `${input.aheadCount} patients are ahead of you.`;
 
-  await getSmtpTransporter().sendMail({
-    from: getRequiredEnv("EMAIL_FROM"),
-    to: input.to,
-    subject: "Your QDoc turn is coming up",
-    text: `Your turn is coming up at ${input.siteName} (${input.queueName}). ${aheadText} Please stay nearby.`,
-    html: `<p>Your turn is coming up at <strong>${input.siteName}</strong> (${input.queueName}).</p><p>${aheadText}</p><p>Please stay nearby.</p>`,
-  });
+  try {
+    await getSmtpTransporter().sendMail({
+      from: getRequiredEnv("EMAIL_FROM"),
+      to: input.to,
+      subject: "Your QDoc turn is coming up",
+      text: `Your turn is coming up at ${input.siteName} (${input.queueName}). ${aheadText} Please stay nearby.`,
+      html: `<p>Your turn is coming up at <strong>${input.siteName}</strong> (${input.queueName}).</p><p>${aheadText}</p><p>Please stay nearby.</p>`,
+    });
+
+    logOperationalEvent("info", "qdoc.notification_delivery_succeeded", {
+      channel: "email",
+      provider,
+      to: maskEmail(input.to),
+      siteName: input.siteName,
+      queueName: input.queueName,
+      aheadCount: input.aheadCount,
+    });
+  } catch (error) {
+    logOperationalEvent("error", "qdoc.notification_delivery_failed", {
+      channel: "email",
+      provider,
+      to: maskEmail(input.to),
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    throw error;
+  }
 }

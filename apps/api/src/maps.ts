@@ -9,6 +9,7 @@ import {
 import { prisma } from "@qdoc/db";
 import { getRequesterKey } from "./auth.js";
 import { readJson, sendJson } from "./http.js";
+import { logOperationalEvent } from "./ops-log.js";
 import { checkMapUsageRateLimit } from "./rate-limit.js";
 
 type MapAvailability = {
@@ -20,6 +21,15 @@ type MapAvailability = {
   periodStart: Date;
   resetAt: Date;
   reason: "provider_disabled" | "token_missing" | "budget_exhausted" | "available";
+};
+
+type MapOperationalStatus = {
+  provider: MapProvider | null;
+  ok: boolean;
+  isEnabled: boolean;
+  reason: MapAvailability["reason"];
+  remainingMapLoads: number;
+  resetAt: string;
 };
 
 function getConfiguredProvider() {
@@ -111,6 +121,33 @@ async function getMapAvailability(): Promise<MapAvailability> {
   return { provider, isEnabled: true, publicToken, limit, used, periodStart, resetAt, reason: "available" };
 }
 
+function getRemainingMapLoads(availability: Pick<MapAvailability, "limit" | "used">) {
+  return Math.max(availability.limit - availability.used, 0);
+}
+
+function logMapHardStop(availability: MapAvailability, usageType: string, reason: MapAvailability["reason"]) {
+  logOperationalEvent("warn", "qdoc.map_usage_hard_stop", {
+    provider: availability.provider,
+    usageType,
+    reason,
+    remainingMapLoads: getRemainingMapLoads(availability),
+    resetAt: availability.resetAt.toISOString(),
+  });
+}
+
+export async function getMapOperationalStatus(): Promise<MapOperationalStatus> {
+  const availability = await getMapAvailability();
+
+  return {
+    provider: availability.provider,
+    ok: availability.reason === "available" || availability.reason === "provider_disabled",
+    isEnabled: availability.isEnabled,
+    reason: availability.reason,
+    remainingMapLoads: getRemainingMapLoads(availability),
+    resetAt: availability.resetAt.toISOString(),
+  };
+}
+
 export async function handleMapConfig(_request: IncomingMessage, response: ServerResponse) {
   const availability = await getMapAvailability();
 
@@ -122,7 +159,7 @@ export async function handleMapConfig(_request: IncomingMessage, response: Serve
       isEnabled: availability.isEnabled,
       canLoad: availability.reason === "available",
       publicToken: null,
-      remainingMapLoads: Math.max(availability.limit - availability.used, 0),
+      remainingMapLoads: getRemainingMapLoads(availability),
       resetAt: availability.resetAt.toISOString(),
       reason: availability.reason,
     }),
@@ -147,11 +184,13 @@ export async function handleMapUsage(request: IncomingMessage, response: ServerR
   const availability = await getMapAvailability();
 
   if (!availability.provider || !availability.isEnabled) {
+    logMapHardStop(availability, input.data.usageType, "provider_disabled");
     sendJson(response, 409, { error: "map_provider_disabled" });
     return;
   }
 
   if (availability.reason !== "available") {
+    logMapHardStop(availability, input.data.usageType, availability.reason);
     sendJson(response, 409, { error: availability.reason === "token_missing" ? "map_provider_disabled" : "map_budget_exhausted" });
     return;
   }
@@ -216,6 +255,7 @@ export async function handleMapUsage(request: IncomingMessage, response: ServerR
   });
 
   if (!usagePeriod) {
+    logMapHardStop(availability, input.data.usageType, "budget_exhausted");
     sendJson(response, 409, { error: "map_budget_exhausted" });
     return;
   }
@@ -228,7 +268,7 @@ export async function handleMapUsage(request: IncomingMessage, response: ServerR
       usageType: usagePeriod.usageType,
       accepted: true,
       publicToken: availability.publicToken,
-      remainingMapLoads: Math.max(usagePeriod.limit - usagePeriod.used, 0),
+      remainingMapLoads: getRemainingMapLoads(usagePeriod),
       resetAt: availability.resetAt.toISOString(),
     }),
   );

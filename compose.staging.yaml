@@ -47,6 +47,13 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env.staging}
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.staging}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL in .env.staging}
+      MAP_PROVIDER: ${MAP_PROVIDER:-}
+      MAP_PROVIDER_ENABLED: ${MAP_PROVIDER_ENABLED:-false}
+      MAP_MONTHLY_MAP_LOAD_LIMIT: ${MAP_MONTHLY_MAP_LOAD_LIMIT:-0}
+      MAPBOX_PUBLIC_TOKEN: ${MAPBOX_PUBLIC_TOKEN:-}
+      GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
+      MAP_USAGE_RATE_LIMIT_PER_MINUTE: ${MAP_USAGE_RATE_LIMIT_PER_MINUTE:-30}
+      MAP_USAGE_RATE_LIMIT_PER_HOUR: ${MAP_USAGE_RATE_LIMIT_PER_HOUR:-300}
     command: ["pnpm", "start:api"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/health >/dev/null 2>&1"]
@@ -80,7 +87,17 @@ services:
       WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-5000}
       WORKER_OUTBOX_BATCH_SIZE: ${WORKER_OUTBOX_BATCH_SIZE:-10}
       WORKER_OUTBOX_MAX_ATTEMPTS: ${WORKER_OUTBOX_MAX_ATTEMPTS:-5}
+      WORKER_HEALTH_FILE: /tmp/qdoc-worker-health.json
     command: ["pnpm", "start:worker"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"const fs=require('fs');const f=process.env.WORKER_HEALTH_FILE||'/tmp/qdoc-worker-health.json';const d=JSON.parse(fs.readFileSync(f,'utf8'));if(Date.now()-Date.parse(d.updatedAt)>30000)process.exit(1);\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
   migrate:
     image: ${QDOC_APP_IMAGE:?Set QDOC_APP_IMAGE in .env.staging or the shell}

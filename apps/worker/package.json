@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts",
-    "verify:outbox": "tsx src/verify-outbox.ts",
+    "verify:outbox": "node --import tsx src/verify-outbox.ts",
+    "verify:ops": "node --import tsx src/verify-ops.ts",
     "build": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit"

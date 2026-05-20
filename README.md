@@ -156,10 +156,13 @@ pnpm lint
 pnpm build
 pnpm db:validate
 pnpm verify:outbox
+pnpm verify:ops
 pnpm e2e
 ```
 
 `pnpm verify:outbox` creates scoped verification rows, runs the worker outbox processor against those rows only, checks processed/retry/failed transitions, and removes the rows it created.
+
+`pnpm verify:ops` prints safe operational JSON for outbox status counts, oldest pending job age, failed almost-ready email jobs, active ticket counts, and current map guardrail state. It exits non-zero when failed outbox jobs, stale processing jobs, failed email jobs, or enabled map guardrail misconfiguration need operator attention.
 
 Install the Playwright Chromium browser once before running E2E tests locally:
 
@@ -215,6 +218,9 @@ Staging environment variables:
 | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | yes for SMTP | SMTP sender and credentials; never print or commit secrets. |
 | `ALLOW_CONSOLE_OTP`, `ALLOW_FIXED_OTP` | yes | Keep both `false` in normal staging. |
 | `WORKER_POLL_INTERVAL_MS`, `WORKER_OUTBOX_BATCH_SIZE`, `WORKER_OUTBOX_MAX_ATTEMPTS` | no | Optional worker tuning values. |
+| `MAP_PROVIDER`, `MAP_PROVIDER_ENABLED`, `MAP_MONTHLY_MAP_LOAD_LIMIT` | no | Optional map provider selection and QDoc monthly hard-stop budget. Leave disabled until provider restrictions and limits are configured. |
+| `MAPBOX_PUBLIC_TOKEN`, `GOOGLE_MAPS_BROWSER_KEY` | no | Browser credentials returned only when QDoc map guardrails allow loading; restrict them in the provider console. |
+| `MAP_USAGE_RATE_LIMIT_PER_MINUTE`, `MAP_USAGE_RATE_LIMIT_PER_HOUR` | no | Optional per-requester rate limits before map usage reservations are accepted. |
 
 GitHub staging environment settings:
 
@@ -290,9 +296,10 @@ Or run the bundled staging verifier from the EC2 checkout:
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true bash deploy/verify-staging.sh
 ```
 
-The verifier checks the Compose service state, healthchecks for web/API/PostgreSQL/Redis, the loopback web endpoint, API health from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` also runs the scoped outbox processor verification against the staging database.
+The verifier checks the Compose service state, healthchecks for web/API/worker/PostgreSQL/Redis, the loopback web endpoint, API health and readiness from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` runs the scoped outbox processor verification against the staging database. `QDOC_VERIFY_OPS=true` runs the safe operational summary for queue, notification, outbox, and map guardrail state.
 
 Useful SSM and host checks:
 

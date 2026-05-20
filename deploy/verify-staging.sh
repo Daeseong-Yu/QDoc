@@ -4,6 +4,7 @@ set -euo pipefail
 COMPOSE_FILE="${QDOC_COMPOSE_FILE:-compose.staging.yaml}"
 ENV_FILE="${QDOC_ENV_FILE:-.env.staging}"
 RUN_OUTBOX="${QDOC_VERIFY_OUTBOX:-false}"
+RUN_OPS="${QDOC_VERIFY_OPS:-false}"
 
 env_file_value() {
   local key="$1"
@@ -79,7 +80,7 @@ for service in web api worker postgres redis; do
 
   health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")"
   case "$service" in
-    web | api | postgres | redis)
+    web | api | worker | postgres | redis)
       [ "$health" = "healthy" ] || fail "Service is not healthy: $service ($health)"
       ;;
   esac
@@ -90,6 +91,9 @@ curl -fsSI "$WEB_URL" >/dev/null
 
 log "Checking API health inside the compose network"
 compose exec -T api wget -qO- http://127.0.0.1:4000/health >/dev/null
+
+log "Checking API readiness inside the compose network"
+compose exec -T api wget -qO- http://127.0.0.1:4000/ready >/dev/null
 
 if [ -n "$PUBLIC_URL" ]; then
   log "Checking public Caddy route: $PUBLIC_URL"
@@ -103,6 +107,13 @@ if [ "$RUN_OUTBOX" = "true" ]; then
   compose run --rm --no-deps worker pnpm verify:outbox
 else
   log "Skipping outbox verification; set QDOC_VERIFY_OUTBOX=true to enable it"
+fi
+
+if [ "$RUN_OPS" = "true" ]; then
+  log "Running operational verification in the staging image"
+  compose run --rm --no-deps worker pnpm verify:ops
+else
+  log "Skipping operational verification; set QDOC_VERIFY_OPS=true to enable it"
 fi
 
 log "Staging verification passed"

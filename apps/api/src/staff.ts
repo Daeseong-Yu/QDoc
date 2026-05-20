@@ -9,6 +9,7 @@ import {
 import { prisma } from "@qdoc/db";
 import { readJson, sendJson } from "./http.js";
 import { getCurrentUserFromRequest, requireStaffMembership } from "./auth.js";
+import { streamSnapshots } from "./sse.js";
 
 type StaffTicketAction = "call" | "start-service" | "complete" | "delay" | "restore" | "cancel";
 
@@ -136,19 +137,7 @@ function serializeStaffQueueTicket(ticket: StaffQueueTicketRecord) {
   };
 }
 
-export async function handleStaffQueue(request: IncomingMessage, response: ServerResponse, siteId: string) {
-  const auth = await requireStaffMembership(request, siteId);
-
-  if (auth.status === "unauthorized") {
-    sendJson(response, 401, { error: "unauthorized" });
-    return;
-  }
-
-  if (auth.status === "forbidden") {
-    sendJson(response, 403, { error: "forbidden" });
-    return;
-  }
-
+async function getStaffQueuePayload(siteId: string) {
   const site = await prisma.site.findUnique({
     where: { id: siteId },
     select: {
@@ -205,19 +194,64 @@ export async function handleStaffQueue(request: IncomingMessage, response: Serve
   });
 
   if (!site) {
+    return null;
+  }
+
+  return staffQueueResponseSchema.parse({
+    siteId: site.id,
+    siteName: site.name,
+    queues: site.queues,
+    tickets: site.tickets.map(serializeStaffQueueTicket),
+  });
+}
+
+async function authorizeStaffQueue(request: IncomingMessage, response: ServerResponse, siteId: string) {
+  const auth = await requireStaffMembership(request, siteId);
+
+  if (auth.status === "unauthorized") {
+    sendJson(response, 401, { error: "unauthorized" });
+    return false;
+  }
+
+  if (auth.status === "forbidden") {
+    sendJson(response, 403, { error: "forbidden" });
+    return false;
+  }
+
+  return auth;
+}
+
+export async function handleStaffQueue(request: IncomingMessage, response: ServerResponse, siteId: string) {
+  if (!(await authorizeStaffQueue(request, response, siteId))) {
+    return;
+  }
+
+  const payload = await getStaffQueuePayload(siteId);
+
+  if (!payload) {
     sendJson(response, 404, { error: "not_found" });
     return;
   }
 
-  sendJson(
-    response,
-    200,
-    staffQueueResponseSchema.parse({
-      siteId: site.id,
-      siteName: site.name,
-      queues: site.queues,
-      tickets: site.tickets.map(serializeStaffQueueTicket),
-    }),
+  sendJson(response, 200, payload);
+}
+
+export async function handleStaffQueueEvents(request: IncomingMessage, response: ServerResponse, siteId: string) {
+  const auth = await authorizeStaffQueue(request, response, siteId);
+
+  if (!auth) {
+    return;
+  }
+
+  const initialPayload = await getStaffQueuePayload(siteId);
+
+  if (!initialPayload) {
+    sendJson(response, 404, { error: "not_found" });
+    return;
+  }
+
+  streamSnapshots(request, response, `staff:${auth.currentUser.id}:${siteId}:queue`, () =>
+    getStaffQueuePayload(siteId).then((payload) => payload ?? initialPayload),
   );
 }
 

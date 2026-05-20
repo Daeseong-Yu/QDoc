@@ -271,12 +271,44 @@ export default function StaffPage() {
       return;
     }
 
-    const timer = window.setInterval(() => {
-      void refreshBoard(false);
-    }, 4000);
+    const requestSiteId = selectedSiteId;
+    let fallbackTimer: number | null = null;
+    const startFallback = () => {
+      if (fallbackTimer !== null) {
+        return;
+      }
+
+      fallbackTimer = window.setInterval(() => {
+        void refreshBoard(false);
+      }, 4000);
+    };
+    const events = new EventSource(`/api/staff/sites/${requestSiteId}/queue/events`);
+
+    events.addEventListener("snapshot", (event) => {
+      try {
+        const data = staffQueueResponseSchema.parse(JSON.parse((event as MessageEvent).data));
+
+        if (data.siteId !== requestSiteId) {
+          return;
+        }
+
+        setQueueBoard(data);
+        setBoardState("success");
+      } catch {
+        startFallback();
+      }
+    });
+
+    events.onerror = () => {
+      events.close();
+      startFallback();
+    };
 
     return () => {
-      window.clearInterval(timer);
+      events.close();
+      if (fallbackTimer !== null) {
+        window.clearInterval(fallbackTimer);
+      }
     };
   }, [currentUser, refreshBoard, selectedSiteId]);
 
@@ -512,7 +544,7 @@ export default function StaffPage() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-950">{activeQueueBoard?.siteName ?? selectedMembership?.siteName ?? "Queue board"}</h2>
-                  <p className="text-sm text-slate-600">Updates every 4 seconds.</p>
+                  <p className="text-sm text-slate-600">Live queue status.</p>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-600">
                   <Activity size={17} aria-hidden="true" />

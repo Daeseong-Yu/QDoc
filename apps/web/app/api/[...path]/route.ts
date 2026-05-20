@@ -106,6 +106,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     responseHeaders.set("set-cookie", setCookie);
   }
 
+  if (contentType?.toLowerCase().startsWith("text/event-stream")) {
+    responseHeaders.set("cache-control", upstream.headers.get("cache-control") ?? "no-cache");
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers: responseHeaders,
+    });
+  }
+
   return new NextResponse(await upstream.text(), {
     status: upstream.status,
     headers: responseHeaders,

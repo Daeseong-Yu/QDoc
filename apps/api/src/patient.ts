@@ -11,6 +11,7 @@ import {
 import { prisma } from "@qdoc/db";
 import { getCurrentUserFromRequest } from "./auth.js";
 import { readJson, sendJson } from "./http.js";
+import { streamSnapshots } from "./sse.js";
 
 type PatientTicketRecord = {
   id: string;
@@ -60,6 +61,13 @@ export async function handleSites(_request: IncomingMessage, response: ServerRes
       id: true,
       name: true,
       distanceKm: true,
+      addressLine1: true,
+      city: true,
+      region: true,
+      postalCode: true,
+      country: true,
+      latitude: true,
+      longitude: true,
       _count: {
         select: {
           tickets: {
@@ -81,6 +89,15 @@ export async function handleSites(_request: IncomingMessage, response: ServerRes
         name: site.name,
         waitingTicketCount: site._count.tickets,
         distanceKm: site.distanceKm,
+        location: {
+          addressLine1: site.addressLine1,
+          city: site.city,
+          region: site.region,
+          postalCode: site.postalCode,
+          country: site.country,
+          latitude: site.latitude,
+          longitude: site.longitude,
+        },
       })),
     }),
   );
@@ -237,17 +254,10 @@ export async function handleCheckIn(request: IncomingMessage, response: ServerRe
   }
 }
 
-export async function handleActiveTicket(request: IncomingMessage, response: ServerResponse) {
-  const currentUser = await getCurrentUserFromRequest(request);
-
-  if (!currentUser) {
-    sendJson(response, 401, { error: "unauthorized" });
-    return;
-  }
-
+async function getActiveTicketPayload(userId: string) {
   const tickets = await prisma.ticket.findMany({
     where: {
-      userId: currentUser.id,
+      userId,
       status: {
         in: activeTicketStatuses,
       },
@@ -284,11 +294,29 @@ export async function handleActiveTicket(request: IncomingMessage, response: Ser
     },
   });
 
-  sendJson(
-    response,
-    200,
-    activeTicketsResponseSchema.parse({
-      tickets: tickets.map(serializePatientTicket),
-    }),
-  );
+  return activeTicketsResponseSchema.parse({
+    tickets: tickets.map(serializePatientTicket),
+  });
+}
+
+export async function handleActiveTicket(request: IncomingMessage, response: ServerResponse) {
+  const currentUser = await getCurrentUserFromRequest(request);
+
+  if (!currentUser) {
+    sendJson(response, 401, { error: "unauthorized" });
+    return;
+  }
+
+  sendJson(response, 200, await getActiveTicketPayload(currentUser.id));
+}
+
+export async function handleActiveTicketEvents(request: IncomingMessage, response: ServerResponse) {
+  const currentUser = await getCurrentUserFromRequest(request);
+
+  if (!currentUser) {
+    sendJson(response, 401, { error: "unauthorized" });
+    return;
+  }
+
+  streamSnapshots(request, response, `patient:${currentUser.id}:active-ticket`, () => getActiveTicketPayload(currentUser.id));
 }

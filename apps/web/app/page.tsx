@@ -17,9 +17,11 @@ import {
 import { Bell, Check, ClipboardList, Clock3, Loader2, LogOut, Mail, MapPin, RefreshCcw, Stethoscope } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { ClinicMap, type BrowserLocation } from "./clinic-map";
 
 type RequestState = "idle" | "loading" | "success" | "error";
 type AuthStep = "email" | "code";
+type LocationState = "idle" | "available" | "unavailable";
 
 type ApiError = {
   status: number;
@@ -84,6 +86,45 @@ function getMessage(error: unknown) {
   return "Request failed. Try again.";
 }
 
+function getSiteCoordinates(site: PatientSiteSummary) {
+  const { latitude, longitude } = site.location;
+
+  if (latitude === null || longitude === null) {
+    return null;
+  }
+
+  return { latitude, longitude };
+}
+
+function getDistanceKm(first: BrowserLocation, second: BrowserLocation) {
+  const earthRadiusKm = 6371;
+  const degreesToRadians = Math.PI / 180;
+  const latitudeDelta = (second.latitude - first.latitude) * degreesToRadians;
+  const longitudeDelta = (second.longitude - first.longitude) * degreesToRadians;
+  const firstLatitude = first.latitude * degreesToRadians;
+  const secondLatitude = second.latitude * degreesToRadians;
+
+  const a =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(firstLatitude) * Math.cos(secondLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function getDisplayDistance(site: PatientSiteSummary, userLocation: BrowserLocation | null) {
+  const coordinates = getSiteCoordinates(site);
+
+  if (userLocation && coordinates) {
+    return getDistanceKm(userLocation, coordinates);
+  }
+
+  return site.distanceKm;
+}
+
+function getAddressLabel(site: PatientSiteSummary) {
+  return [site.location.addressLine1, site.location.city, site.location.region].filter(Boolean).join(", ");
+}
+
 export default function Home() {
   const [sites, setSites] = useState<PatientSiteSummary[]>([]);
   const [queues, setQueues] = useState<PatientQueueSummary[]>([]);
@@ -99,6 +140,9 @@ export default function Home() {
   const [ticketState, setTicketState] = useState<RequestState>("idle");
   const [authState, setAuthState] = useState<RequestState>("idle");
   const [checkInState, setCheckInState] = useState<RequestState>("idle");
+  const [locationState, setLocationState] = useState<LocationState>("idle");
+  const [userLocation, setUserLocation] = useState<BrowserLocation | null>(null);
+  const [locationSelectedSiteId, setLocationSelectedSiteId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const selectedSite = useMemo(() => {
@@ -108,6 +152,14 @@ export default function Home() {
   const activeSiteTicket = useMemo(() => {
     return tickets.find((ticket) => ticket.siteId === selectedSiteId) ?? null;
   }, [selectedSiteId, tickets]);
+
+  const orderedSites = useMemo(() => {
+    if (!userLocation) {
+      return sites;
+    }
+
+    return [...sites].sort((first, second) => getDisplayDistance(first, userLocation) - getDisplayDistance(second, userLocation));
+  }, [sites, userLocation]);
 
   const latestReadyNotification = useMemo(() => {
     return (
@@ -200,6 +252,53 @@ export default function Home() {
   }, [clearPatientSession, loadCurrentUser]);
 
   useEffect(() => {
+    if (!("geolocation" in navigator)) {
+      setLocationState("unavailable");
+      return;
+    }
+
+    let cancelled = false;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (cancelled) {
+          return;
+        }
+
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        });
+        setLocationState("available");
+      },
+      () => {
+        if (!cancelled) {
+          setLocationState("unavailable");
+        }
+      },
+      { enableHighAccuracy: false, maximumAge: 300000, timeout: 5000 },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!userLocation || locationSelectedSiteId || sites.length === 0) {
+      return;
+    }
+
+    const nearestSite = orderedSites.find((site) => getSiteCoordinates(site));
+
+    if (nearestSite) {
+      setSelectedSiteId(nearestSite.id);
+      setLocationSelectedSiteId(nearestSite.id);
+    }
+  }, [locationSelectedSiteId, orderedSites, sites.length, userLocation]);
+
+  useEffect(() => {
     if (!selectedSiteId) {
       return;
     }
@@ -262,18 +361,66 @@ export default function Home() {
       return;
     }
 
-    const timer = window.setInterval(() => {
+    let fallbackTimer: number | null = null;
+    const startFallback = () => {
+      if (fallbackTimer !== null) {
+        return;
+      }
+
+      fallbackTimer = window.setInterval(() => {
+        void loadTickets().catch((error: unknown) => {
+          if (!isApiError(error) || error.status !== 401) {
+            setMessage(getMessage(error));
+          }
+        });
+      }, 4000);
+    };
+    const events = new EventSource("/api/patients/me/tickets/active/events");
+
+    events.addEventListener("snapshot", (event) => {
+      try {
+        const data = activeTicketsResponseSchema.parse(JSON.parse((event as MessageEvent).data));
+        setTickets(data.tickets);
+        setTicketState("success");
+      } catch {
+        startFallback();
+      }
+    });
+
+    events.onerror = () => {
+      events.close();
+      startFallback();
+    };
+
+    return () => {
+      events.close();
+      if (fallbackTimer !== null) {
+        window.clearInterval(fallbackTimer);
+      }
+    };
+  }, [currentUser, loadTickets]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    if (ticketState !== "loading") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
       void loadTickets().catch((error: unknown) => {
         if (!isApiError(error) || error.status !== 401) {
           setMessage(getMessage(error));
         }
       });
-    }, 4000);
+    }, 3000);
 
     return () => {
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
-  }, [currentUser, loadTickets]);
+  }, [currentUser, loadTickets, ticketState]);
 
   async function requestOtp() {
     setMessage("");
@@ -416,13 +563,20 @@ export default function Home() {
             </div>
           ) : null}
 
+          <ClinicMap
+            sites={orderedSites}
+            selectedSiteId={selectedSiteId}
+            userLocation={userLocation}
+            onSelectSite={setSelectedSiteId}
+          />
+
           <section className="grid gap-3 md:grid-cols-2">
             {sitesState === "loading" ? (
               <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
                 Loading clinics...
               </div>
             ) : null}
-            {sites.map((site) => (
+            {orderedSites.map((site) => (
               <button
                 key={site.id}
                 type="button"
@@ -435,10 +589,11 @@ export default function Home() {
                   <div>
                     <h2 className="text-lg font-semibold text-slate-950">{site.name}</h2>
                     <p className="mt-1 text-sm text-slate-600">{site.waitingTicketCount} patients waiting</p>
+                    {getAddressLabel(site) ? <p className="mt-1 text-xs text-slate-500">{getAddressLabel(site)}</p> : null}
                   </div>
                   <div className="grid justify-items-center gap-1 text-[#0a8f9c]">
                     <MapPin size={21} aria-hidden="true" />
-                    <span className="text-xs font-medium">{site.distanceKm.toFixed(1)} km</span>
+                    <span className="text-xs font-medium">{getDisplayDistance(site, userLocation).toFixed(1)} km</span>
                   </div>
                 </div>
               </button>
@@ -568,7 +723,7 @@ export default function Home() {
               <Clock3 size={21} className="text-[#0a8f9c]" aria-hidden="true" />
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">Active tickets</h2>
-                <p className="text-sm text-slate-600">Updates every 4 seconds.</p>
+                <p className="text-sm text-slate-600">{locationState === "available" ? "Live queue status nearby." : "Live queue status."}</p>
               </div>
             </div>
 

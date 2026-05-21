@@ -51,6 +51,7 @@ const sharedEnv = {
   MAPBOX_PUBLIC_TOKEN:
     process.env.MAPBOX_PUBLIC_TOKEN ?? "pk.qdoc-e2e-mapbox-public-token",
   MAP_MONTHLY_MAP_LOAD_LIMIT: process.env.MAP_MONTHLY_MAP_LOAD_LIMIT ?? "1",
+  MAP_SETTINGS_ADMIN_EMAILS: "",
 };
 
 export default defineConfig({

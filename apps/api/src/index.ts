@@ -6,7 +6,22 @@ import { sendJson } from "./http.js";
 import { handleMapConfig, handleMapUsage } from "./maps.js";
 import { handleActiveTicket, handleActiveTicketEvents, handleCheckIn, handleSiteQueues, handleSites } from "./patient.js";
 import { handleReadiness } from "./readiness.js";
-import { handleStaffQueue, handleStaffQueueEvents, handleStaffTicketAction, isStaffTicketAction } from "./staff.js";
+import {
+  handleCreateStaffMembership,
+  handleDeleteStaffMembership,
+  handleStaffAuditLogs,
+  handleStaffMapSettings,
+  handleStaffMemberships,
+  handleStaffQueue,
+  handleStaffQueueEvents,
+  handleStaffQueueSettings,
+  handleStaffSiteOps,
+  handleStaffSiteSettings,
+  handleStaffTicketAction,
+  handleUpdateStaffMapSettings,
+  handleUpdateStaffMembership,
+  isStaffTicketAction,
+} from "./staff.js";
 
 const host = process.env.API_HOST ?? "127.0.0.1";
 const port = Number(process.env.API_PORT ?? "4000");
@@ -94,6 +109,68 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && staffQueueEventsMatch?.[1]) {
       await handleStaffQueueEvents(request, response, staffQueueEventsMatch[1]);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/staff/map-settings") {
+      await handleStaffMapSettings(request, response);
+      return;
+    }
+
+    if (request.method === "PATCH" && url.pathname === "/staff/map-settings") {
+      await handleUpdateStaffMapSettings(request, response);
+      return;
+    }
+
+    const staffSiteOpsMatch = url.pathname.match(/^\/staff\/sites\/([^/]+)\/ops$/);
+
+    if (request.method === "GET" && staffSiteOpsMatch?.[1]) {
+      await handleStaffSiteOps(request, response, staffSiteOpsMatch[1]);
+      return;
+    }
+
+    const staffSiteSettingsMatch = url.pathname.match(/^\/staff\/sites\/([^/]+)\/settings$/);
+
+    if (request.method === "PATCH" && staffSiteSettingsMatch?.[1]) {
+      await handleStaffSiteSettings(request, response, staffSiteSettingsMatch[1]);
+      return;
+    }
+
+    const staffQueueSettingsMatch = url.pathname.match(/^\/staff\/sites\/([^/]+)\/queues\/([^/]+)$/);
+
+    if (request.method === "PATCH" && staffQueueSettingsMatch?.[1] && staffQueueSettingsMatch[2]) {
+      await handleStaffQueueSettings(request, response, staffQueueSettingsMatch[1], staffQueueSettingsMatch[2]);
+      return;
+    }
+
+    const staffMembershipsMatch = url.pathname.match(/^\/staff\/sites\/([^/]+)\/memberships$/);
+
+    if (request.method === "GET" && staffMembershipsMatch?.[1]) {
+      await handleStaffMemberships(request, response, staffMembershipsMatch[1]);
+      return;
+    }
+
+    if (request.method === "POST" && staffMembershipsMatch?.[1]) {
+      await handleCreateStaffMembership(request, response, staffMembershipsMatch[1]);
+      return;
+    }
+
+    const staffMembershipMatch = url.pathname.match(/^\/staff\/sites\/([^/]+)\/memberships\/([^/]+)$/);
+
+    if (request.method === "PATCH" && staffMembershipMatch?.[1] && staffMembershipMatch[2]) {
+      await handleUpdateStaffMembership(request, response, staffMembershipMatch[1], staffMembershipMatch[2]);
+      return;
+    }
+
+    if (request.method === "DELETE" && staffMembershipMatch?.[1] && staffMembershipMatch[2]) {
+      await handleDeleteStaffMembership(request, response, staffMembershipMatch[1], staffMembershipMatch[2]);
+      return;
+    }
+
+    const staffAuditLogsMatch = url.pathname.match(/^\/staff\/sites\/([^/]+)\/audit-logs$/);
+
+    if (request.method === "GET" && staffAuditLogsMatch?.[1]) {
+      await handleStaffAuditLogs(request, response, staffAuditLogsMatch[1]);
       return;
     }
 

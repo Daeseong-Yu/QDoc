@@ -155,7 +155,7 @@ async function signIn(page: Page, emailPlaceholder: string) {
 }
 
 async function selectE2eSite(page: Page) {
-  await page.getByRole("button", { name: new RegExp(e2eSiteName) }).click();
+  await page.getByRole("button", { name: new RegExp(`^${e2eSiteName}`) }).click();
 }
 
 async function expectPatientStatus(page: Page, status: string) {
@@ -273,6 +273,56 @@ test("loads the patient map around the browser location without provider SDK whe
     .filter({ has: page.getByRole("heading", { name: e2eSiteName }) });
   await expect(clinicCard).toContainText("0.2 km");
   expect(providerRequests).toHaveLength(0);
+});
+
+test("lets staff close a queue and blocks patient check-ins", async ({
+  page,
+}) => {
+  await page.goto("/staff");
+  await signIn(page, "staff@example.com");
+  await expect(
+    page.getByRole("heading", { name: "Staff queue board" }),
+  ).toBeVisible();
+  await selectE2eSite(page);
+
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Map budget" })).toHaveCount(0);
+  const mapSettingsUpdate = await page.evaluate(async () => {
+    const response = await fetch("/api/staff/map-settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        provider: "mapbox",
+        isEnabled: true,
+        hardStopEnabled: true,
+        monthlyMapLoadLimit: 10,
+      }),
+    });
+
+    return {
+      body: await response.json(),
+      status: response.status,
+    };
+  });
+  expect(mapSettingsUpdate).toMatchObject({
+    body: { error: "forbidden" },
+    status: 403,
+  });
+
+  await expect(page.getByText("Open to check-ins")).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByText("Closed to check-ins")).toBeVisible();
+
+  await page.goto("/");
+  await selectE2eSite(page);
+  await page.getByRole("radio", { name: new RegExp(e2eQueueName) }).check();
+  await page.getByRole("button", { name: "Check in" }).click();
+  await expect(page.getByText("This queue is currently closed.")).toBeVisible();
+
+  await page.goto("/staff");
+  await selectE2eSite(page);
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.getByText("Open to check-ins")).toBeVisible();
 });
 
 test("covers patient check-in and staff queue transitions", async ({ page }) => {

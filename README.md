@@ -219,6 +219,7 @@ Staging environment variables:
 | `ALLOW_CONSOLE_OTP`, `ALLOW_FIXED_OTP` | yes | Keep both `false` in normal staging. |
 | `WORKER_POLL_INTERVAL_MS`, `WORKER_OUTBOX_BATCH_SIZE`, `WORKER_OUTBOX_MAX_ATTEMPTS` | no | Optional worker tuning values. |
 | `MAP_PROVIDER`, `MAP_PROVIDER_ENABLED`, `MAP_MONTHLY_MAP_LOAD_LIMIT` | no | Optional map provider selection and QDoc monthly hard-stop budget. Leave disabled until provider restrictions and limits are configured. |
+| `MAP_SETTINGS_ADMIN_EMAILS` | no | Comma-separated operator email allowlist for changing global map budget settings from the staff UI. Leave empty unless an operator should manage cost guardrails. |
 | `MAPBOX_PUBLIC_TOKEN`, `GOOGLE_MAPS_BROWSER_KEY` | no | Browser credentials returned only when QDoc map guardrails allow loading; restrict them in the provider console. |
 | `MAP_USAGE_RATE_LIMIT_PER_MINUTE`, `MAP_USAGE_RATE_LIMIT_PER_HOUR` | no | Optional per-requester rate limits before map usage reservations are accepted. |
 

@@ -1,9 +1,23 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   activeTicketStatuses,
+  mapProviderSchema,
+  staffAuditLogSummarySchema,
+  staffMapSettingsInputSchema,
+  staffMapSettingsResponseSchema,
+  staffMembershipInputSchema,
+  staffMembershipRoleInputSchema,
+  staffMembershipSummarySchema,
   staffQueueResponseSchema,
+  staffQueueSettingsInputSchema,
+  staffQueueSummarySchema,
+  staffSiteOpsResponseSchema,
+  staffSiteSettingsInputSchema,
+  staffSiteSettingsSchema,
   staffTicketActionInputSchema,
   staffTicketResponseSchema,
+  type MapProvider,
+  type MembershipRole,
   type TicketStatus,
 } from "@qdoc/contracts";
 import { prisma } from "@qdoc/db";
@@ -222,6 +236,300 @@ async function authorizeStaffQueue(request: IncomingMessage, response: ServerRes
   return auth;
 }
 
+async function authorizeStaffAdmin(request: IncomingMessage, response: ServerResponse, siteId: string) {
+  const auth = await authorizeStaffQueue(request, response, siteId);
+
+  if (!auth) {
+    return false;
+  }
+
+  if (auth.membership.role !== "admin") {
+    sendJson(response, 403, { error: "forbidden" });
+    return false;
+  }
+
+  return auth;
+}
+
+function getMapSettingsAdminEmails() {
+  return new Set(
+    (process.env.MAP_SETTINGS_ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function isMapSettingsAdmin(currentUser: { email: string }) {
+  return getMapSettingsAdminEmails().has(currentUser.email.toLowerCase());
+}
+
+async function authorizeMapSettingsAdmin(request: IncomingMessage, response: ServerResponse) {
+  const currentUser = await getCurrentUserFromRequest(request);
+
+  if (!currentUser) {
+    sendJson(response, 401, { error: "unauthorized" });
+    return false;
+  }
+
+  if (!isMapSettingsAdmin(currentUser)) {
+    sendJson(response, 403, { error: "forbidden" });
+    return false;
+  }
+
+  return currentUser;
+}
+
+function getConfiguredMapProvider() {
+  const parsed = mapProviderSchema.safeParse(process.env.MAP_PROVIDER?.trim().toLowerCase());
+  return parsed.success ? parsed.data : null;
+}
+
+function getPublicMapToken(provider: MapProvider) {
+  if (provider === "mapbox") {
+    return process.env.MAPBOX_PUBLIC_TOKEN ?? process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? null;
+  }
+
+  return process.env.GOOGLE_MAPS_BROWSER_KEY ?? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? null;
+}
+
+function getEnvMapLimit() {
+  const limit = Number.parseInt(process.env.MAP_MONTHLY_MAP_LOAD_LIMIT ?? "", 10);
+  return Number.isFinite(limit) && limit > 0 ? limit : 0;
+}
+
+function getMapPeriodStart(date = new Date()) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function getMapResetAt(periodStart: Date) {
+  return new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth() + 1, 1));
+}
+
+function getRemainingMapLoads(limit: number, used: number) {
+  return Math.max(limit - used, 0);
+}
+
+async function getStaffMapSettingsPayload(providerOverride?: MapProvider) {
+  const provider = providerOverride ?? getConfiguredMapProvider();
+  const periodStart = getMapPeriodStart();
+  const resetAt = getMapResetAt(periodStart);
+
+  if (!provider) {
+    return staffMapSettingsResponseSchema.parse({
+      provider: null,
+      isConfigured: false,
+      isEnabled: false,
+      hardStopEnabled: true,
+      monthlyMapLoadLimit: 0,
+      usedMapLoads: 0,
+      remainingMapLoads: 0,
+      resetAt: resetAt.toISOString(),
+      reason: "provider_disabled",
+    });
+  }
+
+  const [config, usagePeriod] = await Promise.all([
+    prisma.mapProviderConfig.findUnique({
+      where: { provider },
+      select: {
+        isEnabled: true,
+        hardStopEnabled: true,
+        monthlyMapLoadLimit: true,
+      },
+    }),
+    prisma.mapUsagePeriod.findUnique({
+      where: {
+        provider_usageType_periodStart: {
+          provider,
+          usageType: "map_load",
+          periodStart,
+        },
+      },
+      select: {
+        used: true,
+      },
+    }),
+  ]);
+
+  const isEnabled = config?.isEnabled ?? process.env.MAP_PROVIDER_ENABLED === "true";
+  const hardStopEnabled = config?.hardStopEnabled ?? true;
+  const monthlyMapLoadLimit = config?.monthlyMapLoadLimit ?? getEnvMapLimit();
+  const usedMapLoads = usagePeriod?.used ?? 0;
+  const reason =
+    !isEnabled || !hardStopEnabled
+      ? "provider_disabled"
+      : !getPublicMapToken(provider)
+        ? "token_missing"
+        : monthlyMapLoadLimit <= 0 || usedMapLoads >= monthlyMapLoadLimit
+          ? "budget_exhausted"
+          : "available";
+
+  return staffMapSettingsResponseSchema.parse({
+    provider,
+    isConfigured: Boolean(config),
+    isEnabled,
+    hardStopEnabled,
+    monthlyMapLoadLimit,
+    usedMapLoads,
+    remainingMapLoads: getRemainingMapLoads(monthlyMapLoadLimit, usedMapLoads),
+    resetAt: resetAt.toISOString(),
+    reason,
+  });
+}
+
+function serializeSiteSettings(site: {
+  id: string;
+  name: string;
+  distanceKm: number;
+  addressLine1: string | null;
+  city: string | null;
+  region: string | null;
+  postalCode: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}) {
+  return staffSiteSettingsSchema.parse(site);
+}
+
+function serializeMembership(membership: {
+  id: string;
+  userId: string;
+  role: MembershipRole;
+  createdAt: Date;
+  updatedAt: Date;
+  user: {
+    email: string;
+  };
+}) {
+  return staffMembershipSummarySchema.parse({
+    id: membership.id,
+    userId: membership.userId,
+    email: membership.user.email,
+    role: membership.role,
+    createdAt: membership.createdAt.toISOString(),
+    updatedAt: membership.updatedAt.toISOString(),
+  });
+}
+
+function hasAuditSiteId(metadata: unknown, siteId: string) {
+  return typeof metadata === "object" && metadata !== null && !Array.isArray(metadata) && "siteId" in metadata
+    ? (metadata as Record<string, unknown>).siteId === siteId
+    : false;
+}
+
+async function getSiteAuditLogs(siteId: string) {
+  const logs = await prisma.auditLog.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 100,
+    include: {
+      actor: {
+        select: {
+          email: true,
+        },
+      },
+    },
+  });
+
+  return staffAuditLogSummarySchema.array().parse(
+    logs
+      .filter((log) => hasAuditSiteId(log.metadata, siteId))
+      .slice(0, 20)
+      .map((log) => ({
+        id: log.id,
+        action: log.action,
+        actorEmail: log.actor?.email ?? null,
+        metadata: log.metadata ?? null,
+        createdAt: log.createdAt.toISOString(),
+      })),
+  );
+}
+
+async function getSiteMemberships(siteId: string) {
+  const memberships = await prisma.membership.findMany({
+    where: { siteId },
+    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+    include: {
+      user: {
+        select: {
+          email: true,
+        },
+      },
+    },
+  });
+
+  return memberships.map(serializeMembership);
+}
+
+async function getStaffSiteOpsPayload(siteId: string, role: MembershipRole, currentUser: { email: string }) {
+  const site = await prisma.site.findUnique({
+    where: { id: siteId },
+    select: {
+      id: true,
+      name: true,
+      distanceKm: true,
+      addressLine1: true,
+      city: true,
+      region: true,
+      postalCode: true,
+      country: true,
+      latitude: true,
+      longitude: true,
+      queues: {
+        orderBy: {
+          createdAt: "asc",
+        },
+        select: {
+          id: true,
+          name: true,
+          isOpen: true,
+        },
+      },
+    },
+  });
+
+  if (!site) {
+    return null;
+  }
+
+  const canManageMapSettings = isMapSettingsAdmin(currentUser);
+  const [memberships, mapSettings, auditLogs] =
+    role === "admin"
+      ? await Promise.all([
+          getSiteMemberships(siteId),
+          canManageMapSettings ? getStaffMapSettingsPayload() : Promise.resolve(null),
+          getSiteAuditLogs(siteId),
+        ])
+      : [[], null, []];
+
+  return staffSiteOpsResponseSchema.parse({
+    role,
+    canManageMapSettings,
+    site: serializeSiteSettings(site),
+    queues: site.queues,
+    memberships,
+    mapSettings,
+    auditLogs,
+  });
+}
+
+async function ensureAnotherSiteAdmin(siteId: string, membershipId: string) {
+  const remainingAdmins = await prisma.membership.count({
+    where: {
+      siteId,
+      role: "admin",
+      id: {
+        not: membershipId,
+      },
+    },
+  });
+
+  return remainingAdmins > 0;
+}
+
 export async function handleStaffQueue(request: IncomingMessage, response: ServerResponse, siteId: string) {
   if (!(await authorizeStaffQueue(request, response, siteId))) {
     return;
@@ -254,6 +562,542 @@ export async function handleStaffQueueEvents(request: IncomingMessage, response:
   streamSnapshots(request, response, `staff:${auth.currentUser.id}:${siteId}:queue`, () =>
     getStaffQueuePayload(siteId).then((payload) => payload ?? initialPayload),
   );
+}
+
+export async function handleStaffSiteOps(request: IncomingMessage, response: ServerResponse, siteId: string) {
+  const auth = await authorizeStaffQueue(request, response, siteId);
+
+  if (!auth) {
+    return;
+  }
+
+  const payload = await getStaffSiteOpsPayload(siteId, auth.membership.role, auth.currentUser);
+
+  if (!payload) {
+    sendJson(response, 404, { error: "not_found" });
+    return;
+  }
+
+  sendJson(response, 200, payload);
+}
+
+export async function handleStaffSiteSettings(request: IncomingMessage, response: ServerResponse, siteId: string) {
+  const auth = await authorizeStaffAdmin(request, response, siteId);
+
+  if (!auth) {
+    return;
+  }
+
+  const input = staffSiteSettingsInputSchema.safeParse(await readJson(request));
+
+  if (!input.success) {
+    sendJson(response, 400, { error: "invalid_request" });
+    return;
+  }
+
+  const site = await prisma.site.findUnique({
+    where: { id: siteId },
+    select: {
+      id: true,
+      name: true,
+      distanceKm: true,
+      addressLine1: true,
+      city: true,
+      region: true,
+      postalCode: true,
+      country: true,
+      latitude: true,
+      longitude: true,
+    },
+  });
+
+  if (!site) {
+    sendJson(response, 404, { error: "not_found" });
+    return;
+  }
+
+  const hasLatitude = Object.prototype.hasOwnProperty.call(input.data, "latitude");
+  const hasLongitude = Object.prototype.hasOwnProperty.call(input.data, "longitude");
+  const nextLatitude = hasLatitude ? (input.data.latitude ?? null) : site.latitude;
+  const nextLongitude = hasLongitude ? (input.data.longitude ?? null) : site.longitude;
+  const locationWasUpdated = hasLatitude || hasLongitude;
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.site.update({
+      where: { id: siteId },
+      data: {
+        name: input.data.name,
+        distanceKm: input.data.distanceKm,
+        addressLine1: input.data.addressLine1,
+        city: input.data.city,
+        region: input.data.region,
+        postalCode: input.data.postalCode,
+        country: input.data.country,
+        latitude: input.data.latitude,
+        longitude: input.data.longitude,
+        ...(locationWasUpdated
+          ? {
+              locationSource: nextLatitude === null || nextLongitude === null ? null : "staff_admin",
+              locationVerifiedAt: nextLatitude === null || nextLongitude === null ? null : new Date(),
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        distanceKm: true,
+        addressLine1: true,
+        city: true,
+        region: true,
+        postalCode: true,
+        country: true,
+        latitude: true,
+        longitude: true,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: auth.currentUser.id,
+        action: "site.settings.update",
+        metadata: {
+          siteId,
+          before: site,
+          after: result,
+        },
+      },
+    });
+
+    return result;
+  });
+
+  logOperationalEvent("info", "qdoc.site_settings_updated", {
+    actorId: auth.currentUser.id,
+    siteId,
+  });
+  sendJson(response, 200, { site: serializeSiteSettings(updated) });
+}
+
+export async function handleStaffQueueSettings(
+  request: IncomingMessage,
+  response: ServerResponse,
+  siteId: string,
+  queueId: string,
+) {
+  const auth = await authorizeStaffQueue(request, response, siteId);
+
+  if (!auth) {
+    return;
+  }
+
+  const input = staffQueueSettingsInputSchema.safeParse(await readJson(request));
+
+  if (!input.success) {
+    sendJson(response, 400, { error: "invalid_request" });
+    return;
+  }
+
+  const queue = await prisma.queue.findFirst({
+    where: {
+      id: queueId,
+      siteId,
+    },
+    select: {
+      id: true,
+      name: true,
+      isOpen: true,
+    },
+  });
+
+  if (!queue) {
+    sendJson(response, 404, { error: "not_found" });
+    return;
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.queue.update({
+      where: { id: queueId },
+      data: {
+        isOpen: input.data.isOpen,
+      },
+      select: {
+        id: true,
+        name: true,
+        isOpen: true,
+      },
+    });
+
+    if (queue.isOpen !== result.isOpen) {
+      await tx.auditLog.create({
+        data: {
+          actorId: auth.currentUser.id,
+          action: result.isOpen ? "queue.open" : "queue.close",
+          metadata: {
+            siteId,
+            queueId,
+            before: queue,
+            after: result,
+          },
+        },
+      });
+    }
+
+    return result;
+  });
+
+  logOperationalEvent("info", "qdoc.queue_settings_updated", {
+    actorId: auth.currentUser.id,
+    siteId,
+    queueId,
+    isOpen: updated.isOpen,
+  });
+  sendJson(response, 200, { queue: staffQueueSummarySchema.parse(updated) });
+}
+
+export async function handleStaffMemberships(request: IncomingMessage, response: ServerResponse, siteId: string) {
+  if (!(await authorizeStaffAdmin(request, response, siteId))) {
+    return;
+  }
+
+  sendJson(response, 200, { memberships: await getSiteMemberships(siteId) });
+}
+
+export async function handleCreateStaffMembership(request: IncomingMessage, response: ServerResponse, siteId: string) {
+  const auth = await authorizeStaffAdmin(request, response, siteId);
+
+  if (!auth) {
+    return;
+  }
+
+  const input = staffMembershipInputSchema.safeParse(await readJson(request));
+
+  if (!input.success) {
+    sendJson(response, 400, { error: "invalid_request" });
+    return;
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.upsert({
+      where: {
+        email: input.data.email,
+      },
+      update: {},
+      create: {
+        email: input.data.email,
+      },
+      select: {
+        id: true,
+      },
+    });
+    const existing = await tx.membership.findUnique({
+      where: {
+        userId_siteId: {
+          userId: user.id,
+          siteId,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    });
+    const membership = existing
+      ? await tx.membership.update({
+          where: { id: existing.id },
+          data: {
+            role: input.data.role,
+          },
+          include: {
+            user: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        })
+      : await tx.membership.create({
+          data: {
+            userId: user.id,
+            siteId,
+            role: input.data.role,
+          },
+          include: {
+            user: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: auth.currentUser.id,
+        action: existing ? "membership.update" : "membership.create",
+        metadata: {
+          siteId,
+          membershipId: membership.id,
+          email: membership.user.email,
+          before: existing ? { role: existing.role } : null,
+          after: { role: membership.role },
+        },
+      },
+    });
+
+    return membership;
+  });
+
+  sendJson(response, 200, { membership: serializeMembership(result) });
+}
+
+export async function handleUpdateStaffMembership(
+  request: IncomingMessage,
+  response: ServerResponse,
+  siteId: string,
+  membershipId: string,
+) {
+  const auth = await authorizeStaffAdmin(request, response, siteId);
+
+  if (!auth) {
+    return;
+  }
+
+  const input = staffMembershipRoleInputSchema.safeParse(await readJson(request));
+
+  if (!input.success) {
+    sendJson(response, 400, { error: "invalid_request" });
+    return;
+  }
+
+  const existing = await prisma.membership.findFirst({
+    where: {
+      id: membershipId,
+      siteId,
+    },
+    include: {
+      user: {
+        select: {
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (!existing) {
+    sendJson(response, 404, { error: "not_found" });
+    return;
+  }
+
+  if (existing.role === "admin" && input.data.role !== "admin" && !(await ensureAnotherSiteAdmin(siteId, membershipId))) {
+    sendJson(response, 409, { error: "conflict" });
+    return;
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.membership.update({
+      where: { id: membershipId },
+      data: {
+        role: input.data.role,
+      },
+      include: {
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: auth.currentUser.id,
+        action: "membership.update",
+        metadata: {
+          siteId,
+          membershipId,
+          email: result.user.email,
+          before: { role: existing.role },
+          after: { role: result.role },
+        },
+      },
+    });
+
+    return result;
+  });
+
+  sendJson(response, 200, { membership: serializeMembership(updated) });
+}
+
+export async function handleDeleteStaffMembership(
+  request: IncomingMessage,
+  response: ServerResponse,
+  siteId: string,
+  membershipId: string,
+) {
+  const auth = await authorizeStaffAdmin(request, response, siteId);
+
+  if (!auth) {
+    return;
+  }
+
+  const existing = await prisma.membership.findFirst({
+    where: {
+      id: membershipId,
+      siteId,
+    },
+    include: {
+      user: {
+        select: {
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (!existing) {
+    sendJson(response, 404, { error: "not_found" });
+    return;
+  }
+
+  if (existing.role === "admin" && !(await ensureAnotherSiteAdmin(siteId, membershipId))) {
+    sendJson(response, 409, { error: "conflict" });
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.membership.delete({
+      where: { id: membershipId },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: auth.currentUser.id,
+        action: "membership.delete",
+        metadata: {
+          siteId,
+          membershipId,
+          email: existing.user.email,
+          before: { role: existing.role },
+          after: null,
+        },
+      },
+    });
+  });
+
+  sendJson(response, 200, { ok: true });
+}
+
+export async function handleStaffMapSettings(request: IncomingMessage, response: ServerResponse) {
+  if (!(await authorizeMapSettingsAdmin(request, response))) {
+    return;
+  }
+
+  sendJson(response, 200, { mapSettings: await getStaffMapSettingsPayload() });
+}
+
+export async function handleUpdateStaffMapSettings(request: IncomingMessage, response: ServerResponse) {
+  const currentUser = await authorizeMapSettingsAdmin(request, response);
+
+  if (!currentUser) {
+    return;
+  }
+
+  const input = staffMapSettingsInputSchema.safeParse(await readJson(request));
+
+  if (!input.success) {
+    sendJson(response, 400, { error: "invalid_request" });
+    return;
+  }
+
+  const configuredProvider = getConfiguredMapProvider();
+
+  if (configuredProvider && configuredProvider !== input.data.provider) {
+    sendJson(response, 400, { error: "invalid_request" });
+    return;
+  }
+
+  const before = await prisma.mapProviderConfig.findUnique({
+    where: {
+      provider: input.data.provider,
+    },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    const after = await tx.mapProviderConfig.upsert({
+      where: {
+        provider: input.data.provider,
+      },
+      update: {
+        isEnabled: input.data.isEnabled,
+        hardStopEnabled: input.data.hardStopEnabled,
+        monthlyMapLoadLimit: input.data.monthlyMapLoadLimit,
+      },
+      create: {
+        provider: input.data.provider,
+        isEnabled: input.data.isEnabled,
+        hardStopEnabled: input.data.hardStopEnabled,
+        monthlyMapLoadLimit: input.data.monthlyMapLoadLimit,
+      },
+    });
+
+    await tx.mapProviderConfigAudit.create({
+      data: {
+        provider: input.data.provider,
+        action: "map_config.update",
+        actorId: currentUser.id,
+        isEnabledBefore: before?.isEnabled ?? null,
+        isEnabledAfter: after.isEnabled,
+        monthlyMapLoadLimitBefore: before?.monthlyMapLoadLimit ?? null,
+        monthlyMapLoadLimitAfter: after.monthlyMapLoadLimit,
+        hardStopEnabledBefore: before?.hardStopEnabled ?? null,
+        hardStopEnabledAfter: after.hardStopEnabled,
+        metadata: {
+          source: "staff_ops",
+        },
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorId: currentUser.id,
+        action: "map_config.update",
+        metadata: {
+          provider: input.data.provider,
+          before: before
+            ? {
+                isEnabled: before.isEnabled,
+                hardStopEnabled: before.hardStopEnabled,
+                monthlyMapLoadLimit: before.monthlyMapLoadLimit,
+              }
+            : null,
+          after: {
+            isEnabled: after.isEnabled,
+            hardStopEnabled: after.hardStopEnabled,
+            monthlyMapLoadLimit: after.monthlyMapLoadLimit,
+          },
+        },
+      },
+    });
+  });
+
+  logOperationalEvent("info", "qdoc.map_settings_updated", {
+    actorId: currentUser.id,
+    provider: input.data.provider,
+    isEnabled: input.data.isEnabled,
+    hardStopEnabled: input.data.hardStopEnabled,
+    monthlyMapLoadLimit: input.data.monthlyMapLoadLimit,
+  });
+  sendJson(response, 200, { mapSettings: await getStaffMapSettingsPayload(input.data.provider) });
+}
+
+export async function handleStaffAuditLogs(request: IncomingMessage, response: ServerResponse, siteId: string) {
+  if (!(await authorizeStaffAdmin(request, response, siteId))) {
+    return;
+  }
+
+  sendJson(response, 200, { auditLogs: await getSiteAuditLogs(siteId) });
 }
 
 export async function handleStaffTicketAction(

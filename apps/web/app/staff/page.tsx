@@ -5,10 +5,25 @@ import {
   currentUserSchema,
   otpRequestInputSchema,
   otpVerifyInputSchema,
+  staffMapSettingsInputSchema,
+  staffMapSettingsResponseSchema,
+  staffMembershipInputSchema,
+  staffMembershipRoleInputSchema,
+  staffMembershipSummarySchema,
   staffQueueResponseSchema,
+  staffQueueSettingsInputSchema,
+  staffQueueSummarySchema,
+  staffSiteOpsResponseSchema,
+  staffSiteSettingsInputSchema,
+  staffSiteSettingsSchema,
   staffTicketResponseSchema,
   type CurrentUser,
+  type MapProvider,
+  type MembershipRole,
+  type StaffMapSettingsResponse,
+  type StaffSiteOpsResponse,
   type StaffQueueResponse,
+  type StaffSiteSettings,
   type TicketStatus,
 } from "@qdoc/contracts";
 import {
@@ -19,8 +34,14 @@ import {
   Loader2,
   LogOut,
   Mail,
+  MapPinned,
   RefreshCcw,
+  Save,
+  Settings,
+  ShieldCheck,
   Stethoscope,
+  Trash2,
+  Users,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,10 +52,59 @@ type AuthStep = "email" | "code";
 type StaffTicketAction = "call" | "start-service" | "complete" | "delay" | "restore" | "cancel";
 type StaffBoardTicket = StaffQueueResponse["tickets"][number];
 type StaffMembership = CurrentUser["memberships"][number];
+type SiteSettingsForm = {
+  name: string;
+  distanceKm: string;
+  addressLine1: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+  latitude: string;
+  longitude: string;
+};
+type MapSettingsForm = {
+  provider: MapProvider | "";
+  isEnabled: boolean;
+  hardStopEnabled: boolean;
+  monthlyMapLoadLimit: string;
+};
 
 type ApiError = {
   status: number;
   error: string;
+};
+
+const siteSettingsResponseSchema = z.object({
+  site: staffSiteSettingsSchema,
+});
+const queueSettingsResponseSchema = z.object({
+  queue: staffQueueSummarySchema,
+});
+const membershipResponseSchema = z.object({
+  membership: staffMembershipSummarySchema,
+});
+const mapSettingsResponseEnvelopeSchema = z.object({
+  mapSettings: staffMapSettingsResponseSchema,
+});
+
+const emptySiteSettingsForm: SiteSettingsForm = {
+  name: "",
+  distanceKm: "0",
+  addressLine1: "",
+  city: "",
+  region: "",
+  postalCode: "",
+  country: "",
+  latitude: "",
+  longitude: "",
+};
+
+const emptyMapSettingsForm: MapSettingsForm = {
+  provider: "",
+  isEnabled: false,
+  hardStopEnabled: true,
+  monthlyMapLoadLimit: "0",
 };
 
 const boardStatuses: Array<{ status: TicketStatus; label: string }> = [
@@ -97,6 +167,10 @@ function getMessage(error: unknown) {
     return "That ticket can no longer move to the requested status.";
   }
 
+  if (error.error === "conflict") {
+    return "That change conflicts with the current state. Keep at least one site admin.";
+  }
+
   return "Request failed. Try again.";
 }
 
@@ -138,6 +212,43 @@ function getMembershipWaitingCount(membership: StaffMembership, activeQueueBoard
   return activeQueueBoard.tickets.filter((ticket) => ticket.status === "waiting").length;
 }
 
+function siteSettingsToForm(site: StaffSiteSettings): SiteSettingsForm {
+  return {
+    name: site.name,
+    distanceKm: String(site.distanceKm),
+    addressLine1: site.addressLine1 ?? "",
+    city: site.city ?? "",
+    region: site.region ?? "",
+    postalCode: site.postalCode ?? "",
+    country: site.country ?? "",
+    latitude: site.latitude === null ? "" : String(site.latitude),
+    longitude: site.longitude === null ? "" : String(site.longitude),
+  };
+}
+
+function mapSettingsToForm(mapSettings: StaffMapSettingsResponse | null): MapSettingsForm {
+  if (!mapSettings?.provider) {
+    return emptyMapSettingsForm;
+  }
+
+  return {
+    provider: mapSettings.provider,
+    isEnabled: mapSettings.isEnabled,
+    hardStopEnabled: mapSettings.hardStopEnabled,
+    monthlyMapLoadLimit: String(mapSettings.monthlyMapLoadLimit),
+  };
+}
+
+function optionalText(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function optionalNumber(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? Number(trimmed) : null;
+}
+
 export default function StaffPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [queueBoard, setQueueBoard] = useState<StaffQueueResponse | null>(null);
@@ -147,9 +258,17 @@ export default function StaffPage() {
   const [authStep, setAuthStep] = useState<AuthStep>("email");
   const [authState, setAuthState] = useState<RequestState>("idle");
   const [boardState, setBoardState] = useState<RequestState>("idle");
+  const [opsState, setOpsState] = useState<RequestState>("idle");
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [activeOpsAction, setActiveOpsAction] = useState<string | null>(null);
+  const [ops, setOps] = useState<StaffSiteOpsResponse | null>(null);
+  const [siteForm, setSiteForm] = useState<SiteSettingsForm>(emptySiteSettingsForm);
+  const [membershipEmail, setMembershipEmail] = useState("");
+  const [membershipRole, setMembershipRole] = useState<MembershipRole>("staff");
+  const [mapForm, setMapForm] = useState<MapSettingsForm>(emptyMapSettingsForm);
   const [message, setMessage] = useState("");
   const boardRequestId = useRef(0);
+  const opsRequestId = useRef(0);
 
   const staffMemberships = useMemo(() => {
     return currentUser?.memberships.filter((membership) => membership.role === "staff" || membership.role === "admin") ?? [];
@@ -160,6 +279,9 @@ export default function StaffPage() {
   }, [selectedSiteId, staffMemberships]);
 
   const activeQueueBoard = queueBoard?.siteId === selectedSiteId ? queueBoard : null;
+  const opsQueues = ops?.queues ?? activeQueueBoard?.queues ?? [];
+  const canManageSiteOps = ops?.role === "admin";
+  const canManageMapSettings = canManageSiteOps && ops?.canManageMapSettings === true;
 
   const ticketsByStatus = useMemo(() => {
     return Object.fromEntries(
@@ -169,13 +291,20 @@ export default function StaffPage() {
 
   const clearStaffSession = useCallback(() => {
     boardRequestId.current += 1;
+    opsRequestId.current += 1;
     setCurrentUser(null);
     setQueueBoard(null);
+    setOps(null);
     setSelectedSiteId("");
     setAuthStep("email");
     setAuthState("idle");
     setCode("");
     setBoardState("idle");
+    setOpsState("idle");
+    setSiteForm(emptySiteSettingsForm);
+    setMapForm(emptyMapSettingsForm);
+    setMembershipEmail("");
+    setMembershipRole("staff");
   }, []);
 
   const loadBoard = useCallback(async () => {
@@ -212,6 +341,42 @@ export default function StaffPage() {
     }
   }, [clearStaffSession, currentUser, selectedSiteId]);
 
+  const loadOps = useCallback(async () => {
+    if (!selectedSiteId || !currentUser) {
+      return;
+    }
+
+    const requestSiteId = selectedSiteId;
+    const requestId = opsRequestId.current + 1;
+    opsRequestId.current = requestId;
+
+    try {
+      const response = await fetch(`/api/staff/sites/${requestSiteId}/ops`, { cache: "no-store" });
+      const data = await readApiResponse(response, staffSiteOpsResponseSchema);
+
+      if (opsRequestId.current !== requestId) {
+        return false;
+      }
+
+      setOps(data);
+      setSiteForm(siteSettingsToForm(data.site));
+      setMapForm(mapSettingsToForm(data.mapSettings));
+      return true;
+    } catch (error) {
+      if (opsRequestId.current !== requestId) {
+        return false;
+      }
+
+      if (isApiError(error) && error.status === 401) {
+        clearStaffSession();
+      } else {
+        setOps(null);
+      }
+
+      throw error;
+    }
+  }, [clearStaffSession, currentUser, selectedSiteId]);
+
   const refreshBoard = useCallback(
     async (showLoading = true) => {
       if (!currentUser || !selectedSiteId) {
@@ -234,6 +399,30 @@ export default function StaffPage() {
       }
     },
     [currentUser, loadBoard, selectedSiteId],
+  );
+
+  const refreshOps = useCallback(
+    async (showLoading = true) => {
+      if (!currentUser || !selectedSiteId) {
+        return;
+      }
+
+      if (showLoading) {
+        setOpsState("loading");
+      }
+
+      try {
+        const applied = await loadOps();
+
+        if (applied) {
+          setOpsState("success");
+        }
+      } catch (error) {
+        setOpsState("error");
+        setMessage(getMessage(error));
+      }
+    },
+    [currentUser, loadOps, selectedSiteId],
   );
 
   const loadCurrentUser = useCallback(async () => {
@@ -263,8 +452,10 @@ export default function StaffPage() {
     }
 
     setQueueBoard(null);
+    setOps(null);
     void refreshBoard();
-  }, [currentUser, refreshBoard, selectedSiteId]);
+    void refreshOps();
+  }, [currentUser, refreshBoard, refreshOps, selectedSiteId]);
 
   useEffect(() => {
     if (!currentUser || !selectedSiteId) {
@@ -404,6 +595,188 @@ export default function StaffPage() {
     }
   }
 
+  async function updateQueueOpen(queueId: string, queueName: string, isOpen: boolean) {
+    const input = staffQueueSettingsInputSchema.safeParse({ isOpen });
+
+    if (!input.success) {
+      setMessage("Invalid queue setting.");
+      return;
+    }
+
+    const actionKey = `queue:${queueId}`;
+    setActiveOpsAction(actionKey);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/staff/sites/${selectedSiteId}/queues/${queueId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input.data),
+      });
+      await readApiResponse(response, queueSettingsResponseSchema);
+      await Promise.all([loadBoard(), loadOps()]);
+      setBoardState("success");
+      setOpsState("success");
+      setMessage(`${queueName} is now ${isOpen ? "open" : "closed"}.`);
+    } catch (error) {
+      setMessage(getMessage(error));
+    } finally {
+      setActiveOpsAction(null);
+    }
+  }
+
+  async function applySiteSettings() {
+    const input = staffSiteSettingsInputSchema.safeParse({
+      name: siteForm.name,
+      distanceKm: Number(siteForm.distanceKm),
+      addressLine1: optionalText(siteForm.addressLine1),
+      city: optionalText(siteForm.city),
+      region: optionalText(siteForm.region),
+      postalCode: optionalText(siteForm.postalCode),
+      country: optionalText(siteForm.country),
+      latitude: optionalNumber(siteForm.latitude),
+      longitude: optionalNumber(siteForm.longitude),
+    });
+
+    if (!input.success) {
+      setMessage("Check the site settings before saving.");
+      return;
+    }
+
+    setActiveOpsAction("site-settings");
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/staff/sites/${selectedSiteId}/settings`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input.data),
+      });
+      const data = await readApiResponse(response, siteSettingsResponseSchema);
+      setSiteForm(siteSettingsToForm(data.site));
+      await Promise.all([loadCurrentUser(), loadOps()]);
+      setOpsState("success");
+      setMessage("Site settings saved.");
+    } catch (error) {
+      setMessage(getMessage(error));
+    } finally {
+      setActiveOpsAction(null);
+    }
+  }
+
+  async function createMembership() {
+    const input = staffMembershipInputSchema.safeParse({
+      email: membershipEmail,
+      role: membershipRole,
+    });
+
+    if (!input.success) {
+      setMessage("Enter a valid staff email.");
+      return;
+    }
+
+    setActiveOpsAction("membership:create");
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/staff/sites/${selectedSiteId}/memberships`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input.data),
+      });
+      await readApiResponse(response, membershipResponseSchema);
+      setMembershipEmail("");
+      await Promise.all([loadCurrentUser(), loadOps()]);
+      setOpsState("success");
+      setMessage("Staff membership saved.");
+    } catch (error) {
+      setMessage(getMessage(error));
+    } finally {
+      setActiveOpsAction(null);
+    }
+  }
+
+  async function updateMembershipRole(membershipId: string, role: MembershipRole) {
+    const input = staffMembershipRoleInputSchema.safeParse({ role });
+
+    if (!input.success) {
+      setMessage("Invalid membership role.");
+      return;
+    }
+
+    setActiveOpsAction(`membership:${membershipId}`);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/staff/sites/${selectedSiteId}/memberships/${membershipId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input.data),
+      });
+      await readApiResponse(response, membershipResponseSchema);
+      await Promise.all([loadCurrentUser(), loadOps()]);
+      setOpsState("success");
+      setMessage("Staff role updated.");
+    } catch (error) {
+      setMessage(getMessage(error));
+    } finally {
+      setActiveOpsAction(null);
+    }
+  }
+
+  async function deleteMembership(membershipId: string) {
+    setActiveOpsAction(`membership:${membershipId}`);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/staff/sites/${selectedSiteId}/memberships/${membershipId}`, {
+        method: "DELETE",
+      });
+      await readApiResponse(response, z.object({ ok: z.literal(true) }));
+      await Promise.all([loadCurrentUser(), loadOps()]);
+      setOpsState("success");
+      setMessage("Staff membership removed.");
+    } catch (error) {
+      setMessage(getMessage(error));
+    } finally {
+      setActiveOpsAction(null);
+    }
+  }
+
+  async function applyMapSettings() {
+    const input = staffMapSettingsInputSchema.safeParse({
+      provider: mapForm.provider,
+      isEnabled: mapForm.isEnabled,
+      hardStopEnabled: mapForm.hardStopEnabled,
+      monthlyMapLoadLimit: Number.parseInt(mapForm.monthlyMapLoadLimit, 10),
+    });
+
+    if (!input.success) {
+      setMessage("Check the map budget settings before saving.");
+      return;
+    }
+
+    setActiveOpsAction("map-settings");
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/staff/map-settings", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input.data),
+      });
+      const data = await readApiResponse(response, mapSettingsResponseEnvelopeSchema);
+      setMapForm(mapSettingsToForm(data.mapSettings));
+      await loadOps();
+      setOpsState("success");
+      setMessage("Map budget settings saved.");
+    } catch (error) {
+      setMessage(getMessage(error));
+    } finally {
+      setActiveOpsAction(null);
+    }
+  }
+
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
     clearStaffSession();
@@ -521,8 +894,11 @@ export default function StaffPage() {
                       }
 
                       boardRequestId.current += 1;
+                      opsRequestId.current += 1;
                       setQueueBoard(null);
+                      setOps(null);
                       setBoardState("loading");
+                      setOpsState("loading");
                       setSelectedSiteId(membership.siteId);
                     }}
                     className={`rounded-md border px-3 py-3 text-left text-sm font-medium ${
@@ -551,6 +927,322 @@ export default function StaffPage() {
                   {boardState === "loading" ? "Loading" : `${activeQueueBoard?.tickets.length ?? 0} active tickets`}
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Settings size={20} className="text-[#0a8f9c]" aria-hidden="true" />
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-950">Operations</h2>
+                    <p className="text-sm text-slate-600">
+                      {opsState === "loading" ? "Loading controls." : canManageSiteOps ? "Admin controls enabled." : "Queue controls enabled."}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void refreshOps();
+                  }}
+                  disabled={!currentUser || !selectedSiteId || opsState === "loading"}
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RefreshCcw size={15} aria-hidden="true" />
+                  Reload
+                </button>
+              </div>
+
+              {!selectedSiteId ? <p className="text-sm text-slate-500">Select a site to manage operations.</p> : null}
+
+              {selectedSiteId ? (
+                <div className="grid gap-5">
+                  <section className="border-t border-slate-200 pt-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <ShieldCheck size={18} className="text-[#0a8f9c]" aria-hidden="true" />
+                      <h3 className="font-semibold text-slate-950">Queue availability</h3>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {opsQueues.map((queue) => (
+                        <div key={queue.id} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-950">{queue.name}</p>
+                            <p className={`text-xs font-medium ${queue.isOpen ? "text-emerald-700" : "text-slate-500"}`}>
+                              {queue.isOpen ? "Open to check-ins" : "Closed to check-ins"}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void updateQueueOpen(queue.id, queue.name, !queue.isOpen);
+                            }}
+                            disabled={Boolean(activeOpsAction)}
+                            className={`inline-flex h-9 shrink-0 items-center justify-center rounded-md px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
+                              queue.isOpen
+                                ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                                : "bg-[#10b9c4] text-white hover:bg-[#0ea5b2]"
+                            }`}
+                          >
+                            {activeOpsAction === `queue:${queue.id}` ? (
+                              <Loader2 className="animate-spin" size={15} aria-hidden="true" />
+                            ) : queue.isOpen ? (
+                              "Close"
+                            ) : (
+                              "Open"
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                      {opsQueues.length === 0 ? <p className="text-sm text-slate-500">No queues configured.</p> : null}
+                    </div>
+                  </section>
+
+                  {canManageSiteOps ? (
+                    <section className="border-t border-slate-200 pt-4">
+                      <div className="mb-3 flex items-center gap-2">
+                        <Save size={18} className="text-[#0a8f9c]" aria-hidden="true" />
+                        <h3 className="font-semibold text-slate-950">Site settings</h3>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          type="text"
+                          value={siteForm.name}
+                          onChange={(event) => setSiteForm((value) => ({ ...value, name: event.target.value }))}
+                          placeholder="Site name"
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={siteForm.distanceKm}
+                          onChange={(event) => setSiteForm((value) => ({ ...value, distanceKm: event.target.value }))}
+                          placeholder="Distance km"
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                        />
+                        <input
+                          type="text"
+                          value={siteForm.addressLine1}
+                          onChange={(event) => setSiteForm((value) => ({ ...value, addressLine1: event.target.value }))}
+                          placeholder="Address"
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                        />
+                        <input
+                          type="text"
+                          value={siteForm.city}
+                          onChange={(event) => setSiteForm((value) => ({ ...value, city: event.target.value }))}
+                          placeholder="City"
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                        />
+                        <input
+                          type="text"
+                          value={siteForm.region}
+                          onChange={(event) => setSiteForm((value) => ({ ...value, region: event.target.value }))}
+                          placeholder="Region"
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                        />
+                        <input
+                          type="text"
+                          value={siteForm.postalCode}
+                          onChange={(event) => setSiteForm((value) => ({ ...value, postalCode: event.target.value }))}
+                          placeholder="Postal code"
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                        />
+                        <input
+                          type="text"
+                          value={siteForm.country}
+                          onChange={(event) => setSiteForm((value) => ({ ...value, country: event.target.value }))}
+                          placeholder="Country"
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                        />
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <input
+                            type="number"
+                            step="0.000001"
+                            value={siteForm.latitude}
+                            onChange={(event) => setSiteForm((value) => ({ ...value, latitude: event.target.value }))}
+                            placeholder="Latitude"
+                            className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                          />
+                          <input
+                            type="number"
+                            step="0.000001"
+                            value={siteForm.longitude}
+                            onChange={(event) => setSiteForm((value) => ({ ...value, longitude: event.target.value }))}
+                            placeholder="Longitude"
+                            className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void applySiteSettings();
+                        }}
+                        disabled={Boolean(activeOpsAction)}
+                        className="mt-3 inline-flex h-10 items-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
+                      >
+                        {activeOpsAction === "site-settings" ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+                        Save site
+                      </button>
+                    </section>
+                  ) : null}
+
+                  {canManageSiteOps ? (
+                    <section className="grid gap-5 border-t border-slate-200 pt-4 xl:grid-cols-2">
+                      <div>
+                        <div className="mb-3 flex items-center gap-2">
+                          <Users size={18} className="text-[#0a8f9c]" aria-hidden="true" />
+                          <h3 className="font-semibold text-slate-950">Staff membership</h3>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px_auto]">
+                          <input
+                            type="email"
+                            value={membershipEmail}
+                            onChange={(event) => setMembershipEmail(event.target.value)}
+                            placeholder="staff@example.com"
+                            className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                          />
+                          <select
+                            value={membershipRole}
+                            onChange={(event) => setMembershipRole(event.target.value as MembershipRole)}
+                            className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
+                          >
+                            <option value="staff">Staff</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void createMembership();
+                            }}
+                            disabled={Boolean(activeOpsAction)}
+                            className="inline-flex h-10 items-center justify-center rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <div className="mt-3 grid gap-2">
+                          {ops?.memberships.map((membership) => (
+                            <div key={membership.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="break-all text-sm font-semibold text-slate-950">{membership.email}</p>
+                                <p className="text-xs uppercase text-slate-500">{membership.role}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void updateMembershipRole(membership.id, membership.role === "admin" ? "staff" : "admin");
+                                  }}
+                                  disabled={Boolean(activeOpsAction)}
+                                  className="h-8 rounded-md border border-[#b9eaee] px-3 text-xs font-semibold text-[#087884] hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {membership.role === "admin" ? "Make staff" : "Make admin"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void deleteMembership(membership.id);
+                                  }}
+                                  disabled={Boolean(activeOpsAction)}
+                                  className="inline-flex size-8 items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                  aria-label={`Remove ${membership.email}`}
+                                >
+                                  {activeOpsAction === `membership:${membership.id}` ? <Loader2 className="animate-spin" size={14} aria-hidden="true" /> : <Trash2 size={14} aria-hidden="true" />}
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {canManageMapSettings ? (
+                        <div>
+                          <div className="mb-3 flex items-center gap-2">
+                            <MapPinned size={18} className="text-[#0a8f9c]" aria-hidden="true" />
+                            <h3 className="font-semibold text-slate-950">Map budget</h3>
+                          </div>
+                          <div className="grid gap-3">
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <input
+                                type="text"
+                                value={mapForm.provider}
+                                readOnly
+                                placeholder="No provider"
+                                className="h-10 rounded-md border border-slate-300 bg-slate-50 px-3 text-sm text-slate-700 outline-none"
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                value={mapForm.monthlyMapLoadLimit}
+                                onChange={(event) => setMapForm((value) => ({ ...value, monthlyMapLoadLimit: event.target.value }))}
+                                placeholder="Monthly map loads"
+                                className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                              />
+                            </div>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={mapForm.isEnabled}
+                                onChange={(event) => setMapForm((value) => ({ ...value, isEnabled: event.target.checked }))}
+                                className="size-4 rounded border-slate-300"
+                              />
+                              Provider enabled
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={mapForm.hardStopEnabled}
+                                onChange={(event) => setMapForm((value) => ({ ...value, hardStopEnabled: event.target.checked }))}
+                                className="size-4 rounded border-slate-300"
+                              />
+                              Hard stop before overage
+                            </label>
+                            {ops?.mapSettings ? (
+                              <p className="text-sm text-slate-600">
+                                {ops.mapSettings.usedMapLoads} used · {ops.mapSettings.remainingMapLoads} remaining · {ops.mapSettings.reason}
+                              </p>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void applyMapSettings();
+                              }}
+                              disabled={Boolean(activeOpsAction) || !mapForm.provider}
+                              className="inline-flex h-10 w-fit items-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
+                            >
+                              {activeOpsAction === "map-settings" ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+                              Save budget
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+                  ) : null}
+
+                  {canManageSiteOps ? (
+                    <section className="border-t border-slate-200 pt-4">
+                      <h3 className="mb-3 font-semibold text-slate-950">Audit log</h3>
+                      <div className="grid gap-2">
+                        {ops?.auditLogs.length ? (
+                          ops.auditLogs.map((log) => (
+                            <div key={log.id} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="font-semibold text-slate-950">{log.action}</span>
+                                <span className="text-xs text-slate-500">{new Date(log.createdAt).toLocaleString()}</span>
+                              </div>
+                              <p className="mt-1 break-all text-xs text-slate-500">{log.actorEmail ?? "system"}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-slate-500">No site audit entries yet.</p>
+                        )}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-4 xl:grid-cols-4">

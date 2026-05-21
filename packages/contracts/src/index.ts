@@ -24,6 +24,10 @@ export type SiteSummary = z.infer<typeof siteSummarySchema>;
 
 export const emailSchema = z.string().trim().email().toLowerCase();
 
+export const membershipRoleSchema = z.enum(["staff", "admin"]);
+
+export type MembershipRole = z.infer<typeof membershipRoleSchema>;
+
 export const otpRequestInputSchema = z.object({
   email: emailSchema,
 });
@@ -40,7 +44,7 @@ export type OtpVerifyInput = z.infer<typeof otpVerifyInputSchema>;
 export const membershipSummarySchema = z.object({
   siteId: z.string(),
   siteName: z.string(),
-  role: z.enum(["staff", "admin"]),
+  role: membershipRoleSchema,
   waitingTicketCount: z.number().int().nonnegative(),
 });
 
@@ -123,6 +127,79 @@ export const staffTicketActionInputSchema = z.object({
 });
 
 export type StaffTicketActionInput = z.infer<typeof staffTicketActionInputSchema>;
+
+const optionalNullableStringSchema = z.string().trim().max(120).nullable().optional();
+
+export const staffSiteSettingsSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  distanceKm: z.number().nonnegative(),
+  addressLine1: z.string().nullable(),
+  city: z.string().nullable(),
+  region: z.string().nullable(),
+  postalCode: z.string().nullable(),
+  country: z.string().nullable(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+});
+
+export type StaffSiteSettings = z.infer<typeof staffSiteSettingsSchema>;
+
+export const staffSiteSettingsInputSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    distanceKm: z.number().nonnegative().optional(),
+    addressLine1: optionalNullableStringSchema,
+    city: optionalNullableStringSchema,
+    region: optionalNullableStringSchema,
+    postalCode: optionalNullableStringSchema,
+    country: optionalNullableStringSchema,
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0);
+
+export type StaffSiteSettingsInput = z.infer<typeof staffSiteSettingsInputSchema>;
+
+export const staffQueueSettingsInputSchema = z.object({
+  isOpen: z.boolean(),
+});
+
+export type StaffQueueSettingsInput = z.infer<typeof staffQueueSettingsInputSchema>;
+
+export const staffMembershipSummarySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  email: emailSchema,
+  role: membershipRoleSchema,
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type StaffMembershipSummary = z.infer<typeof staffMembershipSummarySchema>;
+
+export const staffMembershipInputSchema = z.object({
+  email: emailSchema,
+  role: membershipRoleSchema,
+});
+
+export type StaffMembershipInput = z.infer<typeof staffMembershipInputSchema>;
+
+export const staffMembershipRoleInputSchema = z.object({
+  role: membershipRoleSchema,
+});
+
+export type StaffMembershipRoleInput = z.infer<typeof staffMembershipRoleInputSchema>;
+
+export const staffAuditLogSummarySchema = z.object({
+  id: z.string(),
+  action: z.string(),
+  actorEmail: emailSchema.nullable(),
+  metadata: z.unknown().nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export type StaffAuditLogSummary = z.infer<typeof staffAuditLogSummarySchema>;
 
 export const siteLocationSchema = z.object({
   addressLine1: z.string().nullable(),
@@ -244,3 +321,38 @@ export const mapUsageResponseSchema = z.object({
 });
 
 export type MapUsageResponse = z.infer<typeof mapUsageResponseSchema>;
+
+export const staffMapSettingsResponseSchema = z.object({
+  provider: mapProviderSchema.nullable(),
+  isConfigured: z.boolean(),
+  isEnabled: z.boolean(),
+  hardStopEnabled: z.boolean(),
+  monthlyMapLoadLimit: z.number().int().nonnegative(),
+  usedMapLoads: z.number().int().nonnegative(),
+  remainingMapLoads: z.number().int().nonnegative(),
+  resetAt: z.string().datetime(),
+  reason: z.enum(["provider_disabled", "token_missing", "budget_exhausted", "available"]),
+});
+
+export type StaffMapSettingsResponse = z.infer<typeof staffMapSettingsResponseSchema>;
+
+export const staffMapSettingsInputSchema = z.object({
+  provider: mapProviderSchema,
+  isEnabled: z.boolean(),
+  hardStopEnabled: z.boolean(),
+  monthlyMapLoadLimit: z.number().int().min(0).max(1_000_000),
+});
+
+export type StaffMapSettingsInput = z.infer<typeof staffMapSettingsInputSchema>;
+
+export const staffSiteOpsResponseSchema = z.object({
+  role: membershipRoleSchema,
+  canManageMapSettings: z.boolean(),
+  site: staffSiteSettingsSchema,
+  queues: staffQueueSummarySchema.array(),
+  memberships: staffMembershipSummarySchema.array(),
+  mapSettings: staffMapSettingsResponseSchema.nullable(),
+  auditLogs: staffAuditLogSummarySchema.array(),
+});
+
+export type StaffSiteOpsResponse = z.infer<typeof staffSiteOpsResponseSchema>;

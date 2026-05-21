@@ -134,6 +134,15 @@ const ticketStatusStyles: Record<TicketStatus, string> = {
   cancelled: "bg-slate-100 text-slate-700 ring-slate-200",
 };
 
+const emptyStatusMessages: Record<TicketStatus, string> = {
+  waiting: "No patients waiting.",
+  called: "No called patients.",
+  in_service: "No patients in service.",
+  completed: "No completed tickets.",
+  delay: "No delayed patients.",
+  cancelled: "No cancelled tickets.",
+};
+
 async function readApiResponse<T>(response: Response, schema: z.ZodSchema<T>) {
   const data: unknown = await response.json();
 
@@ -171,6 +180,18 @@ function getMessage(error: unknown) {
 
   if (error.error === "conflict") {
     return "That change conflicts with the current state. Keep at least one site admin.";
+  }
+
+  if (error.error === "otp_delivery_unavailable") {
+    return "We could not send a code right now. Try again later or contact the clinic.";
+  }
+
+  if (error.error === "invalid_otp") {
+    return "Enter the latest 6-digit verification code.";
+  }
+
+  if (error.error === "rate_limited") {
+    return "Too many attempts. Wait a few minutes before trying again.";
   }
 
   return "Request failed. Try again.";
@@ -808,7 +829,7 @@ export default function StaffPage() {
             className="inline-flex h-10 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] shadow-sm hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!currentUser || !selectedSiteId}
           >
-            <RefreshCcw size={16} aria-hidden="true" />
+            {boardState === "loading" ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <RefreshCcw size={16} aria-hidden="true" />}
             Refresh
           </button>
         </header>
@@ -885,7 +906,9 @@ export default function StaffPage() {
                   <p className="text-sm text-slate-600">Choose a staffed location.</p>
                 </div>
               </div>
-              {staffMemberships.length === 0 ? <p className="text-sm text-slate-500">No staff memberships.</p> : null}
+              {staffMemberships.length === 0 ? (
+                <p className="text-sm text-slate-500">No staff memberships. Ask a site admin to add this email.</p>
+              ) : null}
               <div className="grid gap-2">
                 {staffMemberships.map((membership) => (
                   <button
@@ -931,6 +954,21 @@ export default function StaffPage() {
                   {boardState === "loading" ? "Loading" : `${activeQueueBoard?.tickets.length ?? 0} active tickets`}
                 </div>
               </div>
+              {boardState === "error" ? (
+                <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <p>Queue board could not refresh. Existing ticket actions are paused until the board reloads.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void refreshBoard();
+                    }}
+                    className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] hover:bg-[#eefbfc]"
+                  >
+                    <RefreshCcw size={15} aria-hidden="true" />
+                    Retry board
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -952,12 +990,27 @@ export default function StaffPage() {
                   disabled={!currentUser || !selectedSiteId || opsState === "loading"}
                   className="inline-flex h-9 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <RefreshCcw size={15} aria-hidden="true" />
+                  {opsState === "loading" ? <Loader2 className="animate-spin" size={15} aria-hidden="true" /> : <RefreshCcw size={15} aria-hidden="true" />}
                   Reload
                 </button>
               </div>
 
               {!selectedSiteId ? <p className="text-sm text-slate-500">Select a site to manage operations.</p> : null}
+              {selectedSiteId && opsState === "error" ? (
+                <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <p>Operations controls could not load. Queue actions remain available from the board.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void refreshOps();
+                    }}
+                    className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] hover:bg-[#eefbfc]"
+                  >
+                    <RefreshCcw size={15} aria-hidden="true" />
+                    Retry operations
+                  </button>
+                </div>
+              ) : null}
 
               {selectedSiteId ? (
                 <div className="grid gap-5">
@@ -1316,7 +1369,9 @@ export default function StaffPage() {
 
                   <div className="grid gap-3">
                     {ticketsByStatus[status].length === 0 ? (
-                      <p className="rounded-md border border-dashed border-slate-200 p-4 text-sm text-slate-500">No tickets.</p>
+                      <p className="rounded-md border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                        {emptyStatusMessages[status]}
+                      </p>
                     ) : null}
 
                     {ticketsByStatus[status].map((ticket) => (

@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { createHmac } from "node:crypto";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 
 const defaultDatabaseUrl =
@@ -32,8 +33,35 @@ const e2eSiteId = "site-e2e-playwright";
 const e2eQueueId = "queue-e2e-playwright";
 const e2eSiteName = "E2E Clinic";
 const e2eQueueName = "E2E Walk-in";
-const e2eEmail = "e2e.staff@example.com";
+let e2eEmail = "e2e.staff@example.com";
 const e2eOtpCode = "123456";
+
+function getE2eEmail(testInfo: TestInfo) {
+  const slug = `${testInfo.project.name}-${testInfo.title}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48);
+
+  return `e2e.${slug}@example.com`;
+}
+
+function getE2eRequesterIp(testInfo: TestInfo, offset = 0) {
+  const source = `${testInfo.project.name}-${testInfo.title}-${offset}`;
+  const hash = [...source].reduce((value, character) => (value * 31 + character.charCodeAt(0)) % 200, 0);
+
+  return `198.51.100.${20 + hash}`;
+}
+
+function hashOtpForTest(email: string, code: string) {
+  const sessionSecret = process.env.SESSION_SECRET;
+
+  if (!sessionSecret) {
+    throw new Error("SESSION_SECRET is required for E2E OTP verification");
+  }
+
+  return createHmac("sha256", sessionSecret).update(`otp:${email}:${code}`).digest("base64url");
+}
 
 async function resetE2eData() {
   const user = await prisma.user.findUnique({
@@ -149,8 +177,18 @@ async function signIn(page: Page, emailPlaceholder: string) {
   await expect(
     page.getByText("Enter the verification code sent to your email."),
   ).toBeVisible();
+  await prisma.otpChallenge.updateMany({
+    where: {
+      email: e2eEmail,
+      verifiedAt: null,
+    },
+    data: {
+      codeHash: hashOtpForTest(e2eEmail, e2eOtpCode),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    },
+  });
   await page.getByPlaceholder("6-digit code").fill(e2eOtpCode);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Signed in.")).toBeVisible();
 }
 
@@ -182,7 +220,11 @@ async function expectLatestE2eTicketStatus(status: string) {
     .toBe(status);
 }
 
-test.beforeEach(async () => {
+test.beforeEach(async ({ page }, testInfo) => {
+  e2eEmail = getE2eEmail(testInfo);
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": getE2eRequesterIp(testInfo),
+  });
   await resetE2eData();
 });
 
@@ -315,9 +357,27 @@ test("lets staff close a queue and blocks patient check-ins", async ({
 
   await page.goto("/");
   await selectE2eSite(page);
-  await page.getByRole("radio", { name: new RegExp(e2eQueueName) }).check();
-  await page.getByRole("button", { name: "Check in" }).click();
-  await expect(page.getByText("This queue is currently closed.")).toBeVisible();
+  await expect(
+    page.getByText("All queues are closed. Choose another clinic or check back later."),
+  ).toBeVisible();
+  await expect(page.getByRole("radio", { name: new RegExp(e2eQueueName) })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Queue closed" })).toBeDisabled();
+  const closedCheckIn = await page.evaluate(async (queueId) => {
+    const response = await fetch("/api/sites/site-e2e-playwright/check-ins", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ queueId }),
+    });
+
+    return {
+      body: await response.json(),
+      status: response.status,
+    };
+  }, e2eQueueId);
+  expect(closedCheckIn).toMatchObject({
+    body: { error: "queue_closed" },
+    status: 409,
+  });
 
   await page.goto("/staff");
   await selectE2eSite(page);
@@ -325,8 +385,23 @@ test("lets staff close a queue and blocks patient check-ins", async ({
   await expect(page.getByText("Open to check-ins")).toBeVisible();
 });
 
-test("covers patient check-in and staff queue transitions", async ({ page }) => {
-  await page.setExtraHTTPHeaders({ "x-forwarded-for": "198.51.100.10" });
+test("shows launch-safe empty staff board states", async ({ page }) => {
+  await page.goto("/staff");
+  await signIn(page, "staff@example.com");
+  await selectE2eSite(page);
+
+  await expect(page.getByText("0 active tickets")).toBeVisible();
+  await expect(staffColumn(page, "Waiting")).toContainText("No patients waiting.");
+  await expect(staffColumn(page, "Delayed")).toContainText("No delayed patients.");
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+});
+
+test("covers patient check-in and staff queue transitions", async ({
+  page,
+}, testInfo) => {
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": getE2eRequesterIp(testInfo, 1),
+  });
 
   await page.goto("/");
   await signIn(page, "you@example.com");
@@ -339,7 +414,9 @@ test("covers patient check-in and staff queue transitions", async ({ page }) => 
   await page.getByLabel("Sign out").click();
   await expect(page.getByPlaceholder("you@example.com")).toBeVisible();
 
-  await page.setExtraHTTPHeaders({ "x-forwarded-for": "198.51.100.11" });
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": getE2eRequesterIp(testInfo, 2),
+  });
   await page.goto("/staff");
   await signIn(page, "staff@example.com");
   await expect(
@@ -386,7 +463,7 @@ test("covers patient check-in and staff queue transitions", async ({ page }) => 
     .getByRole("button", { name: "Complete" })
     .click();
   await expect(page.getByText("0 active tickets")).toBeVisible();
-  await expect(staffColumn(page, "In service")).toContainText("No tickets.");
+  await expect(staffColumn(page, "In service")).toContainText("No patients in service.");
   await expectLatestE2eTicketStatus("completed");
 
   await page.goto("/");

@@ -85,6 +85,18 @@ function getMessage(error: unknown) {
     return "This queue is currently closed.";
   }
 
+  if (error.error === "otp_delivery_unavailable") {
+    return "We could not send a code right now. Try again later or contact the clinic.";
+  }
+
+  if (error.error === "invalid_otp") {
+    return "Enter the latest 6-digit verification code.";
+  }
+
+  if (error.error === "rate_limited") {
+    return "Too many attempts. Wait a few minutes before trying again.";
+  }
+
   return "Request failed. Try again.";
 }
 
@@ -147,6 +159,8 @@ export default function Home() {
   const [locationState, setLocationState] = useState<LocationState>("idle");
   const [userLocation, setUserLocation] = useState<BrowserLocation | null>(null);
   const [locationSelectedSiteId, setLocationSelectedSiteId] = useState<string | null>(null);
+  const [sitesReloadKey, setSitesReloadKey] = useState(0);
+  const [queuesReloadKey, setQueuesReloadKey] = useState(0);
   const [message, setMessage] = useState("");
 
   const selectedSite = useMemo(() => {
@@ -156,6 +170,24 @@ export default function Home() {
   const activeSiteTicket = useMemo(() => {
     return tickets.find((ticket) => ticket.siteId === selectedSiteId) ?? null;
   }, [selectedSiteId, tickets]);
+
+  const selectedQueue = useMemo(() => {
+    return queues.find((queue) => queue.id === selectedQueueId) ?? null;
+  }, [queues, selectedQueueId]);
+
+  const hasOpenQueue = useMemo(() => {
+    return queues.some((queue) => queue.isOpen);
+  }, [queues]);
+
+  const canCheckIn = Boolean(currentUser && selectedQueue?.isOpen && !activeSiteTicket && checkInState !== "loading");
+
+  const checkInButtonLabel = queues.length > 0 && !hasOpenQueue
+      ? "Queue closed"
+      : !currentUser
+        ? "Sign in to check in"
+        : !selectedQueue
+          ? "Select an open queue"
+          : "Check in";
 
   const orderedSites = useMemo(() => {
     if (!userLocation) {
@@ -242,6 +274,23 @@ export default function Home() {
     }
   }, [clearPatientSession, currentUser]);
 
+  const refreshTickets = useCallback(async () => {
+    if (!currentUser) {
+      return;
+    }
+
+    setTicketState("loading");
+    setMessage("");
+
+    try {
+      await loadTickets();
+      setTicketState("success");
+    } catch (error) {
+      setTicketState("error");
+      setMessage(getMessage(error));
+    }
+  }, [currentUser, loadTickets]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -278,7 +327,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [clearPatientSession, loadCurrentUser]);
+  }, [clearPatientSession, loadCurrentUser, sitesReloadKey]);
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -347,11 +396,11 @@ export default function Home() {
 
         setQueues(data.queues);
         setSelectedQueueId((current) => {
-          if (data.queues.some((queue) => queue.id === current)) {
+          if (data.queues.some((queue) => queue.id === current && queue.isOpen)) {
             return current;
           }
 
-          return data.queues[0]?.id || "";
+          return data.queues.find((queue) => queue.isOpen)?.id || "";
         });
         setQueuesState("success");
       } catch (error) {
@@ -367,7 +416,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [selectedSiteId]);
+  }, [queuesReloadKey, selectedSiteId]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -382,20 +431,8 @@ export default function Home() {
   }, [currentUser, loadNotificationPreferences]);
 
   useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
-
-    setTicketState("loading");
-    loadTickets()
-      .then(() => {
-        setTicketState("success");
-      })
-      .catch((error: unknown) => {
-        setTicketState("error");
-        setMessage(getMessage(error));
-      });
-  }, [currentUser, loadTickets]);
+    void refreshTickets();
+  }, [refreshTickets]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -522,7 +559,7 @@ export default function Home() {
   }
 
   async function checkIn() {
-    if (!selectedSiteId || !selectedQueueId) {
+    if (!selectedSiteId || !selectedQueue?.isOpen) {
       return;
     }
 
@@ -533,7 +570,7 @@ export default function Home() {
       const response = await fetch(`/api/sites/${selectedSiteId}/check-ins`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ queueId: selectedQueueId }),
+        body: JSON.stringify({ queueId: selectedQueue.id }),
       });
 
       const data = await readApiResponse(response, checkInResponseSchema);
@@ -608,12 +645,12 @@ export default function Home() {
             <button
               type="button"
               onClick={() => {
-                void loadTickets();
+                void refreshTickets();
               }}
               className="inline-flex h-10 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] shadow-sm hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!currentUser}
+              disabled={!currentUser || ticketState === "loading"}
             >
-              <RefreshCcw size={16} aria-hidden="true" />
+              {ticketState === "loading" ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <RefreshCcw size={16} aria-hidden="true" />}
               Refresh
             </button>
           </header>
@@ -648,6 +685,24 @@ export default function Home() {
             {sitesState === "loading" ? (
               <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm">
                 Loading clinics...
+              </div>
+            ) : null}
+            {sitesState === "error" ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm md:col-span-2">
+                <p>Clinics could not load.</p>
+                <button
+                  type="button"
+                  onClick={() => setSitesReloadKey((value) => value + 1)}
+                  className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-[#b9eaee] px-3 text-sm font-medium text-[#087884] hover:bg-[#eefbfc]"
+                >
+                  <RefreshCcw size={15} aria-hidden="true" />
+                  Retry
+                </button>
+              </div>
+            ) : null}
+            {sitesState === "success" && orderedSites.length === 0 ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-500 shadow-sm md:col-span-2">
+                No clinics are available yet.
               </div>
             ) : null}
             {orderedSites.map((site) => (
@@ -685,12 +740,35 @@ export default function Home() {
 
             <div className="grid gap-3">
               {queuesState === "loading" ? <p className="text-sm text-slate-500">Loading queues...</p> : null}
+              {queuesState === "error" ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <p>Queues could not load for this clinic.</p>
+                  <button
+                    type="button"
+                    onClick={() => setQueuesReloadKey((value) => value + 1)}
+                    className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] hover:bg-[#eefbfc]"
+                  >
+                    <RefreshCcw size={15} aria-hidden="true" />
+                    Retry
+                  </button>
+                </div>
+              ) : null}
+              {queuesState === "success" && queues.length === 0 ? (
+                <p className="rounded-md border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                  No queues are available for this clinic yet.
+                </p>
+              ) : null}
+              {queuesState === "success" && queues.length > 0 && !hasOpenQueue ? (
+                <p className="rounded-md border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                  All queues are closed. Choose another clinic or check back later.
+                </p>
+              ) : null}
               {queues.map((queue) => (
                 <label
                   key={queue.id}
-                  className={`flex cursor-pointer items-center justify-between gap-4 rounded-md border p-4 ${
+                  className={`flex items-center justify-between gap-4 rounded-md border p-4 ${
                     selectedQueueId === queue.id ? "border-[#10b9c4] bg-[#eefbfc]" : "border-slate-200"
-                  }`}
+                  } ${queue.isOpen ? "cursor-pointer" : "cursor-not-allowed bg-slate-50 opacity-75"}`}
                 >
                   <span>
                     <span className="block font-medium text-slate-950">{queue.name}</span>
@@ -702,6 +780,7 @@ export default function Home() {
                     value={queue.id}
                     checked={selectedQueueId === queue.id}
                     onChange={() => setSelectedQueueId(queue.id)}
+                    disabled={!queue.isOpen}
                     className="size-4 accent-[#10b9c4]"
                   />
                 </label>
@@ -718,6 +797,11 @@ export default function Home() {
                     {ticketStatusLabels[activeSiteTicket.status]}
                   </span>
                 </div>
+                {activeSiteTicket.status === "delay" ? (
+                  <p className="mt-2 text-sm text-emerald-900">
+                    You are delayed. Check in with staff when you arrive or wait for your ticket to be restored.
+                  </p>
+                ) : null}
               </div>
             ) : (
               <button
@@ -725,11 +809,11 @@ export default function Home() {
                 onClick={() => {
                   void checkIn();
                 }}
-                disabled={!selectedQueueId || checkInState === "loading"}
+                disabled={!canCheckIn}
                 className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {checkInState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : <Check size={17} aria-hidden="true" />}
-                Check in
+                {checkInButtonLabel}
               </button>
             )}
           </section>
@@ -817,7 +901,22 @@ export default function Home() {
 
             {!currentUser ? <p className="text-sm text-slate-500">Sign in to view active tickets.</p> : null}
             {currentUser && ticketState === "loading" ? <p className="text-sm text-slate-500">Loading tickets...</p> : null}
-            {currentUser && tickets.length === 0 && ticketState !== "loading" ? (
+            {currentUser && ticketState === "error" ? (
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <p>Tickets could not refresh.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void refreshTickets();
+                  }}
+                  className="mt-3 inline-flex h-9 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] hover:bg-[#eefbfc]"
+                >
+                  <RefreshCcw size={15} aria-hidden="true" />
+                  Retry
+                </button>
+              </div>
+            ) : null}
+            {currentUser && tickets.length === 0 && ticketState !== "loading" && ticketState !== "error" ? (
               <p className="text-sm text-slate-500">No active tickets.</p>
             ) : null}
             <div className="grid gap-3">

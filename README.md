@@ -157,12 +157,15 @@ pnpm build
 pnpm db:validate
 pnpm verify:outbox
 pnpm verify:ops
+pnpm verify:launch
 pnpm e2e
 ```
 
 `pnpm verify:outbox` creates scoped verification rows, runs the worker outbox processor against those rows only, checks processed/retry/failed transitions, and removes the rows it created.
 
 `pnpm verify:ops` prints safe operational JSON for outbox status counts, oldest pending job age, failed almost-ready email jobs, active ticket counts, and current map guardrail state. It exits non-zero when failed outbox jobs, stale processing jobs, failed email jobs, or enabled map guardrail misconfiguration need operator attention.
+
+`pnpm verify:launch` prints safe launch-readiness JSON for required database and Redis configuration, session hardening, HTTPS origin settings, loopback web binding, OTP debug flags, SMTP readiness, and map-provider cost guardrails. It treats `APP_ENV=staging`, `APP_ENV=production`, and `NODE_ENV=production` as launch-like environments and exits non-zero when fail-closed settings are not ready.
 
 Install the Playwright Chromium browser once before running E2E tests locally:
 
@@ -297,10 +300,10 @@ Or run the bundled staging verifier from the EC2 checkout:
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh
-QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true bash deploy/verify-staging.sh
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_LAUNCH=true bash deploy/verify-staging.sh
 ```
 
-The verifier checks the Compose service state, healthchecks for web/API/worker/PostgreSQL/Redis, the loopback web endpoint, API health and readiness from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` runs the scoped outbox processor verification against the staging database. `QDOC_VERIFY_OPS=true` runs the safe operational summary for queue, notification, outbox, and map guardrail state.
+The verifier checks the Compose service state, healthchecks for web/API/worker/PostgreSQL/Redis, the loopback web endpoint, API health and readiness from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` runs the scoped outbox processor verification against the staging database. `QDOC_VERIFY_OPS=true` runs the safe operational summary for queue, notification, outbox, and map guardrail state. `QDOC_VERIFY_LAUNCH=true` runs the fail-closed launch hardening checks for secrets, OTP debug flags, SMTP readiness, web binding, and map budget controls.
 
 Useful SSM and host checks:
 
@@ -321,12 +324,51 @@ Rollback:
 4. Run `QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh`.
 5. If the rollback crosses database migrations, check the migration contents first. The current MVP deploy path only runs forward Prisma deploy migrations and does not implement automatic down migrations.
 
+Database backup and restore:
+
+1. Create a PostgreSQL custom-format backup from the running Compose database:
+
+```bash
+QDOC_BACKUP_DIR=/opt/qdoc/backups bash deploy/db-backup.sh
+```
+
+The backup script defaults to `compose.staging.yaml` and `.env.staging`. For local verification, point it at the local Compose stack:
+
+```bash
+QDOC_COMPOSE_FILE=compose.yaml QDOC_ENV_FILE=.env QDOC_BACKUP_DIR=/tmp/qdoc-backups bash deploy/db-backup.sh
+```
+
+2. Copy the backup to encrypted off-host storage controlled by the operating AWS account. Backup files contain patient, staff, queue, audit, notification, and OTP challenge metadata, so do not place them in Git, public buckets, screenshots, chat logs, or workflow artifacts. The repository ignores `backups/`, but that is only a local safety net.
+3. Verify that a backup can be restored into a temporary database without changing the primary database:
+
+```bash
+QDOC_COMPOSE_FILE=compose.yaml QDOC_ENV_FILE=.env bash deploy/db-restore-check.sh /tmp/qdoc-backups/<backup-file>.dump
+```
+
+4. Restore the primary database only during an approved recovery window. The restore is destructive and requires an explicit confirmation variable:
+
+```bash
+QDOC_RESTORE_CONFIRM=restore-qdoc bash deploy/db-restore.sh /opt/qdoc/backups/<backup-file>.dump
+```
+
+5. After restore, run `QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_LAUNCH=true bash deploy/verify-staging.sh` and complete the manual patient and staff smoke checks.
+
+Launch hardening checklist:
+
+1. Public exposure matches the documented boundary: only host Caddy listens on public `80/443`; `compose.staging.yaml` publishes web to `127.0.0.1:${QDOC_WEB_PORT}`; API, PostgreSQL, Redis, worker, migrate, and seed are private Compose services.
+2. `pnpm verify:launch` passes with the staging or production environment loaded. In launch-like environments, `APP_URL` must be HTTPS, `SESSION_SECRET` must be a long non-placeholder value, `QDOC_WEB_BIND` must stay `127.0.0.1`, OTP debug flags must be disabled, and SMTP must be configured.
+3. Map providers stay disabled until provider console restrictions, browser credentials, `MAP_MONTHLY_MAP_LOAD_LIMIT`, and QDoc map usage rate limits are configured. When a provider is enabled, QDoc refuses map loads after the configured monthly hard limit is exhausted.
+4. Backup and temporary-restore verification has passed for the environment being launched.
+5. Load and failure smoke checks have no launch blockers: patient OTP/check-in, staff ticket transitions, SSE queue stream, worker retry behavior, map guardrail exhaustion, and public route health all behave as expected for initial usage.
+6. Rollback artifact and matching database backup are available before deployment, and the operator knows whether the release includes forward-only database migrations.
+7. Incident response starts with `deploy/verify-staging.sh`, service logs, `pnpm verify:ops`, and public Caddy checks; do not print secrets or OTP codes while collecting diagnostics.
+
 Artifact retention:
 
 - GitHub Actions keeps the compressed image workflow artifact for 3 days.
 - Configure the private S3 bucket lifecycle to keep `staging/` artifacts for 14 days, with at least the last known-good artifact available until the next deploy is verified.
 - The EC2 deploy script prunes unused Docker images after a successful Compose update, but rollback should use the S3 artifact as the source of truth.
-- Keep database backup and restore procedures outside this repo until the operating AWS account and retention policy are finalized.
+- Store database backups in encrypted off-host storage with an account-level retention policy. Keep at least one known-good backup for the currently running release until the next deployment and verification are complete.
 
 Deployment artifact review:
 

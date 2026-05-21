@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "verify:outbox": "node --import tsx src/verify-outbox.ts",
     "verify:ops": "node --import tsx src/verify-ops.ts",
+    "verify:launch": "node --import tsx src/verify-launch.ts",
     "build": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit"

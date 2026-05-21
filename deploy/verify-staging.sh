@@ -5,6 +5,7 @@ COMPOSE_FILE="${QDOC_COMPOSE_FILE:-compose.staging.yaml}"
 ENV_FILE="${QDOC_ENV_FILE:-.env.staging}"
 RUN_OUTBOX="${QDOC_VERIFY_OUTBOX:-false}"
 RUN_OPS="${QDOC_VERIFY_OPS:-false}"
+RUN_LAUNCH="${QDOC_VERIFY_LAUNCH:-false}"
 
 env_file_value() {
   local key="$1"
@@ -114,6 +115,13 @@ if [ "$RUN_OPS" = "true" ]; then
   compose run --rm --no-deps worker pnpm verify:ops
 else
   log "Skipping operational verification; set QDOC_VERIFY_OPS=true to enable it"
+fi
+
+if [ "$RUN_LAUNCH" = "true" ]; then
+  log "Running launch hardening verification in the staging image"
+  compose run --rm --no-deps worker pnpm verify:launch
+else
+  log "Skipping launch hardening verification; set QDOC_VERIFY_LAUNCH=true to enable it"
 fi
 
 log "Staging verification passed"

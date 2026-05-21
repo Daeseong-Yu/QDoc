@@ -134,6 +134,7 @@ export const staffSiteSettingsSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   distanceKm: z.number().nonnegative(),
+  notificationAheadCount: z.number().int().min(0).max(10),
   addressLine1: z.string().nullable(),
   city: z.string().nullable(),
   region: z.string().nullable(),
@@ -149,6 +150,7 @@ export const staffSiteSettingsInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
     distanceKm: z.number().nonnegative().optional(),
+    notificationAheadCount: z.number().int().min(0).max(10).optional(),
     addressLine1: optionalNullableStringSchema,
     city: optionalNullableStringSchema,
     region: optionalNullableStringSchema,
@@ -260,6 +262,24 @@ export const patientNotificationSummarySchema = z.object({
 
 export type PatientNotificationSummary = z.infer<typeof patientNotificationSummarySchema>;
 
+export const patientNotificationPreferencesSchema = z.object({
+  emailNotificationsEnabled: z.boolean(),
+});
+
+export type PatientNotificationPreferences = z.infer<typeof patientNotificationPreferencesSchema>;
+
+export const patientNotificationPreferencesInputSchema = z.object({
+  emailNotificationsEnabled: z.boolean(),
+});
+
+export type PatientNotificationPreferencesInput = z.infer<typeof patientNotificationPreferencesInputSchema>;
+
+export const patientNotificationPreferencesResponseSchema = z.object({
+  preferences: patientNotificationPreferencesSchema,
+});
+
+export type PatientNotificationPreferencesResponse = z.infer<typeof patientNotificationPreferencesResponseSchema>;
+
 export const patientTicketSummarySchema = z.object({
   id: z.string(),
   siteId: z.string(),
@@ -345,6 +365,26 @@ export const staffMapSettingsInputSchema = z.object({
 
 export type StaffMapSettingsInput = z.infer<typeof staffMapSettingsInputSchema>;
 
+export const staffNotificationFailureSummarySchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  status: z.string(),
+  attempts: z.number().int().nonnegative(),
+  availableAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type StaffNotificationFailureSummary = z.infer<typeof staffNotificationFailureSummarySchema>;
+
+export const staffNotificationHealthSchema = z.object({
+  pendingOutboxCount: z.number().int().nonnegative(),
+  processingOutboxCount: z.number().int().nonnegative(),
+  failedOutboxCount: z.number().int().nonnegative(),
+  recentFailures: staffNotificationFailureSummarySchema.array(),
+});
+
+export type StaffNotificationHealth = z.infer<typeof staffNotificationHealthSchema>;
+
 export const staffSiteOpsResponseSchema = z.object({
   role: membershipRoleSchema,
   canManageMapSettings: z.boolean(),
@@ -352,6 +392,7 @@ export const staffSiteOpsResponseSchema = z.object({
   queues: staffQueueSummarySchema.array(),
   memberships: staffMembershipSummarySchema.array(),
   mapSettings: staffMapSettingsResponseSchema.nullable(),
+  notificationHealth: staffNotificationHealthSchema,
   auditLogs: staffAuditLogSummarySchema.array(),
 });
 

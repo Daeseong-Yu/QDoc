@@ -7,6 +7,8 @@ import {
   currentUserSchema,
   otpRequestInputSchema,
   otpVerifyInputSchema,
+  patientNotificationPreferencesInputSchema,
+  patientNotificationPreferencesResponseSchema,
   patientQueuesResponseSchema,
   patientSitesResponseSchema,
   type CurrentUser,
@@ -140,6 +142,8 @@ export default function Home() {
   const [ticketState, setTicketState] = useState<RequestState>("idle");
   const [authState, setAuthState] = useState<RequestState>("idle");
   const [checkInState, setCheckInState] = useState<RequestState>("idle");
+  const [preferencesState, setPreferencesState] = useState<RequestState>("idle");
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
   const [locationState, setLocationState] = useState<LocationState>("idle");
   const [userLocation, setUserLocation] = useState<BrowserLocation | null>(null);
   const [locationSelectedSiteId, setLocationSelectedSiteId] = useState<string | null>(null);
@@ -181,6 +185,8 @@ export default function Home() {
     setCurrentUser(null);
     setTickets([]);
     setTicketState("idle");
+    setPreferencesState("idle");
+    setEmailNotificationsEnabled(true);
   }, []);
 
   const loadTickets = useCallback(async () => {
@@ -212,6 +218,29 @@ export default function Home() {
     const user = await readApiResponse(response, currentUserSchema);
     setCurrentUser(user);
   }, [clearPatientSession]);
+
+  const loadNotificationPreferences = useCallback(async () => {
+    if (!currentUser) {
+      return;
+    }
+
+    setPreferencesState("loading");
+
+    try {
+      const response = await fetch("/api/patients/me/notification-preferences", { cache: "no-store" });
+      const data = await readApiResponse(response, patientNotificationPreferencesResponseSchema);
+      setEmailNotificationsEnabled(data.preferences.emailNotificationsEnabled);
+      setPreferencesState("success");
+    } catch (error) {
+      if (isApiError(error) && error.status === 401) {
+        clearPatientSession();
+      } else {
+        setPreferencesState("error");
+      }
+
+      throw error;
+    }
+  }, [clearPatientSession, currentUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -339,6 +368,18 @@ export default function Home() {
       cancelled = true;
     };
   }, [selectedSiteId]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    void loadNotificationPreferences().catch((error: unknown) => {
+      if (!isApiError(error) || error.status !== 401) {
+        setMessage(getMessage(error));
+      }
+    });
+  }, [currentUser, loadNotificationPreferences]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -505,6 +546,39 @@ export default function Home() {
       }
 
       setCheckInState("error");
+      setMessage(getMessage(error));
+    }
+  }
+
+  async function updateEmailNotificationsEnabled(nextValue: boolean) {
+    const input = patientNotificationPreferencesInputSchema.safeParse({
+      emailNotificationsEnabled: nextValue,
+    });
+
+    if (!input.success) {
+      setMessage("Check notification settings before saving.");
+      return;
+    }
+
+    setPreferencesState("loading");
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/patients/me/notification-preferences", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input.data),
+      });
+      const data = await readApiResponse(response, patientNotificationPreferencesResponseSchema);
+      setEmailNotificationsEnabled(data.preferences.emailNotificationsEnabled);
+      setPreferencesState("success");
+      setMessage("Notification settings saved.");
+    } catch (error) {
+      if (isApiError(error) && error.status === 401) {
+        clearPatientSession();
+      }
+
+      setPreferencesState("error");
       setMessage(getMessage(error));
     }
   }
@@ -715,6 +789,20 @@ export default function Home() {
                   {authStep === "email" ? "Send code" : "Sign in"}
                 </button>
               </div>
+            ) : null}
+            {currentUser ? (
+              <label className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm text-slate-700">
+                <span>Email almost-ready alerts</span>
+                <input
+                  type="checkbox"
+                  checked={emailNotificationsEnabled}
+                  onChange={(event) => {
+                    void updateEmailNotificationsEnabled(event.target.checked);
+                  }}
+                  disabled={preferencesState === "loading"}
+                  className="size-4 accent-[#10b9c4] disabled:cursor-not-allowed"
+                />
+              </label>
             ) : null}
           </section>
 

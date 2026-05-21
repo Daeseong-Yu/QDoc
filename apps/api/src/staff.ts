@@ -8,6 +8,7 @@ import {
   staffMembershipInputSchema,
   staffMembershipRoleInputSchema,
   staffMembershipSummarySchema,
+  staffNotificationHealthSchema,
   staffQueueResponseSchema,
   staffQueueSettingsInputSchema,
   staffQueueSummarySchema,
@@ -96,6 +97,7 @@ const ticketStatusLabels: Record<TicketStatus, string> = {
 };
 
 const almostReadyMessage = "Your turn is coming up. Please stay nearby.";
+const notificationOutboxTypes = ["ticket.status_changed", "ticket.almost_ready_email"];
 
 function maskEmail(email: string) {
   const atIndex = email.lastIndexOf("@");
@@ -382,6 +384,7 @@ function serializeSiteSettings(site: {
   id: string;
   name: string;
   distanceKm: number;
+  notificationAheadCount: number;
   addressLine1: string | null;
   city: string | null;
   region: string | null;
@@ -448,6 +451,70 @@ async function getSiteAuditLogs(siteId: string) {
   );
 }
 
+async function getSiteNotificationHealth(siteId: string) {
+  const notificationOutboxFilter = {
+    type: {
+      in: notificationOutboxTypes,
+    },
+    payload: {
+      path: ["siteId"],
+      equals: siteId,
+    },
+  };
+  const [pendingOutboxCount, processingOutboxCount, failedOutboxCount, recentFailures] = await Promise.all([
+    prisma.outbox.count({
+      where: {
+        ...notificationOutboxFilter,
+        status: "pending",
+      },
+    }),
+    prisma.outbox.count({
+      where: {
+        ...notificationOutboxFilter,
+        status: "processing",
+      },
+    }),
+    prisma.outbox.count({
+      where: {
+        ...notificationOutboxFilter,
+        status: "failed",
+      },
+    }),
+    prisma.outbox.findMany({
+      where: {
+        ...notificationOutboxFilter,
+        status: "failed",
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+      take: 5,
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        attempts: true,
+        availableAt: true,
+        updatedAt: true,
+      },
+    }),
+  ]);
+
+  return staffNotificationHealthSchema.parse({
+    pendingOutboxCount,
+    processingOutboxCount,
+    failedOutboxCount,
+    recentFailures: recentFailures.map((failure) => ({
+      id: failure.id,
+      type: failure.type,
+      status: failure.status,
+      attempts: failure.attempts,
+      availableAt: failure.availableAt.toISOString(),
+      updatedAt: failure.updatedAt.toISOString(),
+    })),
+  });
+}
+
 async function getSiteMemberships(siteId: string) {
   const memberships = await prisma.membership.findMany({
     where: { siteId },
@@ -471,6 +538,7 @@ async function getStaffSiteOpsPayload(siteId: string, role: MembershipRole, curr
       id: true,
       name: true,
       distanceKm: true,
+      notificationAheadCount: true,
       addressLine1: true,
       city: true,
       region: true,
@@ -496,6 +564,7 @@ async function getStaffSiteOpsPayload(siteId: string, role: MembershipRole, curr
   }
 
   const canManageMapSettings = isMapSettingsAdmin(currentUser);
+  const notificationHealth = await getSiteNotificationHealth(siteId);
   const [memberships, mapSettings, auditLogs] =
     role === "admin"
       ? await Promise.all([
@@ -512,6 +581,7 @@ async function getStaffSiteOpsPayload(siteId: string, role: MembershipRole, curr
     queues: site.queues,
     memberships,
     mapSettings,
+    notificationHealth,
     auditLogs,
   });
 }
@@ -601,6 +671,7 @@ export async function handleStaffSiteSettings(request: IncomingMessage, response
       id: true,
       name: true,
       distanceKm: true,
+      notificationAheadCount: true,
       addressLine1: true,
       city: true,
       region: true,
@@ -627,6 +698,7 @@ export async function handleStaffSiteSettings(request: IncomingMessage, response
       data: {
         name: input.data.name,
         distanceKm: input.data.distanceKm,
+        notificationAheadCount: input.data.notificationAheadCount,
         addressLine1: input.data.addressLine1,
         city: input.data.city,
         region: input.data.region,
@@ -645,6 +717,7 @@ export async function handleStaffSiteSettings(request: IncomingMessage, response
         id: true,
         name: true,
         distanceKm: true,
+        notificationAheadCount: true,
         addressLine1: true,
         city: true,
         region: true,
@@ -1141,6 +1214,11 @@ export async function handleStaffTicketAction(
       queueId: true,
       userId: true,
       status: true,
+      site: {
+        select: {
+          notificationAheadCount: true,
+        },
+      },
     },
   });
 
@@ -1267,37 +1345,42 @@ export async function handleStaffTicketAction(
         user: {
           select: {
             email: true,
+            emailNotificationsEnabled: true,
           },
         },
       },
     });
 
-    for (const queueTicket of waitingTickets.slice(0, 3)) {
-      const existingInAppAlmostReadyNotification = await tx.notificationLog.findFirst({
-        where: {
-          ticketId: queueTicket.id,
-          channel: "in_app",
-          message: almostReadyMessage,
-        },
-        select: {
-          id: true,
-        },
-      });
+    const notificationAheadCount = ticket.site.notificationAheadCount;
 
-      if (!existingInAppAlmostReadyNotification) {
-        await tx.notificationLog.create({
-          data: {
+    if (notificationAheadCount > 0) {
+      for (const queueTicket of waitingTickets.slice(0, notificationAheadCount + 1)) {
+        const existingInAppAlmostReadyNotification = await tx.notificationLog.findFirst({
+          where: {
             ticketId: queueTicket.id,
             channel: "in_app",
             message: almostReadyMessage,
           },
+          select: {
+            id: true,
+          },
         });
+
+        if (!existingInAppAlmostReadyNotification) {
+          await tx.notificationLog.create({
+            data: {
+              ticketId: queueTicket.id,
+              channel: "in_app",
+              message: almostReadyMessage,
+            },
+          });
+        }
       }
     }
 
-    const almostReadyTicket = waitingTickets[2];
+    const almostReadyTicket = notificationAheadCount > 0 ? waitingTickets[notificationAheadCount] : null;
 
-    if (almostReadyTicket) {
+    if (almostReadyTicket?.user.emailNotificationsEnabled) {
       const existingAlmostReadyNotification = await tx.notificationLog.findFirst({
         where: {
           ticketId: almostReadyTicket.id,
@@ -1329,7 +1412,7 @@ export async function handleStaffTicketAction(
               queueName: almostReadyTicket.queue.name,
               userId: almostReadyTicket.userId,
               userEmail: almostReadyTicket.user.email,
-              aheadCount: 2,
+              aheadCount: notificationAheadCount,
               notificationLogId: almostReadyNotification.id,
             },
           },

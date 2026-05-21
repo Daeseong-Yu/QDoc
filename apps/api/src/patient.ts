@@ -4,6 +4,8 @@ import {
   activeTicketStatuses,
   checkInInputSchema,
   checkInResponseSchema,
+  patientNotificationPreferencesInputSchema,
+  patientNotificationPreferencesResponseSchema,
   patientQueuesResponseSchema,
   patientSitesResponseSchema,
   type TicketStatus,
@@ -297,6 +299,79 @@ async function getActiveTicketPayload(userId: string) {
   return activeTicketsResponseSchema.parse({
     tickets: tickets.map(serializePatientTicket),
   });
+}
+
+async function getPatientNotificationPreferencesPayload(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      emailNotificationsEnabled: true,
+    },
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  return patientNotificationPreferencesResponseSchema.parse({
+    preferences: {
+      emailNotificationsEnabled: user.emailNotificationsEnabled,
+    },
+  });
+}
+
+export async function handlePatientNotificationPreferences(request: IncomingMessage, response: ServerResponse) {
+  const currentUser = await getCurrentUserFromRequest(request);
+
+  if (!currentUser) {
+    sendJson(response, 401, { error: "unauthorized" });
+    return;
+  }
+
+  const payload = await getPatientNotificationPreferencesPayload(currentUser.id);
+
+  if (!payload) {
+    sendJson(response, 404, { error: "not_found" });
+    return;
+  }
+
+  sendJson(response, 200, payload);
+}
+
+export async function handleUpdatePatientNotificationPreferences(request: IncomingMessage, response: ServerResponse) {
+  const currentUser = await getCurrentUserFromRequest(request);
+
+  if (!currentUser) {
+    sendJson(response, 401, { error: "unauthorized" });
+    return;
+  }
+
+  const input = patientNotificationPreferencesInputSchema.safeParse(await readJson(request));
+
+  if (!input.success) {
+    sendJson(response, 400, { error: "invalid_request" });
+    return;
+  }
+
+  const user = await prisma.user.update({
+    where: { id: currentUser.id },
+    data: {
+      emailNotificationsEnabled: input.data.emailNotificationsEnabled,
+    },
+    select: {
+      emailNotificationsEnabled: true,
+    },
+  });
+
+  sendJson(
+    response,
+    200,
+    patientNotificationPreferencesResponseSchema.parse({
+      preferences: {
+        emailNotificationsEnabled: user.emailNotificationsEnabled,
+      },
+    }),
+  );
 }
 
 export async function handleActiveTicket(request: IncomingMessage, response: ServerResponse) {

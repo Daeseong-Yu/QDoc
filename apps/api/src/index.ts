@@ -4,7 +4,15 @@ import { handleLogout, handleMe, handleOtpRequest, handleOtpVerify } from "./aut
 import { getEmailDeliveryHealth } from "./email.js";
 import { sendJson } from "./http.js";
 import { handleMapConfig, handleMapUsage } from "./maps.js";
-import { handleActiveTicket, handleActiveTicketEvents, handleCheckIn, handleSiteQueues, handleSites } from "./patient.js";
+import {
+  handleActiveTicket,
+  handleActiveTicketEvents,
+  handleCheckIn,
+  handlePatientNotificationPreferences,
+  handleSiteQueues,
+  handleSites,
+  handleUpdatePatientNotificationPreferences,
+} from "./patient.js";
 import { handleReadiness } from "./readiness.js";
 import {
   handleCreateStaffMembership,
@@ -97,6 +105,16 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/patients/me/tickets/active") {
       await handleActiveTicket(request, response);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/patients/me/notification-preferences") {
+      await handlePatientNotificationPreferences(request, response);
+      return;
+    }
+
+    if (request.method === "PATCH" && url.pathname === "/patients/me/notification-preferences") {
+      await handleUpdatePatientNotificationPreferences(request, response);
       return;
     }
 

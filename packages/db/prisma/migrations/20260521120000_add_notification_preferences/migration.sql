@@ -1,0 +1,2 @@
+ALTER TABLE "Site" ADD COLUMN "notificationAheadCount" INTEGER NOT NULL DEFAULT 2;
+ALTER TABLE "User" ADD COLUMN "emailNotificationsEnabled" BOOLEAN NOT NULL DEFAULT true;

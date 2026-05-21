@@ -43,6 +43,7 @@ model Site {
   organizationId     String
   name               String
   distanceKm         Float          @default(0)
+  notificationAheadCount Int        @default(2)
   addressLine1       String?
   city               String?
   region             String?
@@ -76,6 +77,7 @@ model Queue {
 model User {
   id              String           @id @default(cuid())
   email           String           @unique
+  emailNotificationsEnabled Boolean @default(true)
   memberships     Membership[]
   patientProfile  PatientProfile?
   otpChallenges   OtpChallenge[]

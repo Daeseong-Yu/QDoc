@@ -55,6 +55,7 @@ type StaffMembership = CurrentUser["memberships"][number];
 type SiteSettingsForm = {
   name: string;
   distanceKm: string;
+  notificationAheadCount: string;
   addressLine1: string;
   city: string;
   region: string;
@@ -91,6 +92,7 @@ const mapSettingsResponseEnvelopeSchema = z.object({
 const emptySiteSettingsForm: SiteSettingsForm = {
   name: "",
   distanceKm: "0",
+  notificationAheadCount: "2",
   addressLine1: "",
   city: "",
   region: "",
@@ -216,6 +218,7 @@ function siteSettingsToForm(site: StaffSiteSettings): SiteSettingsForm {
   return {
     name: site.name,
     distanceKm: String(site.distanceKm),
+    notificationAheadCount: String(site.notificationAheadCount),
     addressLine1: site.addressLine1 ?? "",
     city: site.city ?? "",
     region: site.region ?? "",
@@ -629,6 +632,7 @@ export default function StaffPage() {
     const input = staffSiteSettingsInputSchema.safeParse({
       name: siteForm.name,
       distanceKm: Number(siteForm.distanceKm),
+      notificationAheadCount: Number.parseInt(siteForm.notificationAheadCount, 10),
       addressLine1: optionalText(siteForm.addressLine1),
       city: optionalText(siteForm.city),
       region: optionalText(siteForm.region),
@@ -997,6 +1001,50 @@ export default function StaffPage() {
                     </div>
                   </section>
 
+                  <section className="border-t border-slate-200 pt-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Bell size={18} className="text-[#0a8f9c]" aria-hidden="true" />
+                      <h3 className="font-semibold text-slate-950">Notification health</h3>
+                    </div>
+                    {ops?.notificationHealth ? (
+                      <div className="grid gap-3">
+                        <div className="grid gap-2 md:grid-cols-3">
+                          <div className="rounded-md border border-slate-200 px-3 py-3">
+                            <p className="text-xs font-medium uppercase text-slate-500">Pending</p>
+                            <p className="mt-1 text-xl font-semibold text-slate-950">{ops.notificationHealth.pendingOutboxCount}</p>
+                          </div>
+                          <div className="rounded-md border border-slate-200 px-3 py-3">
+                            <p className="text-xs font-medium uppercase text-slate-500">Processing</p>
+                            <p className="mt-1 text-xl font-semibold text-slate-950">{ops.notificationHealth.processingOutboxCount}</p>
+                          </div>
+                          <div className="rounded-md border border-slate-200 px-3 py-3">
+                            <p className="text-xs font-medium uppercase text-slate-500">Failed</p>
+                            <p className="mt-1 text-xl font-semibold text-slate-950">{ops.notificationHealth.failedOutboxCount}</p>
+                          </div>
+                        </div>
+                        <div className="grid gap-2">
+                          {ops.notificationHealth.recentFailures.length ? (
+                            ops.notificationHealth.recentFailures.map((failure) => (
+                              <div key={failure.id} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-semibold text-slate-950">{failure.type}</span>
+                                  <span className="text-xs text-slate-500">{new Date(failure.updatedAt).toLocaleString()}</span>
+                                </div>
+                                <p className="mt-1 text-xs uppercase text-slate-500">
+                                  {failure.status} · {failure.attempts} attempts · {failure.id.slice(0, 8)}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm text-slate-500">No failed notification jobs.</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">Loading notification health.</p>
+                    )}
+                  </section>
+
                   {canManageSiteOps ? (
                     <section className="border-t border-slate-200 pt-4">
                       <div className="mb-3 flex items-center gap-2">
@@ -1018,6 +1066,16 @@ export default function StaffPage() {
                           value={siteForm.distanceKm}
                           onChange={(event) => setSiteForm((value) => ({ ...value, distanceKm: event.target.value }))}
                           placeholder="Distance km"
+                          className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          step="1"
+                          value={siteForm.notificationAheadCount}
+                          onChange={(event) => setSiteForm((value) => ({ ...value, notificationAheadCount: event.target.value }))}
+                          placeholder="Notification ahead count"
                           className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
                         />
                         <input

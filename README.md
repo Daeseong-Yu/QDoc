@@ -305,6 +305,21 @@ QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS
 
 The verifier checks the Compose service state, healthchecks for web/API/worker/PostgreSQL/Redis, the loopback web endpoint, API health and readiness from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` runs the scoped outbox processor verification against the staging database. `QDOC_VERIFY_OPS=true` runs the safe operational summary for queue, notification, outbox, and map guardrail state. `QDOC_VERIFY_LAUNCH=true` runs the fail-closed launch hardening checks for secrets, OTP debug flags, SMTP readiness, web binding, and map budget controls.
 
+Launch-candidate staging rehearsal:
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_SOURCE_REF=<git-sha> QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha> bash deploy/staging-rehearsal.sh
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_REHEARSAL_BACKUP=true QDOC_BACKUP_DIR=/opt/qdoc/backups bash deploy/staging-rehearsal.sh
+```
+
+The rehearsal validates the Compose configuration, optional checkout SHA, optional app image tag, public route requirement, full staging verifier, outbox verification, operational checks, and launch hardening checks. When `QDOC_REHEARSAL_BACKUP=true`, it also creates a PostgreSQL custom-format backup and restores it into a temporary database through `deploy/db-restore-check.sh`; it never restores the primary database.
+
+For local command validation without running staging containers:
+
+```bash
+QDOC_ENV_FILE=.env.staging.example QDOC_REHEARSAL_DRY_RUN=true QDOC_REHEARSAL_REQUIRE_PUBLIC_URL=false bash deploy/staging-rehearsal.sh
+```
+
 Useful SSM and host checks:
 
 ```bash

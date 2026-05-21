@@ -17,6 +17,7 @@
     "verify:ops": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:ops",
     "verify:launch": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:launch",
     "verify:staging": "bash deploy/verify-staging.sh",
+    "verify:staging:rehearsal": "bash deploy/staging-rehearsal.sh",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

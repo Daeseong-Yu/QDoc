@@ -2,15 +2,23 @@
 set -euo pipefail
 
 COMPOSE_FILE="${QDOC_COMPOSE_FILE:-compose.staging.yaml}"
-ENV_FILE="${QDOC_ENV_FILE:-.env.staging}"
+ENV_FILE="${QDOC_ENV_FILE:-}"
 PUBLIC_URL="${QDOC_PUBLIC_URL:-}"
 BACKUP_DIR="${QDOC_BACKUP_DIR:-backups}"
-EXPECTED_SOURCE_REF="${QDOC_EXPECTED_SOURCE_REF:-}"
+EXPECTED_RELEASE_SHA="${QDOC_EXPECTED_RELEASE_SHA:-}"
 EXPECTED_APP_IMAGE="${QDOC_EXPECTED_APP_IMAGE:-}"
 DRY_RUN="${QDOC_REHEARSAL_DRY_RUN:-false}"
 REQUIRE_PUBLIC_URL="${QDOC_REHEARSAL_REQUIRE_PUBLIC_URL:-true}"
 RUN_BACKUP="${QDOC_REHEARSAL_BACKUP:-false}"
 RUN_LOAD_DRILLS="${QDOC_REHEARSAL_LOAD_DRILLS:-false}"
+
+if [ -z "$ENV_FILE" ]; then
+  if [ -f ".env.staging" ]; then
+    ENV_FILE=".env.staging"
+  else
+    ENV_FILE="/opt/qdoc/shared/.env.staging"
+  fi
+fi
 
 log() {
   printf '==> %s\n' "$*"
@@ -67,15 +75,14 @@ compose() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
-check_expected_source_ref() {
-  local current_ref
+check_expected_release_sha() {
+  local current_release
 
-  [ -z "$EXPECTED_SOURCE_REF" ] && return 0
-  [[ "$EXPECTED_SOURCE_REF" =~ ^[0-9a-fA-F]{40}$ ]] || fail "QDOC_EXPECTED_SOURCE_REF must be a 40-character Git SHA"
+  [ -z "$EXPECTED_RELEASE_SHA" ] && return 0
+  [[ "$EXPECTED_RELEASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || fail "QDOC_EXPECTED_RELEASE_SHA must be a 40-character Git SHA"
 
-  need_command git
-  current_ref="$(git rev-parse --verify HEAD)"
-  [ "$current_ref" = "$EXPECTED_SOURCE_REF" ] || fail "Checkout SHA mismatch: expected $EXPECTED_SOURCE_REF, got $current_ref"
+  current_release="$(basename "$(pwd -P)")"
+  [ "$current_release" = "$EXPECTED_RELEASE_SHA" ] || fail "Release directory mismatch: expected $EXPECTED_RELEASE_SHA, got $current_release"
 }
 
 check_expected_app_image() {
@@ -112,6 +119,8 @@ print_dry_run() {
 
 need_command docker
 
+[ -z "${QDOC_EXPECTED_SOURCE_REF:-}" ] || fail "QDOC_EXPECTED_SOURCE_REF is no longer supported; use QDOC_EXPECTED_RELEASE_SHA"
+
 [ -f "$COMPOSE_FILE" ] || fail "Compose file not found: $COMPOSE_FILE"
 [ -f "$ENV_FILE" ] || fail "Environment file not found: $ENV_FILE"
 
@@ -120,7 +129,7 @@ if is_true "$REQUIRE_PUBLIC_URL" && [ -z "$PUBLIC_URL" ]; then
 fi
 
 log "Checking release identity"
-check_expected_source_ref
+check_expected_release_sha
 check_expected_app_image
 
 log "Checking Compose configuration"

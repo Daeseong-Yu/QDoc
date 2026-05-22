@@ -2,7 +2,7 @@
 set -euo pipefail
 
 COMPOSE_FILE="${QDOC_COMPOSE_FILE:-compose.staging.yaml}"
-ENV_FILE="${QDOC_ENV_FILE:-.env.staging}"
+ENV_FILE="${QDOC_ENV_FILE:-}"
 DRY_RUN="${QDOC_DRILL_DRY_RUN:-false}"
 REQUESTS="${QDOC_DRILL_REQUESTS:-12}"
 TIMEOUT_SECONDS="${QDOC_DRILL_TIMEOUT_SECONDS:-5}"
@@ -14,6 +14,14 @@ RUN_LAUNCH="${QDOC_DRILL_VERIFY_LAUNCH:-true}"
 
 MAX_REQUESTS=60
 MAX_TIMEOUT_SECONDS=30
+
+if [ -z "$ENV_FILE" ]; then
+  if [ -f ".env.staging" ]; then
+    ENV_FILE=".env.staging"
+  else
+    ENV_FILE="/opt/qdoc/shared/.env.staging"
+  fi
+fi
 
 log() {
   printf '==> %s\n' "$*"

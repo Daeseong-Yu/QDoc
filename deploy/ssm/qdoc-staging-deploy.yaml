@@ -1,21 +1,25 @@
 schemaVersion: "2.2"
-description: Deploy QDoc staging artifact from S3.
+description: Deploy QDoc staging app and ops artifacts from S3.
 parameters:
-  artifactUri:
+  appArtifactUri:
     type: String
     description: S3 URI for the qdoc-app image artifact.
     allowedPattern: "^s3://[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]/staging/[0-9a-f]{40}/qdoc-app\\.tar\\.gz$"
+  opsBundleUri:
+    type: String
+    description: S3 URI for the qdoc-ops deployment bundle.
+    allowedPattern: "^s3://[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]/staging/[0-9a-f]{40}/qdoc-ops\\.tar\\.gz$"
   imageTag:
     type: String
     description: Docker image tag generated from the Git commit SHA.
     allowedPattern: "^[0-9a-f]{40}$"
-  sourceRef:
-    type: String
-    description: Git commit SHA to check out before running Compose.
-    allowedPattern: "^[0-9a-f]{40}$"
-  expectedSha256:
+  expectedAppSha256:
     type: String
     description: Expected SHA-256 digest for the compressed image artifact.
+    allowedPattern: "^[0-9a-f]{64}$"
+  expectedOpsSha256:
+    type: String
+    description: Expected SHA-256 digest for the compressed ops bundle.
     allowedPattern: "^[0-9a-f]{64}$"
 mainSteps:
   - action: aws:runShellScript
@@ -23,4 +27,166 @@ mainSteps:
     inputs:
       timeoutSeconds: "900"
       runCommand:
-        - /opt/qdoc/deploy/deploy-from-s3.sh "{{ artifactUri }}" "{{ imageTag }}" "{{ sourceRef }}" "{{ expectedSha256 }}"
+        - |
+          set -eu
+
+          APP_ARTIFACT_URI="{{ appArtifactUri }}"
+          OPS_BUNDLE_URI="{{ opsBundleUri }}"
+          IMAGE_TAG="{{ imageTag }}"
+          EXPECTED_APP_SHA256="{{ expectedAppSha256 }}"
+          EXPECTED_OPS_SHA256="{{ expectedOpsSha256 }}"
+          RELEASES_DIR="${QDOC_RELEASES_DIR:-/opt/qdoc/releases}"
+          RELEASE_DIR="${RELEASES_DIR}/${IMAGE_TAG}"
+          CURRENT_LINK="${QDOC_CURRENT_LINK:-/opt/qdoc/current}"
+          SHARED_ENV_FILE="${QDOC_ENV_FILE:-/opt/qdoc/shared/.env.staging}"
+          TRUSTED_DEPLOY_BUCKET_FILE="${QDOC_DEPLOY_BUCKET_FILE:-/opt/qdoc/shared/deploy-bucket}"
+          BOOTSTRAP_LOCK_FILE="${QDOC_BOOTSTRAP_LOCK_FILE:-/var/lock/qdoc-deploy-bootstrap.lock}"
+          TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/qdoc-ops.XXXXXX")"
+          OPS_PATH="${TMP_DIR}/qdoc-ops.tar.gz"
+          OPS_CHECKSUM_PATH="${TMP_DIR}/qdoc-ops.tar.gz.sha256"
+          OPS_MEMBERS_PATH="${TMP_DIR}/qdoc-ops.members"
+          OPS_LIST_PATH="${TMP_DIR}/qdoc-ops.list"
+
+          artifact_release_sha() {
+            uri="$1"
+            artifact_name="$2"
+
+            prefix="${uri%/${artifact_name}}"
+            printf '%s\n' "${prefix##*/}"
+          }
+
+          s3_bucket() {
+            uri_without_scheme="${1#s3://}"
+            printf '%s\n' "${uri_without_scheme%%/*}"
+          }
+
+          validate_ops_archive() {
+            tar -tzf "$OPS_PATH" > "$OPS_MEMBERS_PATH"
+            tar -tvf "$OPS_PATH" > "$OPS_LIST_PATH"
+
+            awk '
+              {
+                type = substr($1, 1, 1)
+                if (type != "-" && type != "d") {
+                  exit 1
+                }
+              }
+            ' "$OPS_LIST_PATH" || {
+              echo "Ops bundle contains non-file or non-directory entries" >&2
+              exit 65
+            }
+
+            while IFS= read -r member; do
+              case "$member" in
+                "" | /* | ../* | */../* | */..)
+                  echo "Unsafe ops bundle member: $member" >&2
+                  exit 65
+                  ;;
+              esac
+
+              case "$member" in
+                .env.staging.example | \
+                compose.staging.yaml | \
+                deploy/ | \
+                deploy/Caddyfile | \
+                deploy/db-backup.sh | \
+                deploy/db-restore-check.sh | \
+                deploy/db-restore.sh | \
+                deploy/deploy-from-s3.sh | \
+                deploy/load-failure-drills.sh | \
+                deploy/staging-rehearsal.sh | \
+                deploy/verify-staging.sh | \
+                deploy/ssm/ | \
+                deploy/ssm/qdoc-staging-deploy.yaml)
+                  ;;
+                *)
+                  echo "Unexpected ops bundle member: $member" >&2
+                  exit 65
+                  ;;
+              esac
+            done < "$OPS_MEMBERS_PATH"
+          }
+
+          cleanup() {
+            rm -rf "$TMP_DIR"
+          }
+          trap cleanup EXIT
+
+          for command_name in awk aws chmod flock mkdir rm sha256sum tar; do
+            if ! command -v "$command_name" >/dev/null 2>&1; then
+              echo "Missing required command: $command_name" >&2
+              exit 69
+            fi
+          done
+
+          [ -f "$TRUSTED_DEPLOY_BUCKET_FILE" ] || {
+            echo "Trusted deploy bucket file not found: $TRUSTED_DEPLOY_BUCKET_FILE" >&2
+            exit 78
+          }
+
+          IFS= read -r TRUSTED_DEPLOY_BUCKET < "$TRUSTED_DEPLOY_BUCKET_FILE"
+          case "$TRUSTED_DEPLOY_BUCKET" in
+            "" | *[!a-z0-9.-]*)
+              echo "Trusted deploy bucket file is invalid" >&2
+              exit 78
+              ;;
+          esac
+
+          if [ "$(s3_bucket "$APP_ARTIFACT_URI")" != "$TRUSTED_DEPLOY_BUCKET" ]; then
+            echo "App artifact bucket is not trusted" >&2
+            exit 65
+          fi
+
+          if [ "$(s3_bucket "$OPS_BUNDLE_URI")" != "$TRUSTED_DEPLOY_BUCKET" ]; then
+            echo "Ops bundle bucket is not trusted" >&2
+            exit 65
+          fi
+
+          if [ "$(artifact_release_sha "$APP_ARTIFACT_URI" qdoc-app.tar.gz)" != "$IMAGE_TAG" ]; then
+            echo "App artifact URI does not match image tag" >&2
+            exit 65
+          fi
+
+          if [ "$(artifact_release_sha "$OPS_BUNDLE_URI" qdoc-ops.tar.gz)" != "$IMAGE_TAG" ]; then
+            echo "Ops bundle URI does not match image tag" >&2
+            exit 65
+          fi
+
+          [ -f "$SHARED_ENV_FILE" ] || {
+            echo "Environment file not found: $SHARED_ENV_FILE" >&2
+            exit 78
+          }
+
+          (
+            exec 9>"$BOOTSTRAP_LOCK_FILE"
+            if ! flock -n 9; then
+              echo "Another QDoc deploy bootstrap is already running" >&2
+              exit 75
+            fi
+
+            mkdir -p "$RELEASE_DIR"
+            chmod 700 "$TMP_DIR"
+
+            aws s3 cp "$OPS_BUNDLE_URI" "$OPS_PATH"
+            aws s3 cp "${OPS_BUNDLE_URI}.sha256" "$OPS_CHECKSUM_PATH"
+
+            (
+              cd "$TMP_DIR"
+              sha256sum -c "$(basename "$OPS_CHECKSUM_PATH")"
+            )
+
+            ACTUAL_OPS_SHA256="$(cut -d ' ' -f1 "$OPS_CHECKSUM_PATH")"
+            if [ "$ACTUAL_OPS_SHA256" != "$EXPECTED_OPS_SHA256" ]; then
+              echo "Ops bundle checksum does not match expected digest" >&2
+              exit 65
+            fi
+
+            validate_ops_archive
+            tar -xzf "$OPS_PATH" -C "$RELEASE_DIR"
+            chmod +x "$RELEASE_DIR"/deploy/*.sh
+          )
+
+          QDOC_DEPLOY_DIR="$RELEASE_DIR" \
+            QDOC_CURRENT_LINK="$CURRENT_LINK" \
+            QDOC_ENV_FILE="$SHARED_ENV_FILE" \
+            "$RELEASE_DIR/deploy/deploy-from-s3.sh" "$APP_ARTIFACT_URI" "$IMAGE_TAG" "" "$EXPECTED_APP_SHA256"

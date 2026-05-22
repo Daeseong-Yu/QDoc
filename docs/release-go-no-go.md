@@ -6,8 +6,10 @@ Use this checklist for a launch-candidate decision. Record command status, short
 
 - Candidate Git SHA: `<40-character-sha>`
 - Docker image tag: `qdoc-app:<sha>`
-- S3 artifact URI: `s3://<private-bucket>/staging/<sha>/qdoc-app.tar.gz`
-- Artifact SHA-256: `<sha256-from-workflow>`
+- S3 app artifact URI: `s3://<private-bucket>/staging/<sha>/qdoc-app.tar.gz`
+- S3 ops bundle URI: `s3://<private-bucket>/staging/<sha>/qdoc-ops.tar.gz`
+- App artifact SHA-256: `<sha256-from-workflow>`
+- Ops bundle SHA-256: `<sha256-from-workflow>`
 - Staging public URL: `https://qdoc.example.com`
 - Database migration range reviewed: `<from-sha>..<to-sha>`
 - Rollback target SHA and artifact confirmed: `<known-good-sha>`
@@ -44,9 +46,10 @@ No-go criteria:
 
 ## Staging Evidence
 
-Run staging checks from the EC2 checkout or equivalent deployment operator shell after the candidate artifact is deployed.
+Run staging checks from `/opt/qdoc/current` or an equivalent deployment operator shell after the candidate artifact is deployed.
 
 ```bash
+cd /opt/qdoc/current
 QDOC_PUBLIC_URL=https://qdoc.example.com \
 QDOC_VERIFY_OUTBOX=true \
 QDOC_VERIFY_OPS=true \
@@ -58,8 +61,9 @@ bash deploy/verify-staging.sh
 Run the full rehearsal when the backup directory and public URL are configured:
 
 ```bash
+cd /opt/qdoc/current
 QDOC_PUBLIC_URL=https://qdoc.example.com \
-QDOC_EXPECTED_SOURCE_REF=<git-sha> \
+QDOC_EXPECTED_RELEASE_SHA=<git-sha> \
 QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha> \
 QDOC_REHEARSAL_BACKUP=true \
 QDOC_REHEARSAL_LOAD_DRILLS=true \
@@ -72,11 +76,11 @@ Go criteria:
 - Compose services are healthy and only web is bound to host loopback.
 - Public Caddy route returns success for the expected domain.
 - Outbox, ops, admin-data, launch-hardening, backup restore-check, and bounded drill checks exit zero.
-- The operator records SSM command ID, artifact SHA, candidate source SHA, backup filename, and restore-check pass/fail without copying private logs or dump files into Git.
+- The operator records SSM command ID, app artifact SHA, ops bundle SHA, candidate source SHA, backup filename, and restore-check pass/fail without copying private logs or dump files into Git.
 
 No-go criteria:
 
-- Public URL is missing or points at a different artifact/source SHA.
+- Public URL is missing or points at a different artifact/release SHA.
 - Backup restore-check has not passed for the launch database.
 - `verify:admin-data` shows missing launch clinic, queue, staff admin, or map guardrail records.
 - `verify:launch` reports console/fixed OTP enabled, missing SMTP, weak session secret, non-HTTPS app URL, public web bind, or map hard-stop misconfiguration in a launch-like environment.
@@ -106,11 +110,13 @@ Confirm these account-level and host-level items before go:
 - DNS points the launch domain at the expected EC2 address.
 - Security group exposes only approved public ports, normally `80` and `443`.
 - Host Caddy proxies the launch domain to `127.0.0.1:${QDOC_WEB_PORT}`.
-- `.env.staging` or production env contains HTTPS `APP_URL`, long `SESSION_SECRET`, SMTP settings, Redis URL, database URL, and disabled OTP debug flags.
+- `/opt/qdoc/shared/.env.staging` or production env contains HTTPS `APP_URL`, long `SESSION_SECRET`, SMTP settings, Redis URL, database URL, and disabled OTP debug flags.
 - GitHub OIDC role, S3 bucket lifecycle, SSM document, EC2 instance profile, and environment secrets are configured in the operating account.
+- `/opt/qdoc/shared/deploy-bucket` contains only the trusted private deployment bucket name.
+- S3 contains both the app artifact and matching ops bundle for the candidate SHA.
 - Map provider remains disabled, or provider-side restrictions, browser credential limits, QDoc monthly hard-stop, and map usage rate limits are all configured.
 - Database backup is copied to encrypted off-host storage and a restore-check has passed.
-- Rollback artifact and matching backup are available before launch.
+- Rollback app artifact, matching ops bundle, and matching backup are available before launch.
 
 ## Rollback Readiness
 
@@ -119,20 +125,21 @@ Before go, identify a known-good artifact and database backup.
 ```bash
 aws ssm list-command-invocations --command-id <command-id> --details
 aws s3 ls s3://<private-bucket>/staging/<known-good-sha>/
-docker compose -f compose.staging.yaml --env-file .env.staging ps
+cd /opt/qdoc/current
+docker compose -f compose.staging.yaml --env-file /opt/qdoc/shared/.env.staging ps
 ```
 
 Rollback procedure:
 
 1. Stop feature promotion and preserve current logs without exposing secrets.
-2. Re-run the SSM deployment document for the known-good artifact SHA and image tag.
+2. Re-run the SSM deployment document for the known-good app artifact, ops bundle, and image tag.
 3. Run `QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh`.
 4. Restore the database only during an approved recovery window, using the documented `QDOC_RESTORE_CONFIRM=restore-qdoc` flow.
 5. Re-run full staging verification and manual patient/staff smoke checks after rollback or restore.
 
 No-go criteria:
 
-- No known-good artifact exists in S3.
+- No known-good app artifact or matching ops bundle exists in S3.
 - No matching database backup exists for a migration-bearing release.
 - The release includes forward-only database changes whose rollback impact has not been reviewed.
 
@@ -143,8 +150,10 @@ Use this block in the release notes or ticket:
 ```text
 Decision: GO | NO-GO
 Candidate SHA:
-Artifact URI:
-Artifact SHA-256:
+App artifact URI:
+Ops bundle URI:
+App artifact SHA-256:
+Ops bundle SHA-256:
 Staging URL:
 Local checks:
 Staging verifier:

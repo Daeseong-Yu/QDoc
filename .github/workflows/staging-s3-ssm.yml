@@ -66,6 +66,19 @@ jobs:
           docker save "${QDOC_IMAGE_NAME}:${GITHUB_SHA}" | gzip > "qdoc-app-${GITHUB_SHA}.tar.gz"
           sha256sum "qdoc-app-${GITHUB_SHA}.tar.gz" | sed "s#qdoc-app-${GITHUB_SHA}.tar.gz#qdoc-app.tar.gz#" > qdoc-app.tar.gz.sha256
 
+      - name: Build ops bundle
+        run: |
+          set -euo pipefail
+          tar --sort=name \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -czf "qdoc-ops-${GITHUB_SHA}.tar.gz" \
+            compose.staging.yaml \
+            deploy \
+            .env.staging.example
+          sha256sum "qdoc-ops-${GITHUB_SHA}.tar.gz" | sed "s#qdoc-ops-${GITHUB_SHA}.tar.gz#qdoc-ops.tar.gz#" > qdoc-ops.tar.gz.sha256
+
       - name: Upload build artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -73,6 +86,8 @@ jobs:
           path: |
             qdoc-app-${{ github.sha }}.tar.gz
             qdoc-app.tar.gz.sha256
+            qdoc-ops-${{ github.sha }}.tar.gz
+            qdoc-ops.tar.gz.sha256
           retention-days: 3
           if-no-files-found: error
 
@@ -108,19 +123,27 @@ jobs:
           aws s3 cp qdoc-app.tar.gz.sha256 \
             "s3://${{ secrets.QDOC_DEPLOY_BUCKET }}/staging/${GITHUB_SHA}/qdoc-app.tar.gz.sha256" \
             --no-progress
+          aws s3 cp "qdoc-ops-${GITHUB_SHA}.tar.gz" \
+            "s3://${{ secrets.QDOC_DEPLOY_BUCKET }}/staging/${GITHUB_SHA}/qdoc-ops.tar.gz" \
+            --no-progress
+          aws s3 cp qdoc-ops.tar.gz.sha256 \
+            "s3://${{ secrets.QDOC_DEPLOY_BUCKET }}/staging/${GITHUB_SHA}/qdoc-ops.tar.gz.sha256" \
+            --no-progress
 
       - name: Deploy on EC2 with SSM
         run: |
           set -euo pipefail
-          ARTIFACT_URI="s3://${{ secrets.QDOC_DEPLOY_BUCKET }}/staging/${GITHUB_SHA}/qdoc-app.tar.gz"
-          EXPECTED_SHA256="$(cut -d ' ' -f1 qdoc-app.tar.gz.sha256)"
+          APP_ARTIFACT_URI="s3://${{ secrets.QDOC_DEPLOY_BUCKET }}/staging/${GITHUB_SHA}/qdoc-app.tar.gz"
+          OPS_BUNDLE_URI="s3://${{ secrets.QDOC_DEPLOY_BUCKET }}/staging/${GITHUB_SHA}/qdoc-ops.tar.gz"
+          EXPECTED_APP_SHA256="$(cut -d ' ' -f1 qdoc-app.tar.gz.sha256)"
+          EXPECTED_OPS_SHA256="$(cut -d ' ' -f1 qdoc-ops.tar.gz.sha256)"
 
           COMMAND_ID="$(
             aws ssm send-command \
               --document-name "${QDOC_SSM_DOCUMENT_NAME}" \
               --instance-ids "${{ secrets.QDOC_STAGING_INSTANCE_ID }}" \
               --comment "Deploy QDoc ${GITHUB_SHA}" \
-              --parameters "{\"artifactUri\":[\"${ARTIFACT_URI}\"],\"imageTag\":[\"${GITHUB_SHA}\"],\"sourceRef\":[\"${GITHUB_SHA}\"],\"expectedSha256\":[\"${EXPECTED_SHA256}\"]}" \
+              --parameters "{\"appArtifactUri\":[\"${APP_ARTIFACT_URI}\"],\"opsBundleUri\":[\"${OPS_BUNDLE_URI}\"],\"imageTag\":[\"${GITHUB_SHA}\"],\"expectedAppSha256\":[\"${EXPECTED_APP_SHA256}\"],\"expectedOpsSha256\":[\"${EXPECTED_OPS_SHA256}\"]}" \
               --query "Command.CommandId" \
               --output text
           )"

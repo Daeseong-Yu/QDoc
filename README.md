@@ -208,7 +208,7 @@ Host networking:
 ```
 
 - Compose: `compose.staging.yaml` publishes only `web` to `127.0.0.1:${QDOC_WEB_PORT}`. API, PostgreSQL, Redis, worker, migrate, and seed remain on the private Docker network.
-- Environment: set `APP_DOMAIN`, `APP_URL`, `QDOC_APP_IMAGE`, `QDOC_WEB_BIND=127.0.0.1`, `QDOC_WEB_PORT`, SMTP credentials, `SESSION_SECRET`, `QDOC_DB_SECRET`, and a matching `DATABASE_URL` in `.env.staging`.
+- Environment: set `APP_DOMAIN`, `APP_URL`, `QDOC_APP_IMAGE`, `QDOC_WEB_BIND=127.0.0.1`, `QDOC_WEB_PORT`, SMTP credentials, `SESSION_SECRET`, `QDOC_DB_SECRET`, and a matching `DATABASE_URL` in `/opt/qdoc/shared/.env.staging`.
 
 Staging environment variables:
 
@@ -277,34 +277,40 @@ aws ssm update-document \
   --content file://deploy/ssm/qdoc-staging-deploy.yaml
 ```
 
-Install or refresh the host-side deploy script. The EC2 checkout must be able to fetch the target commit, because the deploy script checks out the same source ref as the image tag before running Compose:
+Prepare the host-side deployment directories. The EC2 instance does not need a Git checkout for deployment; GitHub Actions uploads both the app image artifact and an ops bundle containing the deploy scripts and Compose config. Keep staging secrets outside release bundles in a stable shared env file:
 
 ```bash
-sudo mkdir -p /opt
-sudo git clone <repository-url> /opt/qdoc
-sudo chmod +x /opt/qdoc/deploy/deploy-from-s3.sh
+sudo mkdir -p /opt/qdoc/releases /opt/qdoc/shared /opt/qdoc/backups
+sudo install -m 600 .env.staging /opt/qdoc/shared/.env.staging
+printf '%s\n' '<artifact-bucket>' | sudo tee /opt/qdoc/shared/deploy-bucket >/dev/null
+sudo chmod 600 /opt/qdoc/shared/deploy-bucket
 ```
 
 Deploy manually through SSM if needed:
 
 ```bash
-sudo /opt/qdoc/deploy/deploy-from-s3.sh s3://<artifact-bucket>/staging/<git-sha>/qdoc-app.tar.gz <git-sha> <git-sha> <artifact-sha256>
+aws ssm send-command \
+  --document-name QDoc-StagingDeploy \
+  --instance-ids <instance-id> \
+  --parameters '{"appArtifactUri":["s3://<artifact-bucket>/staging/<git-sha>/qdoc-app.tar.gz"],"opsBundleUri":["s3://<artifact-bucket>/staging/<git-sha>/qdoc-ops.tar.gz"],"imageTag":["<git-sha>"],"expectedAppSha256":["<app-artifact-sha256>"],"expectedOpsSha256":["<ops-bundle-sha256>"]}'
 ```
 
-The deploy script runs as root through SSM, serializes deployments with a host lock, downloads `qdoc-app.tar.gz.sha256` from the same S3 prefix, verifies the image artifact against the workflow-provided digest before loading it into Docker, forces the web bind to loopback, and waits for Compose services to become healthy.
+The SSM command runs as root, requires app and ops artifacts to come from the trusted bucket recorded in `/opt/qdoc/shared/deploy-bucket`, downloads and verifies `qdoc-ops.tar.gz` from the same S3 prefix, extracts it to `/opt/qdoc/releases/<git-sha>`, then runs the bundled `deploy/deploy-from-s3.sh`. The deploy script serializes deployments with a host lock, downloads `qdoc-app.tar.gz.sha256`, verifies the image artifact against the workflow-provided digest before loading it into Docker, forces the web bind to loopback, waits for Compose services to become healthy, and updates `/opt/qdoc/current` after success.
 
 Verify the path before testing in a browser:
 
 ```bash
 curl -I "http://127.0.0.1:${QDOC_WEB_PORT}"
 curl -Iv https://qdoc.example.com
-docker compose -f compose.staging.yaml --env-file .env.staging ps
-docker compose -f compose.staging.yaml --env-file .env.staging logs -f web api worker
+cd /opt/qdoc/current
+docker compose -f compose.staging.yaml --env-file /opt/qdoc/shared/.env.staging ps
+docker compose -f compose.staging.yaml --env-file /opt/qdoc/shared/.env.staging logs -f web api worker
 ```
 
-Or run the bundled staging verifier from the EC2 checkout:
+Or run the bundled staging verifier from the current release:
 
 ```bash
+cd /opt/qdoc/current
 QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_ADMIN_DATA=true QDOC_VERIFY_LAUNCH=true bash deploy/verify-staging.sh
@@ -345,12 +351,13 @@ Patient OTP/check-in and staff ticket transitions should be smoke-tested manuall
 Launch-candidate staging rehearsal:
 
 ```bash
-QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_SOURCE_REF=<git-sha> QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha> bash deploy/staging-rehearsal.sh
+cd /opt/qdoc/current
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_RELEASE_SHA=<git-sha> QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha> bash deploy/staging-rehearsal.sh
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_REHEARSAL_BACKUP=true QDOC_BACKUP_DIR=/opt/qdoc/backups bash deploy/staging-rehearsal.sh
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_REHEARSAL_LOAD_DRILLS=true bash deploy/staging-rehearsal.sh
 ```
 
-The rehearsal validates the Compose configuration, optional checkout SHA, optional app image tag, public route requirement, full staging verifier, outbox verification, operational checks, and launch hardening checks. When `QDOC_REHEARSAL_BACKUP=true`, it also creates a PostgreSQL custom-format backup and restores it into a temporary database through `deploy/db-restore-check.sh`; it never restores the primary database. When `QDOC_REHEARSAL_LOAD_DRILLS=true`, it also runs the bounded load/failure drill script after the main verifier.
+The rehearsal validates the Compose configuration, optional release-directory SHA, optional app image tag, public route requirement, full staging verifier, outbox verification, operational checks, and launch hardening checks. When `QDOC_REHEARSAL_BACKUP=true`, it also creates a PostgreSQL custom-format backup and restores it into a temporary database through `deploy/db-restore-check.sh`; it never restores the primary database. When `QDOC_REHEARSAL_LOAD_DRILLS=true`, it also runs the bounded load/failure drill script after the main verifier.
 
 For local command validation without running staging containers:
 
@@ -363,19 +370,19 @@ Useful SSM and host checks:
 ```bash
 aws ssm list-command-invocations --command-id <command-id> --details
 aws ssm get-command-invocation --command-id <command-id> --instance-id <instance-id>
-docker compose -f compose.staging.yaml --env-file .env.staging ps
-docker compose -f compose.staging.yaml --env-file .env.staging logs --tail=200 web api worker
+cd /opt/qdoc/current
+docker compose -f compose.staging.yaml --env-file /opt/qdoc/shared/.env.staging ps
+docker compose -f compose.staging.yaml --env-file /opt/qdoc/shared/.env.staging logs --tail=200 web api worker
 curl -fsSI "http://127.0.0.1:${QDOC_WEB_PORT}"
 curl -fsSI https://qdoc.example.com
 ```
 
 Rollback:
 
-1. Pick a previously verified 40-character Git SHA whose `staging/<sha>/qdoc-app.tar.gz` and `.sha256` files still exist in the private deployment bucket.
-2. Confirm the EC2 checkout can fetch that SHA.
-3. Re-run the SSM document with `artifactUri`, `imageTag`, `sourceRef`, and `expectedSha256` for the known-good artifact, or run `deploy/deploy-from-s3.sh` manually on the host with those four values.
-4. Run `QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh`.
-5. If the rollback crosses database migrations, check the migration contents first. The current MVP deploy path only runs forward Prisma deploy migrations and does not implement automatic down migrations.
+1. Pick a previously verified 40-character Git SHA whose `staging/<sha>/qdoc-app.tar.gz`, `staging/<sha>/qdoc-ops.tar.gz`, and checksum files still exist in the private deployment bucket.
+2. Re-run the SSM document with `appArtifactUri`, `opsBundleUri`, `imageTag`, `expectedAppSha256`, and `expectedOpsSha256` for the known-good release.
+3. Run `cd /opt/qdoc/current && QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh`.
+4. If the rollback crosses database migrations, check the migration contents first. The current MVP deploy path only runs forward Prisma deploy migrations and does not implement automatic down migrations.
 
 Admin data operations:
 
@@ -408,7 +415,7 @@ Database backup and restore:
 QDOC_BACKUP_DIR=/opt/qdoc/backups bash deploy/db-backup.sh
 ```
 
-The backup script defaults to `compose.staging.yaml` and `.env.staging`. For local verification, point it at the local Compose stack:
+The backup script defaults to `compose.staging.yaml` and uses `.env.staging` when it exists in the current directory, otherwise `/opt/qdoc/shared/.env.staging`. For local verification, point it at the local Compose stack:
 
 ```bash
 QDOC_COMPOSE_FILE=compose.yaml QDOC_ENV_FILE=.env QDOC_BACKUP_DIR=/tmp/qdoc-backups bash deploy/db-backup.sh

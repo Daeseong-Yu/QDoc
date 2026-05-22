@@ -2,9 +2,17 @@
 set -euo pipefail
 
 COMPOSE_FILE="${QDOC_COMPOSE_FILE:-compose.staging.yaml}"
-ENV_FILE="${QDOC_ENV_FILE:-.env.staging}"
+ENV_FILE="${QDOC_ENV_FILE:-}"
 BACKUP_DIR="${QDOC_BACKUP_DIR:-backups}"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+
+if [ -z "$ENV_FILE" ]; then
+  if [ -f ".env.staging" ]; then
+    ENV_FILE=".env.staging"
+  else
+    ENV_FILE="/opt/qdoc/shared/.env.staging"
+  fi
+fi
 
 fail() {
   printf 'ERROR: %s\n' "$*" >&2

@@ -1,3 +1,5 @@
+name: qdoc
+
 services:
   web:
     image: ${QDOC_APP_IMAGE:?Set QDOC_APP_IMAGE in .env.staging or the shell}

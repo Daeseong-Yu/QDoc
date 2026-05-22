@@ -2,20 +2,21 @@
 set -euo pipefail
 
 if [ "$#" -lt 2 ] || [ "$#" -gt 4 ]; then
-  echo "Usage: $0 <s3-artifact-uri> <image-tag> [source-ref] [expected-sha256]" >&2
+  echo "Usage: $0 <s3-app-artifact-uri> <image-tag> [legacy-source-ref] [expected-sha256]" >&2
   exit 64
 fi
 
 S3_ARTIFACT_URI="$1"
 IMAGE_TAG="$2"
-SOURCE_REF="${3:-}"
+LEGACY_SOURCE_REF="${3:-}"
 EXPECTED_SHA256="${4:-}"
-APP_DIR="${QDOC_DEPLOY_DIR:-/opt/qdoc}"
+APP_DIR="${QDOC_DEPLOY_DIR:-/opt/qdoc/current}"
 COMPOSE_FILE="${QDOC_COMPOSE_FILE:-compose.staging.yaml}"
-ENV_FILE="${QDOC_ENV_FILE:-.env.staging}"
+ENV_FILE="${QDOC_ENV_FILE:-}"
 IMAGE_NAME="${QDOC_IMAGE_NAME:-qdoc-app}"
 DEPLOY_WAIT_TIMEOUT="${QDOC_DEPLOY_WAIT_TIMEOUT:-180}"
 LOCK_FILE="${QDOC_DEPLOY_LOCK_FILE:-/var/lock/qdoc-deploy.lock}"
+CURRENT_LINK="${QDOC_CURRENT_LINK:-}"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/qdoc-deploy.XXXXXX")"
 ARTIFACT_PATH="${TMP_DIR}/qdoc-app.tar.gz"
 CHECKSUM_PATH="${TMP_DIR}/qdoc-app.tar.gz.sha256"
@@ -33,8 +34,8 @@ if [[ ! "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]]; then
   exit 64
 fi
 
-if [ -n "$SOURCE_REF" ] && [[ ! "$SOURCE_REF" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "Invalid source ref: $SOURCE_REF" >&2
+if [ -n "$LEGACY_SOURCE_REF" ] && [[ ! "$LEGACY_SOURCE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Invalid legacy source ref: $LEGACY_SOURCE_REF" >&2
   exit 64
 fi
 
@@ -43,12 +44,17 @@ if [ -n "$EXPECTED_SHA256" ] && [[ ! "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]]; th
   exit 64
 fi
 
-for command_name in aws docker flock git gunzip sha256sum; do
+for command_name in aws docker flock gunzip sha256sum; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "Missing required command: $command_name" >&2
     exit 69
   fi
 done
+
+if [ -n "$CURRENT_LINK" ] && ! command -v ln >/dev/null 2>&1; then
+  echo "Missing required command: ln" >&2
+  exit 69
+fi
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
@@ -58,11 +64,16 @@ fi
 
 cd "$APP_DIR"
 
-if [ -n "$SOURCE_REF" ]; then
-  if ! git fetch --depth 1 origin "$SOURCE_REF"; then
-    git fetch --depth 50 origin main
+if [ -z "$ENV_FILE" ]; then
+  if [ -f ".env.staging" ]; then
+    ENV_FILE=".env.staging"
+  else
+    ENV_FILE="/opt/qdoc/shared/.env.staging"
   fi
-  git checkout --force "$SOURCE_REF"
+fi
+
+if [ -n "$LEGACY_SOURCE_REF" ]; then
+  echo "Ignoring legacy source ref; deploy scripts and Compose files are supplied by the ops bundle." >&2
 fi
 
 aws s3 cp "$S3_ARTIFACT_URI" "$ARTIFACT_PATH"
@@ -93,3 +104,7 @@ fi
 
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --no-build --wait --wait-timeout "$DEPLOY_WAIT_TIMEOUT"
 docker image prune -f --filter "label=app=qdoc"
+
+if [ -n "$CURRENT_LINK" ]; then
+  ln -sfn "$APP_DIR" "$CURRENT_LINK"
+fi

@@ -235,6 +235,8 @@ Staging environment variables:
 
 GitHub staging environment settings:
 
+Create a GitHub Environment named `staging` and define these values there, or define them at repository/organization scope if they are shared. The deploy workflow validates that required values exist before assuming the AWS role and does not print secret values.
+
 | Name | Type | Notes |
 | --- | --- | --- |
 | `AWS_REGION` | variable | Region for S3 and Systems Manager. |

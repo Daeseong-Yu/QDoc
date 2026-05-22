@@ -344,6 +344,38 @@ export async function checkMapUsageRateLimit(requesterKey: string): Promise<Rate
   }
 }
 
+export async function checkMapSearchRateLimit(requesterKey: string): Promise<RateLimitResult> {
+  const requesterKeyPart = getStableKeyPart(requesterKey);
+  const policies: RateLimitPolicy[] = [
+    {
+      name: "map_search_ip_minute",
+      key: `qdoc:rate:map-search:ip:${requesterKeyPart}:60`,
+      limit: getPositiveIntegerEnv("MAP_SEARCH_RATE_LIMIT_PER_MINUTE", 10),
+      windowSeconds: 60,
+    },
+    {
+      name: "map_search_ip_hour",
+      key: `qdoc:rate:map-search:ip:${requesterKeyPart}:3600`,
+      limit: getPositiveIntegerEnv("MAP_SEARCH_RATE_LIMIT_PER_HOUR", 100),
+      windowSeconds: 3600,
+    },
+  ];
+
+  if (!getRedisUrl()) {
+    return checkLocalPolicies(policies);
+  }
+
+  try {
+    return await checkPolicies(policies);
+  } catch (error) {
+    logOperationalEvent("error", "qdoc.redis_rate_limit_unavailable", {
+      policyGroup: "map_search",
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return checkLocalPolicies(policies);
+  }
+}
+
 export async function checkOtpRequestRateLimit(email: string, requesterKey: string): Promise<RateLimitResult> {
   const emailKey = getStableKeyPart(email.toLowerCase());
   const requesterKeyPart = getStableKeyPart(requesterKey);

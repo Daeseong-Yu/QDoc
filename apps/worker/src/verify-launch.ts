@@ -53,8 +53,15 @@ function getChecks(): LaunchCheck[] {
   const mapProvider = env("MAP_PROVIDER").toLowerCase();
   const mapEnabled = isTruthy("MAP_PROVIDER_ENABLED");
   const mapTokenName = mapProvider === "google" ? "GOOGLE_MAPS_BROWSER_KEY" : "MAPBOX_PUBLIC_TOKEN";
+  const mapSearchLimit = getPositiveInteger("MAP_MONTHLY_PLACES_SEARCH_LIMIT");
+  const mapSearchEnabled = mapEnabled && mapSearchLimit > 0;
+  const mapSearchTokenName = mapProvider === "google" ? "GOOGLE_PLACES_SERVER_KEY" : "MAPBOX_SEARCH_TOKEN";
   const mapRateLimitsOk =
     !mapEnabled || (getPositiveInteger("MAP_USAGE_RATE_LIMIT_PER_MINUTE") > 0 && getPositiveInteger("MAP_USAGE_RATE_LIMIT_PER_HOUR") > 0);
+  const mapSearchRateLimitsOk =
+    !mapSearchEnabled ||
+    (getPositiveInteger("MAP_SEARCH_RATE_LIMIT_PER_MINUTE") > 0 && getPositiveInteger("MAP_SEARCH_RATE_LIMIT_PER_HOUR") > 0);
+  const mapSearchCacheOk = !mapSearchEnabled || getPositiveInteger("MAP_SEARCH_CACHE_TTL_SECONDS") > 0;
 
   return [
     check("database_url", env("DATABASE_URL").length > 0, "configured", "missing_database_url"),
@@ -116,6 +123,25 @@ function getChecks(): LaunchCheck[] {
       "map_enabled_without_public_token",
     ),
     check("map_rate_limits", mapRateLimitsOk, mapEnabled ? "configured" : "disabled", "map_rate_limits_invalid"),
+    check(
+      "map_search_budget",
+      !mapSearchEnabled || mapSearchLimit > 0,
+      mapSearchEnabled ? "hard_limit_configured" : "disabled",
+      "map_search_enabled_without_positive_monthly_limit",
+    ),
+    check(
+      "map_search_token",
+      !mapSearchEnabled || env(mapSearchTokenName).length > 0,
+      mapSearchEnabled ? "configured" : "disabled",
+      "map_search_enabled_without_server_token",
+    ),
+    check(
+      "map_search_rate_limits",
+      mapSearchRateLimitsOk,
+      mapSearchEnabled ? "configured" : "disabled",
+      "map_search_rate_limits_invalid",
+    ),
+    check("map_search_cache", mapSearchCacheOk, mapSearchEnabled ? "configured" : "disabled", "map_search_cache_ttl_invalid"),
   ];
 }
 

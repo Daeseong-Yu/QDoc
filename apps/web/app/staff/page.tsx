@@ -69,6 +69,7 @@ type MapSettingsForm = {
   isEnabled: boolean;
   hardStopEnabled: boolean;
   monthlyMapLoadLimit: string;
+  monthlyPlacesSearchLimit: string;
 };
 
 type ApiError = {
@@ -107,6 +108,7 @@ const emptyMapSettingsForm: MapSettingsForm = {
   isEnabled: false,
   hardStopEnabled: true,
   monthlyMapLoadLimit: "0",
+  monthlyPlacesSearchLimit: "0",
 };
 
 const boardStatuses: Array<{ status: TicketStatus; label: string }> = [
@@ -260,6 +262,7 @@ function mapSettingsToForm(mapSettings: StaffMapSettingsResponse | null): MapSet
     isEnabled: mapSettings.isEnabled,
     hardStopEnabled: mapSettings.hardStopEnabled,
     monthlyMapLoadLimit: String(mapSettings.monthlyMapLoadLimit),
+    monthlyPlacesSearchLimit: String(mapSettings.monthlyPlacesSearchLimit),
   };
 }
 
@@ -774,6 +777,7 @@ export default function StaffPage() {
       isEnabled: mapForm.isEnabled,
       hardStopEnabled: mapForm.hardStopEnabled,
       monthlyMapLoadLimit: Number.parseInt(mapForm.monthlyMapLoadLimit, 10),
+      monthlyPlacesSearchLimit: Number.parseInt(mapForm.monthlyPlacesSearchLimit, 10),
     });
 
     if (!input.success) {
@@ -1291,6 +1295,16 @@ export default function StaffPage() {
                                 placeholder="Monthly map loads"
                                 className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
                               />
+                              <input
+                                type="number"
+                                min="0"
+                                value={mapForm.monthlyPlacesSearchLimit}
+                                onChange={(event) =>
+                                  setMapForm((value) => ({ ...value, monthlyPlacesSearchLimit: event.target.value }))
+                                }
+                                placeholder="Monthly place searches"
+                                className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4] sm:col-start-2"
+                              />
                             </div>
                             <label className="flex items-center gap-2 text-sm text-slate-700">
                               <input
@@ -1312,7 +1326,9 @@ export default function StaffPage() {
                             </label>
                             {ops?.mapSettings ? (
                               <p className="text-sm text-slate-600">
-                                {ops.mapSettings.usedMapLoads} used · {ops.mapSettings.remainingMapLoads} remaining · {ops.mapSettings.reason}
+                                Loads {ops.mapSettings.usedMapLoads} used / {ops.mapSettings.remainingMapLoads} remaining · Searches{" "}
+                                {ops.mapSettings.usedPlacesSearches} used / {ops.mapSettings.remainingPlacesSearches} remaining ·{" "}
+                                {ops.mapSettings.reason}
                               </p>
                             ) : null}
                             <button

@@ -168,7 +168,7 @@ pnpm e2e
 
 `pnpm verify:admin-data` prints safe operational JSON for organization, clinic site, queue, staff membership, audit-log count, ticket-count, and map budget configuration readiness. It does not print emails, OTPs, raw database URLs, ticket IDs, audit metadata, or patient payloads. Set `QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener` to require specific launch clinic IDs; a missing expected site exits non-zero and provides a failure-path check without changing database rows.
 
-`pnpm verify:launch` prints safe launch-readiness JSON for required database and Redis configuration, session hardening, HTTPS origin settings, loopback web binding, OTP debug flags, SMTP readiness, and map-provider cost guardrails. It treats `APP_ENV=staging`, `APP_ENV=production`, and `NODE_ENV=production` as launch-like environments and exits non-zero when fail-closed settings are not ready.
+`pnpm verify:launch` prints safe launch-readiness JSON for required database and Redis configuration, session hardening, HTTPS origin settings, loopback web binding, OTP debug flags, SMTP readiness, and map-provider cost guardrails. It treats `APP_ENV=staging`, `APP_ENV=production`, and `NODE_ENV=production` as launch-like environments and exits non-zero when fail-closed settings are not ready. Nearby healthcare search is disabled by default until a server-side provider credential and a positive monthly search limit are configured.
 
 Install the Playwright Chromium browser once before running E2E tests locally:
 
@@ -228,10 +228,12 @@ Staging environment variables:
 | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | yes for SMTP | SMTP sender and credentials; never print or commit secrets. |
 | `ALLOW_CONSOLE_OTP`, `ALLOW_FIXED_OTP` | yes | Keep both `false` in normal staging. |
 | `WORKER_POLL_INTERVAL_MS`, `WORKER_OUTBOX_BATCH_SIZE`, `WORKER_OUTBOX_MAX_ATTEMPTS` | no | Optional worker tuning values. |
-| `MAP_PROVIDER`, `MAP_PROVIDER_ENABLED`, `MAP_MONTHLY_MAP_LOAD_LIMIT` | no | Optional map provider selection and QDoc monthly hard-stop budget. Leave disabled until provider restrictions and limits are configured. |
+| `MAP_PROVIDER`, `MAP_PROVIDER_ENABLED`, `MAP_MONTHLY_MAP_LOAD_LIMIT`, `MAP_MONTHLY_PLACES_SEARCH_LIMIT` | no | Optional map provider selection and QDoc monthly hard-stop budgets for browser map loads and provider place searches. Leave search limit at `0` until server-side provider credentials, provider restrictions, and launch limits are configured. |
 | `MAP_SETTINGS_ADMIN_EMAILS` | no | Comma-separated operator email allowlist for changing global map budget settings from the staff UI. Leave empty unless an operator should manage cost guardrails. |
 | `MAPBOX_PUBLIC_TOKEN`, `GOOGLE_MAPS_BROWSER_KEY` | no | Browser credentials returned only when QDoc map guardrails allow loading; restrict them in the provider console. |
+| `MAPBOX_SEARCH_TOKEN`, `GOOGLE_PLACES_SERVER_KEY` | no | Server-side nearby healthcare search credentials. Never expose these in browser code; restrict them in the provider console and keep search disabled until monthly limits are set. |
 | `MAP_USAGE_RATE_LIMIT_PER_MINUTE`, `MAP_USAGE_RATE_LIMIT_PER_HOUR` | no | Optional per-requester rate limits before map usage reservations are accepted. |
+| `MAP_SEARCH_RATE_LIMIT_PER_MINUTE`, `MAP_SEARCH_RATE_LIMIT_PER_HOUR`, `MAP_SEARCH_CACHE_TTL_SECONDS` | no | Optional per-requester rate limits and short cache TTL for provider nearby healthcare searches. |
 
 GitHub staging environment settings:
 
@@ -390,7 +392,7 @@ Admin data operations:
 
 1. Classify the operation before changing data:
    - Seed-only: `pnpm db:seed` and `pnpm db:seed:staging` create the demo organization, clinic sites, queues, staff account, sample tickets, and disabled map provider guardrail rows. Use these for local or approved staging bootstrap only, not production onboarding.
-   - Application-supported: staff admins can manage site settings, notification threshold, queue open/closed state, site memberships, audit-log review, and notification health from `/staff`. Operators listed in `MAP_SETTINGS_ADMIN_EMAILS` can manage global map provider enablement, monthly map-load limits, and hard-stop settings from the staff UI.
+   - Application-supported: staff admins can manage site settings, notification threshold, queue open/closed state, site memberships, audit-log review, and notification health from `/staff`. Operators listed in `MAP_SETTINGS_ADMIN_EMAILS` can manage global map provider enablement, monthly map-load limits, monthly place-search limits, and hard-stop settings from the staff UI.
    - Database-admin-only: new production organization/site/queue creation, destructive record cleanup, direct restore, and emergency data correction require an approved DB-admin procedure or a reviewed script. Do not bypass staff authorization boundaries from the public API.
 2. After migrations and approved seed/bootstrap data are applied, sign in as a site admin, verify every launch clinic has the expected address or coordinates, set `notificationAheadCount`, confirm at least one queue exists, and add at least one admin membership per site.
 3. Keep map providers disabled until provider console restrictions, browser credentials, monthly QDoc limit, and QDoc hard-stop settings are all configured. If a provider is enabled, `monthlyMapLoadLimit` must be positive and `hardStopEnabled` must stay true.
@@ -442,7 +444,7 @@ Launch hardening checklist:
 
 1. Public exposure matches the documented boundary: only host Caddy listens on public `80/443`; `compose.staging.yaml` publishes web to `127.0.0.1:${QDOC_WEB_PORT}`; API, PostgreSQL, Redis, worker, migrate, and seed are private Compose services.
 2. `pnpm verify:launch` passes with the staging or production environment loaded. In launch-like environments, `APP_URL` must be HTTPS, `SESSION_SECRET` must be a long non-placeholder value, `QDOC_WEB_BIND` must stay `127.0.0.1`, OTP debug flags must be disabled, and SMTP must be configured.
-3. Map providers stay disabled until provider console restrictions, browser credentials, `MAP_MONTHLY_MAP_LOAD_LIMIT`, and QDoc map usage rate limits are configured. When a provider is enabled, QDoc refuses map loads after the configured monthly hard limit is exhausted.
+3. Map providers stay disabled until provider console restrictions, browser credentials, `MAP_MONTHLY_MAP_LOAD_LIMIT`, and QDoc map usage rate limits are configured. Nearby healthcare search stays disabled until server-side search credentials, `MAP_MONTHLY_PLACES_SEARCH_LIMIT`, search rate limits, and cache TTL are configured. When a provider is enabled, QDoc refuses map loads and provider searches after the configured monthly hard limits are exhausted.
 4. Backup and temporary-restore verification has passed for the environment being launched.
 5. Load and failure smoke checks have no launch blockers: patient OTP/check-in, staff ticket transitions, SSE queue stream, worker retry behavior, map guardrail exhaustion, and public route health all behave as expected for initial usage.
 6. Rollback artifact and matching database backup are available before deployment, and the operator knows whether the release includes forward-only database migrations.

@@ -300,6 +300,11 @@ function getEnvMapLimit() {
   return Number.isFinite(limit) && limit > 0 ? limit : 0;
 }
 
+function getEnvPlacesSearchLimit() {
+  const limit = Number.parseInt(process.env.MAP_MONTHLY_PLACES_SEARCH_LIMIT ?? "", 10);
+  return Number.isFinite(limit) && limit > 0 ? limit : 0;
+}
+
 function getMapPeriodStart(date = new Date()) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
@@ -326,29 +331,32 @@ async function getStaffMapSettingsPayload(providerOverride?: MapProvider) {
       monthlyMapLoadLimit: 0,
       usedMapLoads: 0,
       remainingMapLoads: 0,
+      monthlyPlacesSearchLimit: 0,
+      usedPlacesSearches: 0,
+      remainingPlacesSearches: 0,
       resetAt: resetAt.toISOString(),
       reason: "provider_disabled",
     });
   }
 
-  const [config, usagePeriod] = await Promise.all([
+  const [config, usagePeriods] = await Promise.all([
     prisma.mapProviderConfig.findUnique({
       where: { provider },
       select: {
         isEnabled: true,
         hardStopEnabled: true,
         monthlyMapLoadLimit: true,
+        monthlyPlacesSearchLimit: true,
       },
     }),
-    prisma.mapUsagePeriod.findUnique({
+    prisma.mapUsagePeriod.findMany({
       where: {
-        provider_usageType_periodStart: {
-          provider,
-          usageType: "map_load",
-          periodStart,
-        },
+        provider,
+        usageType: { in: ["map_load", "places_search"] },
+        periodStart,
       },
       select: {
+        usageType: true,
         used: true,
       },
     }),
@@ -357,7 +365,9 @@ async function getStaffMapSettingsPayload(providerOverride?: MapProvider) {
   const isEnabled = config?.isEnabled ?? process.env.MAP_PROVIDER_ENABLED === "true";
   const hardStopEnabled = config?.hardStopEnabled ?? true;
   const monthlyMapLoadLimit = config?.monthlyMapLoadLimit ?? getEnvMapLimit();
-  const usedMapLoads = usagePeriod?.used ?? 0;
+  const monthlyPlacesSearchLimit = config?.monthlyPlacesSearchLimit ?? getEnvPlacesSearchLimit();
+  const usedMapLoads = usagePeriods.find((usagePeriod) => usagePeriod.usageType === "map_load")?.used ?? 0;
+  const usedPlacesSearches = usagePeriods.find((usagePeriod) => usagePeriod.usageType === "places_search")?.used ?? 0;
   const reason =
     !isEnabled || !hardStopEnabled
       ? "provider_disabled"
@@ -375,6 +385,9 @@ async function getStaffMapSettingsPayload(providerOverride?: MapProvider) {
     monthlyMapLoadLimit,
     usedMapLoads,
     remainingMapLoads: getRemainingMapLoads(monthlyMapLoadLimit, usedMapLoads),
+    monthlyPlacesSearchLimit,
+    usedPlacesSearches,
+    remainingPlacesSearches: getRemainingMapLoads(monthlyPlacesSearchLimit, usedPlacesSearches),
     resetAt: resetAt.toISOString(),
     reason,
   });
@@ -1106,12 +1119,14 @@ export async function handleUpdateStaffMapSettings(request: IncomingMessage, res
         isEnabled: input.data.isEnabled,
         hardStopEnabled: input.data.hardStopEnabled,
         monthlyMapLoadLimit: input.data.monthlyMapLoadLimit,
+        monthlyPlacesSearchLimit: input.data.monthlyPlacesSearchLimit,
       },
       create: {
         provider: input.data.provider,
         isEnabled: input.data.isEnabled,
         hardStopEnabled: input.data.hardStopEnabled,
         monthlyMapLoadLimit: input.data.monthlyMapLoadLimit,
+        monthlyPlacesSearchLimit: input.data.monthlyPlacesSearchLimit,
       },
     });
 
@@ -1124,6 +1139,8 @@ export async function handleUpdateStaffMapSettings(request: IncomingMessage, res
         isEnabledAfter: after.isEnabled,
         monthlyMapLoadLimitBefore: before?.monthlyMapLoadLimit ?? null,
         monthlyMapLoadLimitAfter: after.monthlyMapLoadLimit,
+        monthlyPlacesSearchLimitBefore: before?.monthlyPlacesSearchLimit ?? null,
+        monthlyPlacesSearchLimitAfter: after.monthlyPlacesSearchLimit,
         hardStopEnabledBefore: before?.hardStopEnabled ?? null,
         hardStopEnabledAfter: after.hardStopEnabled,
         metadata: {
@@ -1143,12 +1160,14 @@ export async function handleUpdateStaffMapSettings(request: IncomingMessage, res
                 isEnabled: before.isEnabled,
                 hardStopEnabled: before.hardStopEnabled,
                 monthlyMapLoadLimit: before.monthlyMapLoadLimit,
+                monthlyPlacesSearchLimit: before.monthlyPlacesSearchLimit,
               }
             : null,
           after: {
             isEnabled: after.isEnabled,
             hardStopEnabled: after.hardStopEnabled,
             monthlyMapLoadLimit: after.monthlyMapLoadLimit,
+            monthlyPlacesSearchLimit: after.monthlyPlacesSearchLimit,
           },
         },
       },
@@ -1161,6 +1180,7 @@ export async function handleUpdateStaffMapSettings(request: IncomingMessage, res
     isEnabled: input.data.isEnabled,
     hardStopEnabled: input.data.hardStopEnabled,
     monthlyMapLoadLimit: input.data.monthlyMapLoadLimit,
+    monthlyPlacesSearchLimit: input.data.monthlyPlacesSearchLimit,
   });
   sendJson(response, 200, { mapSettings: await getStaffMapSettingsPayload(input.data.provider) });
 }

@@ -3,7 +3,7 @@ import { activeTicketStatuses } from "@qdoc/contracts";
 import { handleLogout, handleMe, handleOtpRequest, handleOtpVerify } from "./auth.js";
 import { getEmailDeliveryHealth } from "./email.js";
 import { sendJson } from "./http.js";
-import { handleMapConfig, handleMapUsage } from "./maps.js";
+import { handleMapConfig, handleMapUsage, handleNearbyHealthcare } from "./maps.js";
 import {
   handleActiveTicket,
   handleActiveTicketEvents,
@@ -86,6 +86,11 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "POST" && url.pathname === "/maps/usage") {
       await handleMapUsage(request, response);
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/maps/nearby-healthcare") {
+      await handleNearbyHealthcare(request, response);
       return;
     }
 

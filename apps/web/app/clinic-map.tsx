@@ -4,10 +4,12 @@ import {
   authErrorSchema,
   mapConfigResponseSchema,
   mapUsageResponseSchema,
+  nearbyHealthcareResponseSchema,
   type MapConfigResponse,
+  type NearbyHealthcarePlace,
   type PatientSiteSummary,
 } from "@qdoc/contracts";
-import { Crosshair, Loader2, MapPin, ShieldCheck } from "lucide-react";
+import { Crosshair, Loader2, MapPin } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
@@ -27,6 +29,16 @@ type ClinicMapProps = {
 type ApiError = Error & {
   status: number;
   error: string;
+};
+
+type MapDisplayPlace = {
+  id: string;
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  qdocSiteId: string | null;
+  kind: "qdoc_site" | "provider_place";
 };
 
 type MapboxMap = {
@@ -142,6 +154,20 @@ async function reserveMapLoad() {
   return readApiResponse(response, mapUsageResponseSchema);
 }
 
+async function fetchNearbyHealthcare(userLocation: BrowserLocation) {
+  const response = await fetch("/api/maps/nearby-healthcare", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      latitude: userLocation.latitude,
+      longitude: userLocation.longitude,
+      radiusMeters: 5000,
+    }),
+  });
+
+  return readApiResponse(response, nearbyHealthcareResponseSchema);
+}
+
 function getWindowMaps() {
   return window as Window & {
     mapboxgl?: MapboxNamespace;
@@ -149,21 +175,60 @@ function getWindowMaps() {
   };
 }
 
+function getSiteDisplayPlaces(sites: PatientSiteSummary[]): MapDisplayPlace[] {
+  return sites.flatMap((site) => {
+    const coordinates = getCoordinates(site);
+
+    if (!coordinates) {
+      return [];
+    }
+
+    const address = [site.location.addressLine1, site.location.city, site.location.region].filter(Boolean).join(", ");
+
+    return [
+      {
+        id: site.id,
+        name: site.name,
+        address: address || null,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        qdocSiteId: site.id,
+        kind: "qdoc_site" as const,
+      },
+    ];
+  });
+}
+
+function getProviderDisplayPlaces(places: NearbyHealthcarePlace[]): MapDisplayPlace[] {
+  return places.map((place) => ({
+    id: place.id,
+    name: place.name,
+    address: place.address,
+    latitude: place.latitude,
+    longitude: place.longitude,
+    qdocSiteId: place.qdocSiteId,
+    kind: "provider_place" as const,
+  }));
+}
+
 async function initializeProviderMap(
   container: HTMLElement,
   config: MapConfigResponse,
-  sites: PatientSiteSummary[],
+  places: MapDisplayPlace[],
   userLocation: BrowserLocation | null,
 ) {
   if (!config.provider) {
     return null;
   }
 
-  const mappedSites = sites
-    .map((site) => ({ site, coordinates: getCoordinates(site) }))
-    .filter((item): item is { site: PatientSiteSummary; coordinates: BrowserLocation } => item.coordinates !== null);
+  const firstPlace = places[0] ?? null;
+  const center = userLocation
+    ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+    : firstPlace
+      ? { latitude: firstPlace.latitude, longitude: firstPlace.longitude }
+      : null;
 
-  if (mappedSites.length === 0) {
+  if (!center) {
     return null;
   }
 
@@ -180,16 +245,11 @@ async function initializeProviderMap(
       throw new Error("mapbox_unavailable");
     }
 
-    const firstSite = mappedSites[0];
-    const center: [number, number] = userLocation
-      ? [userLocation.longitude, userLocation.latitude]
-      : [firstSite.coordinates.longitude, firstSite.coordinates.latitude];
-
     mapboxgl.accessToken = publicToken;
     const map = new mapboxgl.Map({
       container,
       style: "mapbox://styles/mapbox/streets-v12",
-      center,
+      center: [center.longitude, center.latitude],
       zoom: 12,
       attributionControl: false,
     });
@@ -198,10 +258,10 @@ async function initializeProviderMap(
       new mapboxgl.Marker({ color: "#087884" }).setLngLat([userLocation.longitude, userLocation.latitude]).addTo(map);
     }
 
-    for (const { site, coordinates } of mappedSites) {
+    for (const place of places) {
       new mapboxgl.Marker()
-        .setLngLat([coordinates.longitude, coordinates.latitude])
-        .setPopup(new mapboxgl.Popup({ offset: 16 }).setText(site.name))
+        .setLngLat([place.longitude, place.latitude])
+        .setPopup(new mapboxgl.Popup({ offset: 16 }).setText(place.name))
         .addTo(map);
     }
 
@@ -219,11 +279,8 @@ async function initializeProviderMap(
     throw new Error("google_maps_unavailable");
   }
 
-  const firstSite = mappedSites[0];
   const map = new google.maps.Map(container, {
-    center: userLocation
-      ? { lat: userLocation.latitude, lng: userLocation.longitude }
-      : { lat: firstSite.coordinates.latitude, lng: firstSite.coordinates.longitude },
+    center: { lat: center.latitude, lng: center.longitude },
     disableDefaultUI: true,
     zoom: 12,
   });
@@ -239,17 +296,20 @@ async function initializeProviderMap(
     });
   }
 
-  for (const { site, coordinates } of mappedSites) {
-    const position = { lat: coordinates.latitude, lng: coordinates.longitude };
+  for (const place of places) {
+    const position = { lat: place.latitude, lng: place.longitude };
     bounds.extend(position);
     new google.maps.Marker({
       map,
       position,
-      title: site.name,
+      title: place.name,
     });
   }
 
-  map.fitBounds(bounds);
+  if (userLocation || places.length > 0) {
+    map.fitBounds(bounds);
+  }
+
   return {
     remove: () => {
       container.replaceChildren();
@@ -257,8 +317,8 @@ async function initializeProviderMap(
   };
 }
 
-function getFallbackPosition(site: PatientSiteSummary, index: number, selectedSiteId: string) {
-  if (site.id === selectedSiteId) {
+function getFallbackPosition(placeId: string, index: number, selectedPlaceId: string) {
+  if (placeId === selectedPlaceId) {
     return { left: "50%", top: "45%" };
   }
 
@@ -275,15 +335,34 @@ function getFallbackPosition(site: PatientSiteSummary, index: number, selectedSi
 export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }: ClinicMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const providerMapRef = useRef<MapboxMap | null>(null);
-  const [config, setConfig] = useState<MapConfigResponse | null>(null);
+  const locationSignature = userLocation
+    ? `${userLocation.latitude.toFixed(5)}:${userLocation.longitude.toFixed(5)}`
+    : "";
+  const [nearbyResult, setNearbyResult] = useState<{
+    locationSignature: string;
+    places: NearbyHealthcarePlace[];
+  } | null>(null);
+  const [selectedNearbyPlaceId, setSelectedNearbyPlaceId] = useState<string | null>(null);
   const [mapState, setMapState] = useState<"idle" | "loading" | "ready" | "fallback">("idle");
 
-  const siteSignature = useMemo(
+  const hasLocationContext = userLocation !== null;
+  const siteDisplayPlaces = useMemo(() => getSiteDisplayPlaces(sites), [sites]);
+  const providerDisplayPlaces = useMemo(() => {
+    if (!nearbyResult || nearbyResult.locationSignature !== locationSignature) {
+      return [];
+    }
+
+    return getProviderDisplayPlaces(nearbyResult.places);
+  }, [locationSignature, nearbyResult]);
+  const displayPlaces = hasLocationContext ? providerDisplayPlaces : siteDisplayPlaces;
+  const isNearbySearchSettled = !hasLocationContext || nearbyResult?.locationSignature === locationSignature;
+
+  const displaySignature = useMemo(
     () =>
-      sites
-        .map((site) => `${site.id}:${site.location.latitude ?? ""}:${site.location.longitude ?? ""}`)
+      displayPlaces
+        .map((place) => `${place.id}:${place.latitude}:${place.longitude}`)
         .join("|"),
-    [sites],
+    [displayPlaces],
   );
 
   useEffect(() => {
@@ -294,7 +373,41 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
   }, []);
 
   useEffect(() => {
-    if (sites.length === 0 || !mapContainerRef.current) {
+    if (!userLocation) {
+      setNearbyResult(null);
+      setSelectedNearbyPlaceId(null);
+      return;
+    }
+
+    const location = userLocation;
+    const currentLocationSignature = locationSignature;
+    let cancelled = false;
+
+    async function loadNearbyPlaces() {
+      try {
+        const data = await fetchNearbyHealthcare(location);
+
+        if (!cancelled) {
+          setNearbyResult({ locationSignature: currentLocationSignature, places: data.places });
+          setSelectedNearbyPlaceId((current) => (current && data.places.some((place) => place.id === current) ? current : null));
+        }
+      } catch {
+        if (!cancelled) {
+          setNearbyResult({ locationSignature: currentLocationSignature, places: [] });
+          setSelectedNearbyPlaceId(null);
+        }
+      }
+    }
+
+    void loadNearbyPlaces();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locationSignature, userLocation]);
+
+  useEffect(() => {
+    if (!mapContainerRef.current || !isNearbySearchSettled) {
       return;
     }
 
@@ -313,14 +426,12 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
           return;
         }
 
-        setConfig(mapConfig);
-
         if (!mapConfig.canLoad || !mapContainerRef.current) {
           setMapState("fallback");
           return;
         }
 
-        const providerMap = await initializeProviderMap(mapContainerRef.current, mapConfig, sites, userLocation);
+        const providerMap = await initializeProviderMap(mapContainerRef.current, mapConfig, displayPlaces, userLocation);
 
         if (cancelled) {
           providerMap?.remove();
@@ -343,9 +454,18 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
       providerMapRef.current?.remove();
       providerMapRef.current = null;
     };
-  }, [siteSignature, sites, userLocation]);
+  }, [displaySignature, displayPlaces, isNearbySearchSettled, userLocation]);
 
-  const selectedSite = sites.find((site) => site.id === selectedSiteId) ?? sites[0] ?? null;
+  const selectedNearbyPlace = selectedNearbyPlaceId
+    ? providerDisplayPlaces.find((place) => place.id === selectedNearbyPlaceId) ?? null
+    : null;
+  const selectedSite = hasLocationContext ? null : sites.find((site) => site.id === selectedSiteId) ?? sites[0] ?? null;
+  const selectedSiteAddress = selectedSite && !selectedNearbyPlace
+    ? [selectedSite.location.addressLine1, selectedSite.location.city, selectedSite.location.region].filter(Boolean).join(", ")
+    : "";
+  const selectedLabel = selectedNearbyPlace?.name ?? selectedSite?.name ?? (hasLocationContext ? "No nearby clinics found" : "Select a clinic");
+  const selectedAddress = selectedNearbyPlace?.address ?? selectedSiteAddress;
+  const selectedDisplayPlaceId = selectedNearbyPlace?.id ?? selectedSiteId;
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -357,8 +477,8 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs font-medium text-[#087884]">
-          {mapState === "loading" ? <Loader2 className="animate-spin" size={15} aria-hidden="true" /> : <ShieldCheck size={15} aria-hidden="true" />}
-          {mapState === "ready" ? `${config?.provider ?? "map"} guarded` : "cost guard active"}
+          {mapState === "loading" ? <Loader2 className="animate-spin" size={15} aria-hidden="true" /> : <MapPin size={15} aria-hidden="true" />}
+          {mapState === "loading" ? "Loading map" : "Clinic map"}
         </div>
       </div>
 
@@ -378,18 +498,27 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
                 <Crosshair size={18} aria-hidden="true" />
               </div>
             ) : null}
-            {sites.map((site, index) => {
-              const position = getFallbackPosition(site, index, selectedSiteId);
+            {displayPlaces.map((place, index) => {
+              const position = getFallbackPosition(place.id, index, selectedDisplayPlaceId);
+              const isSelected = place.id === selectedDisplayPlaceId;
               return (
                 <button
-                  key={site.id}
+                  key={place.id}
                   type="button"
-                  onClick={() => onSelectSite(site.id)}
+                  onClick={() => {
+                    if (place.kind === "qdoc_site" && place.qdocSiteId) {
+                      setSelectedNearbyPlaceId(null);
+                      onSelectSite(place.qdocSiteId);
+                      return;
+                    }
+
+                    setSelectedNearbyPlaceId(place.id);
+                  }}
                   className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full p-2 shadow-md transition ${
-                    site.id === selectedSiteId ? "bg-[#10b9c4] text-white ring-8 ring-[#10b9c4]/20" : "bg-white text-[#087884]"
+                    isSelected ? "bg-[#10b9c4] text-white ring-8 ring-[#10b9c4]/20" : "bg-white text-[#087884]"
                   }`}
                   style={position}
-                  aria-label={`Select ${site.name}`}
+                  aria-label={`Select ${place.name}`}
                 >
                   <MapPin size={18} aria-hidden="true" />
                 </button>
@@ -400,10 +529,8 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm">
-        <span className="font-medium text-slate-950">{selectedSite?.name ?? "Select a clinic"}</span>
-        <span className="text-slate-500">
-          {config?.canLoad ? `${config.remainingMapLoads} guarded map loads left this month` : "Provider map disabled by budget guard"}
-        </span>
+        <span className="font-medium text-slate-950">{selectedLabel}</span>
+        {selectedAddress ? <span className="text-slate-500">{selectedAddress}</span> : null}
       </div>
     </section>
   );

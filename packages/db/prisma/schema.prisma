@@ -28,6 +28,7 @@ enum MapProvider {
 
 enum MapUsageType {
   map_load
+  places_search
 }
 
 model Organization {
@@ -182,28 +183,31 @@ model AuditLog {
 }
 
 model MapProviderConfig {
-  id                  String      @id @default(cuid())
-  provider            MapProvider @unique
-  isEnabled           Boolean     @default(false)
-  monthlyMapLoadLimit Int         @default(0)
-  hardStopEnabled     Boolean     @default(true)
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  id                       String      @id @default(cuid())
+  provider                 MapProvider @unique
+  isEnabled                Boolean     @default(false)
+  monthlyMapLoadLimit      Int         @default(0)
+  monthlyPlacesSearchLimit Int         @default(0)
+  hardStopEnabled          Boolean     @default(true)
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
 }
 
 model MapProviderConfigAudit {
-  id                             String      @id @default(cuid())
-  provider                       MapProvider
-  action                         String
-  actorId                        String?
-  isEnabledBefore                Boolean?
-  isEnabledAfter                 Boolean?
-  monthlyMapLoadLimitBefore      Int?
-  monthlyMapLoadLimitAfter       Int?
-  hardStopEnabledBefore          Boolean?
-  hardStopEnabledAfter           Boolean?
-  metadata                       Json?
-  createdAt                      DateTime    @default(now())
+  id                                   String      @id @default(cuid())
+  provider                             MapProvider
+  action                               String
+  actorId                              String?
+  isEnabledBefore                      Boolean?
+  isEnabledAfter                       Boolean?
+  monthlyMapLoadLimitBefore            Int?
+  monthlyMapLoadLimitAfter             Int?
+  monthlyPlacesSearchLimitBefore       Int?
+  monthlyPlacesSearchLimitAfter        Int?
+  hardStopEnabledBefore                Boolean?
+  hardStopEnabledAfter                 Boolean?
+  metadata                             Json?
+  createdAt                            DateTime    @default(now())
 
   @@index([provider, createdAt])
   @@index([actorId, createdAt])
@@ -222,4 +226,17 @@ model MapUsagePeriod {
 
   @@unique([provider, usageType, periodStart])
   @@index([provider, usageType, periodStart])
+}
+
+model MapSearchCache {
+  id           String      @id @default(cuid())
+  provider     MapProvider
+  queryKey     String
+  responseJson Json
+  expiresAt    DateTime
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([provider, queryKey])
+  @@index([expiresAt])
 }

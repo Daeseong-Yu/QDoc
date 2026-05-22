@@ -309,7 +309,7 @@ export const mapProviderSchema = z.enum(["mapbox", "google"]);
 
 export type MapProvider = z.infer<typeof mapProviderSchema>;
 
-export const mapUsageTypeSchema = z.enum(["map_load"]);
+export const mapUsageTypeSchema = z.enum(["map_load", "places_search"]);
 
 export type MapUsageType = z.infer<typeof mapUsageTypeSchema>;
 
@@ -342,14 +342,46 @@ export const mapUsageResponseSchema = z.object({
 
 export type MapUsageResponse = z.infer<typeof mapUsageResponseSchema>;
 
+export const nearbyHealthcareInputSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  radiusMeters: z.number().int().min(500).max(10_000).default(5_000),
+});
+
+export type NearbyHealthcareInput = z.infer<typeof nearbyHealthcareInputSchema>;
+
+export const nearbyHealthcarePlaceSchema = z.object({
+  id: z.string(),
+  providerPlaceId: z.string(),
+  name: z.string(),
+  address: z.string().nullable(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  qdocSiteId: z.string().nullable(),
+});
+
+export type NearbyHealthcarePlace = z.infer<typeof nearbyHealthcarePlaceSchema>;
+
+export const nearbyHealthcareResponseSchema = z.object({
+  provider: mapProviderSchema.nullable(),
+  places: nearbyHealthcarePlaceSchema.array(),
+  source: z.enum(["cache", "provider", "unavailable"]),
+  radiusMeters: z.number().int().nonnegative(),
+});
+
+export type NearbyHealthcareResponse = z.infer<typeof nearbyHealthcareResponseSchema>;
+
 export const staffMapSettingsResponseSchema = z.object({
   provider: mapProviderSchema.nullable(),
   isConfigured: z.boolean(),
   isEnabled: z.boolean(),
   hardStopEnabled: z.boolean(),
   monthlyMapLoadLimit: z.number().int().nonnegative(),
+  monthlyPlacesSearchLimit: z.number().int().nonnegative(),
   usedMapLoads: z.number().int().nonnegative(),
+  usedPlacesSearches: z.number().int().nonnegative(),
   remainingMapLoads: z.number().int().nonnegative(),
+  remainingPlacesSearches: z.number().int().nonnegative(),
   resetAt: z.string().datetime(),
   reason: z.enum(["provider_disabled", "token_missing", "budget_exhausted", "available"]),
 });
@@ -361,6 +393,7 @@ export const staffMapSettingsInputSchema = z.object({
   isEnabled: z.boolean(),
   hardStopEnabled: z.boolean(),
   monthlyMapLoadLimit: z.number().int().min(0).max(1_000_000),
+  monthlyPlacesSearchLimit: z.number().int().min(0).max(1_000_000),
 });
 
 export type StaffMapSettingsInput = z.infer<typeof staffMapSettingsInputSchema>;

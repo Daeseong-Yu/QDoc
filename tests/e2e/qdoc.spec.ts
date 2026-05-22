@@ -161,6 +161,27 @@ async function resetE2eData() {
   });
 }
 
+async function resetMapGuardrailsAfterE2e() {
+  await prisma.mapUsagePeriod.deleteMany({ where: { provider: "mapbox" } });
+  await prisma.mapProviderConfigAudit.deleteMany({
+    where: { provider: "mapbox" },
+  });
+  await prisma.mapProviderConfig.upsert({
+    where: { provider: "mapbox" },
+    update: {
+      isEnabled: false,
+      monthlyMapLoadLimit: 0,
+      hardStopEnabled: true,
+    },
+    create: {
+      provider: "mapbox",
+      isEnabled: false,
+      monthlyMapLoadLimit: 0,
+      hardStopEnabled: true,
+    },
+  });
+}
+
 function staffColumn(page: Page, name: string) {
   return page.locator("section").filter({
     has: page.locator("h3", { hasText: new RegExp(`^${name}$`) }),
@@ -229,6 +250,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 });
 
 test.afterAll(async () => {
+  await resetMapGuardrailsAfterE2e();
   await prisma.$disconnect();
 });
 

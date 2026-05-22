@@ -10,6 +10,7 @@ EXPECTED_APP_IMAGE="${QDOC_EXPECTED_APP_IMAGE:-}"
 DRY_RUN="${QDOC_REHEARSAL_DRY_RUN:-false}"
 REQUIRE_PUBLIC_URL="${QDOC_REHEARSAL_REQUIRE_PUBLIC_URL:-true}"
 RUN_BACKUP="${QDOC_REHEARSAL_BACKUP:-false}"
+RUN_LOAD_DRILLS="${QDOC_REHEARSAL_LOAD_DRILLS:-false}"
 
 log() {
   printf '==> %s\n' "$*"
@@ -101,6 +102,12 @@ print_dry_run() {
   else
     log "Would skip backup restore-check; set QDOC_REHEARSAL_BACKUP=true to include it"
   fi
+
+  if is_true "$RUN_LOAD_DRILLS"; then
+    printf 'Would run: QDOC_PUBLIC_URL=%q QDOC_COMPOSE_FILE=%q QDOC_ENV_FILE=%q bash deploy/load-failure-drills.sh\n' "$PUBLIC_URL" "$COMPOSE_FILE" "$ENV_FILE"
+  else
+    log "Would skip load/failure drills; set QDOC_REHEARSAL_LOAD_DRILLS=true to include them"
+  fi
 }
 
 need_command docker
@@ -152,6 +159,16 @@ if is_true "$RUN_BACKUP"; then
     bash deploy/db-restore-check.sh "$backup_path"
 else
   log "Skipping backup restore-check; set QDOC_REHEARSAL_BACKUP=true to include it"
+fi
+
+if is_true "$RUN_LOAD_DRILLS"; then
+  log "Running bounded load and failure drills"
+  QDOC_COMPOSE_FILE="$COMPOSE_FILE" \
+    QDOC_ENV_FILE="$ENV_FILE" \
+    QDOC_PUBLIC_URL="$PUBLIC_URL" \
+    bash deploy/load-failure-drills.sh
+else
+  log "Skipping load/failure drills; set QDOC_REHEARSAL_LOAD_DRILLS=true to include them"
 fi
 
 log "Staging rehearsal passed"

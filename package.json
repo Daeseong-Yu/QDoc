@@ -17,6 +17,7 @@
     "verify:ops": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:ops",
     "verify:admin-data": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:admin-data",
     "verify:launch": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:launch",
+    "verify:drills": "bash deploy/load-failure-drills.sh",
     "verify:staging": "bash deploy/verify-staging.sh",
     "verify:staging:rehearsal": "bash deploy/staging-rehearsal.sh",
     "build": "turbo run build",

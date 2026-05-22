@@ -189,7 +189,7 @@ async function signIn(page: Page, emailPlaceholder: string) {
   });
   await page.getByPlaceholder("6-digit code").fill(e2eOtpCode);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText("Signed in.")).toBeVisible();
+  await expect(page.getByText(e2eEmail)).toBeVisible();
 }
 
 async function selectE2eSite(page: Page) {

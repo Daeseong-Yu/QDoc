@@ -186,6 +186,10 @@ Manual core-flow staging checklist:
 4. Staff delays a waiting ticket and restores it; the restored ticket returns to the front of the waiting queue.
 5. Worker logs show outbox jobs being processed, or `QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh` passes against staging.
 
+Release go/no-go:
+
+Use [docs/release-go-no-go.md](docs/release-go-no-go.md) as the launch-candidate evidence template. A launch decision needs local check results, staging verifier/rehearsal evidence, backup restore-check evidence, manual smoke results, manual account configuration confirmation, known residual risks, and a rollback target. Do not store secrets, OTPs, database dumps, private deployment logs, patient payloads, or raw connection strings in the evidence.
+
 ## AWS EC2 Staging Deployment
 
 The staging setup assumes another host-level Caddy process already owns public ports `80` and `443`. QDoc should not start its own public Caddy container on that host. The EC2 instance is intentionally kept out of the build path: GitHub Actions builds the Docker image, stores it in S3, and asks Systems Manager to run the host-side deployment script.

@@ -15,6 +15,7 @@
     "e2e:install": "playwright install chromium",
     "verify:outbox": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:outbox",
     "verify:ops": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:ops",
+    "verify:admin-data": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:admin-data",
     "verify:launch": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:launch",
     "verify:staging": "bash deploy/verify-staging.sh",
     "verify:staging:rehearsal": "bash deploy/staging-rehearsal.sh",

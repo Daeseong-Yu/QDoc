@@ -93,7 +93,7 @@ check_expected_app_image() {
 
 print_dry_run() {
   log "Dry run passed preflight checks"
-  printf 'Would run: QDOC_PUBLIC_URL=%q QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_LAUNCH=true QDOC_COMPOSE_FILE=%q QDOC_ENV_FILE=%q bash deploy/verify-staging.sh\n' "$PUBLIC_URL" "$COMPOSE_FILE" "$ENV_FILE"
+  printf 'Would run: QDOC_PUBLIC_URL=%q QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_ADMIN_DATA=true QDOC_VERIFY_LAUNCH=true QDOC_COMPOSE_FILE=%q QDOC_ENV_FILE=%q bash deploy/verify-staging.sh\n' "$PUBLIC_URL" "$COMPOSE_FILE" "$ENV_FILE"
 
   if is_true "$RUN_BACKUP"; then
     printf 'Would run: QDOC_BACKUP_DIR=%q QDOC_COMPOSE_FILE=%q QDOC_ENV_FILE=%q bash deploy/db-backup.sh\n' "$BACKUP_DIR" "$COMPOSE_FILE" "$ENV_FILE"
@@ -130,6 +130,7 @@ QDOC_COMPOSE_FILE="$COMPOSE_FILE" \
   QDOC_PUBLIC_URL="$PUBLIC_URL" \
   QDOC_VERIFY_OUTBOX=true \
   QDOC_VERIFY_OPS=true \
+  QDOC_VERIFY_ADMIN_DATA=true \
   QDOC_VERIFY_LAUNCH=true \
   bash deploy/verify-staging.sh
 

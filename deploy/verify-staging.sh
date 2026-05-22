@@ -5,6 +5,7 @@ COMPOSE_FILE="${QDOC_COMPOSE_FILE:-compose.staging.yaml}"
 ENV_FILE="${QDOC_ENV_FILE:-.env.staging}"
 RUN_OUTBOX="${QDOC_VERIFY_OUTBOX:-false}"
 RUN_OPS="${QDOC_VERIFY_OPS:-false}"
+RUN_ADMIN_DATA="${QDOC_VERIFY_ADMIN_DATA:-false}"
 RUN_LAUNCH="${QDOC_VERIFY_LAUNCH:-false}"
 
 env_file_value() {
@@ -115,6 +116,13 @@ if [ "$RUN_OPS" = "true" ]; then
   compose run --rm --no-deps worker pnpm verify:ops
 else
   log "Skipping operational verification; set QDOC_VERIFY_OPS=true to enable it"
+fi
+
+if [ "$RUN_ADMIN_DATA" = "true" ]; then
+  log "Running admin data verification in the staging image"
+  compose run --rm --no-deps worker pnpm verify:admin-data
+else
+  log "Skipping admin data verification; set QDOC_VERIFY_ADMIN_DATA=true to enable it"
 fi
 
 if [ "$RUN_LAUNCH" = "true" ]; then

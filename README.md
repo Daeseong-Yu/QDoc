@@ -157,6 +157,7 @@ pnpm build
 pnpm db:validate
 pnpm verify:outbox
 pnpm verify:ops
+pnpm verify:admin-data
 pnpm verify:launch
 pnpm e2e
 ```
@@ -164,6 +165,8 @@ pnpm e2e
 `pnpm verify:outbox` creates scoped verification rows, runs the worker outbox processor against those rows only, checks processed/retry/failed transitions, and removes the rows it created.
 
 `pnpm verify:ops` prints safe operational JSON for outbox status counts, oldest pending job age, failed almost-ready email jobs, active ticket counts, and current map guardrail state. It exits non-zero when failed outbox jobs, stale processing jobs, failed email jobs, or enabled map guardrail misconfiguration need operator attention.
+
+`pnpm verify:admin-data` prints safe operational JSON for organization, clinic site, queue, staff membership, audit-log count, ticket-count, and map budget configuration readiness. It does not print emails, OTPs, raw database URLs, ticket IDs, audit metadata, or patient payloads. Set `QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener` to require specific launch clinic IDs; a missing expected site exits non-zero and provides a failure-path check without changing database rows.
 
 `pnpm verify:launch` prints safe launch-readiness JSON for required database and Redis configuration, session hardening, HTTPS origin settings, loopback web binding, OTP debug flags, SMTP readiness, and map-provider cost guardrails. It treats `APP_ENV=staging`, `APP_ENV=production`, and `NODE_ENV=production` as launch-like environments and exits non-zero when fail-closed settings are not ready.
 
@@ -300,10 +303,10 @@ Or run the bundled staging verifier from the EC2 checkout:
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh
-QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_LAUNCH=true bash deploy/verify-staging.sh
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_ADMIN_DATA=true QDOC_VERIFY_LAUNCH=true bash deploy/verify-staging.sh
 ```
 
-The verifier checks the Compose service state, healthchecks for web/API/worker/PostgreSQL/Redis, the loopback web endpoint, API health and readiness from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` runs the scoped outbox processor verification against the staging database. `QDOC_VERIFY_OPS=true` runs the safe operational summary for queue, notification, outbox, and map guardrail state. `QDOC_VERIFY_LAUNCH=true` runs the fail-closed launch hardening checks for secrets, OTP debug flags, SMTP readiness, web binding, and map budget controls.
+The verifier checks the Compose service state, healthchecks for web/API/worker/PostgreSQL/Redis, the loopback web endpoint, API health and readiness from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` runs the scoped outbox processor verification against the staging database. `QDOC_VERIFY_OPS=true` runs the safe operational summary for queue, notification, outbox, and map guardrail state. `QDOC_VERIFY_ADMIN_DATA=true` checks launch-critical organization, clinic, queue, staff access, and map budget records without printing sensitive fields. `QDOC_VERIFY_LAUNCH=true` runs the fail-closed launch hardening checks for secrets, OTP debug flags, SMTP readiness, web binding, and map budget controls.
 
 Launch-candidate staging rehearsal:
 
@@ -339,6 +342,29 @@ Rollback:
 4. Run `QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh`.
 5. If the rollback crosses database migrations, check the migration contents first. The current MVP deploy path only runs forward Prisma deploy migrations and does not implement automatic down migrations.
 
+Admin data operations:
+
+1. Classify the operation before changing data:
+   - Seed-only: `pnpm db:seed` and `pnpm db:seed:staging` create the demo organization, clinic sites, queues, staff account, sample tickets, and disabled map provider guardrail rows. Use these for local or approved staging bootstrap only, not production onboarding.
+   - Application-supported: staff admins can manage site settings, notification threshold, queue open/closed state, site memberships, audit-log review, and notification health from `/staff`. Operators listed in `MAP_SETTINGS_ADMIN_EMAILS` can manage global map provider enablement, monthly map-load limits, and hard-stop settings from the staff UI.
+   - Database-admin-only: new production organization/site/queue creation, destructive record cleanup, direct restore, and emergency data correction require an approved DB-admin procedure or a reviewed script. Do not bypass staff authorization boundaries from the public API.
+2. After migrations and approved seed/bootstrap data are applied, sign in as a site admin, verify every launch clinic has the expected address or coordinates, set `notificationAheadCount`, confirm at least one queue exists, and add at least one admin membership per site.
+3. Keep map providers disabled until provider console restrictions, browser credentials, monthly QDoc limit, and QDoc hard-stop settings are all configured. If a provider is enabled, `monthlyMapLoadLimit` must be positive and `hardStopEnabled` must stay true.
+4. Run the admin data verifier:
+
+```bash
+pnpm verify:admin-data
+QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener pnpm verify:admin-data
+```
+
+5. Exercise the failure path without mutating data:
+
+```bash
+QDOC_ADMIN_DATA_EXPECT_SITE_IDS=missing-launch-site pnpm verify:admin-data
+```
+
+The failure-path command should exit non-zero and print only safe JSON counts, statuses, site IDs/names, queue IDs/names, and map guardrail fields.
+
 Database backup and restore:
 
 1. Create a PostgreSQL custom-format backup from the running Compose database:
@@ -366,7 +392,7 @@ QDOC_COMPOSE_FILE=compose.yaml QDOC_ENV_FILE=.env bash deploy/db-restore-check.s
 QDOC_RESTORE_CONFIRM=restore-qdoc bash deploy/db-restore.sh /opt/qdoc/backups/<backup-file>.dump
 ```
 
-5. After restore, run `QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_LAUNCH=true bash deploy/verify-staging.sh` and complete the manual patient and staff smoke checks.
+5. After restore, run `QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_ADMIN_DATA=true QDOC_VERIFY_LAUNCH=true bash deploy/verify-staging.sh` and complete the manual patient and staff smoke checks.
 
 Launch hardening checklist:
 

@@ -252,26 +252,26 @@ export async function handleOtpRequest(request: IncomingMessage, response: Serve
     return;
   }
 
-  const redisRateLimit = await checkOtpRequestRateLimit(input.data.email, getRequesterKey(request));
-
-  if (!redisRateLimit.allowed) {
-    console.warn("OTP request rate limited", {
-      policy: redisRateLimit.policy,
-      email: maskEmail(input.data.email),
-    });
-    sendJson(response, 429, { error: "rate_limited" }, { "retry-after": String(redisRateLimit.retryAfterSeconds) });
-    return;
-  }
-
   if (!reserveRequestEmail(input.data.email)) {
     sendJson(response, 429, { error: "rate_limited" });
     return;
   }
 
   if (await hasTooManyPendingChallenges(input.data.email)) {
-    clearCooldown(otpRequestCooldowns, requestCooldownKey);
     releaseRequestEmail(input.data.email);
     sendJson(response, 429, { error: "rate_limited" });
+    return;
+  }
+
+  const redisRateLimit = await checkOtpRequestRateLimit(input.data.email, getRequesterKey(request));
+
+  if (!redisRateLimit.allowed) {
+    releaseRequestEmail(input.data.email);
+    console.warn("OTP request rate limited", {
+      policy: redisRateLimit.policy,
+      email: maskEmail(input.data.email),
+    });
+    sendJson(response, 429, { error: "rate_limited" }, { "retry-after": String(redisRateLimit.retryAfterSeconds) });
     return;
   }
 

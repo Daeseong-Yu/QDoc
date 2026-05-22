@@ -385,31 +385,31 @@ export async function checkOtpRequestRateLimit(email: string, requesterKey: stri
     return await checkPolicies([
       {
         name: "otp_request_pair_minute",
-        key: `qdoc:rate:otp-request:pair:${pairKey}:60`,
+        key: `qdoc:rate:otp-request:v2:pair:${pairKey}:60`,
         limit: 1,
         windowSeconds: 60,
       },
       {
         name: "otp_request_email_hour",
-        key: `qdoc:rate:otp-request:email:${emailKey}:3600`,
+        key: `qdoc:rate:otp-request:v2:email:${emailKey}:3600`,
         limit: 5,
         windowSeconds: 3600,
       },
       {
         name: "otp_request_email_day",
-        key: `qdoc:rate:otp-request:email:${emailKey}:86400`,
+        key: `qdoc:rate:otp-request:v2:email:${emailKey}:86400`,
         limit: 20,
         windowSeconds: 86400,
       },
       {
         name: "otp_request_ip_minute",
-        key: `qdoc:rate:otp-request:ip:${requesterKeyPart}:60`,
+        key: `qdoc:rate:otp-request:v2:ip:${requesterKeyPart}:60`,
         limit: 10,
         windowSeconds: 60,
       },
       {
         name: "otp_request_ip_hour",
-        key: `qdoc:rate:otp-request:ip:${requesterKeyPart}:3600`,
+        key: `qdoc:rate:otp-request:v2:ip:${requesterKeyPart}:3600`,
         limit: 100,
         windowSeconds: 3600,
       },

@@ -291,6 +291,19 @@ export default function Home() {
     }
   }, [currentUser, loadTickets]);
 
+  const refreshDashboard = useCallback(() => {
+    setMessage("");
+    setSitesReloadKey((value) => value + 1);
+
+    if (selectedSiteId) {
+      setQueuesReloadKey((value) => value + 1);
+    }
+
+    if (currentUser) {
+      void refreshTickets();
+    }
+  }, [currentUser, refreshTickets, selectedSiteId]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -628,10 +641,12 @@ export default function Home() {
     setMessage("");
   }
 
+  const isRefreshing = sitesState === "loading" || queuesState === "loading" || ticketState === "loading";
+
   return (
     <main className="min-h-screen bg-[#f4fbfb] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="flex flex-col gap-5">
+      <div className="mx-auto flex max-w-6xl flex-col gap-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
           <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-lg bg-[#10b9c4] text-white">
@@ -645,16 +660,89 @@ export default function Home() {
             <button
               type="button"
               onClick={() => {
-                void refreshTickets();
+                refreshDashboard();
               }}
               className="inline-flex h-10 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] shadow-sm hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!currentUser || ticketState === "loading"}
+              disabled={isRefreshing}
             >
-              {ticketState === "loading" ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <RefreshCcw size={16} aria-hidden="true" />}
+              {isRefreshing ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <RefreshCcw size={16} aria-hidden="true" />}
               Refresh
             </button>
           </header>
 
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Patient session</h2>
+                <p className="text-sm text-slate-600">{currentUser ? currentUser.email : "Sign in with email OTP."}</p>
+              </div>
+              {currentUser ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void signOut();
+                  }}
+                  className="inline-flex size-9 items-center justify-center rounded-md border border-[#b9eaee] text-[#087884] hover:bg-[#eefbfc]"
+                  aria-label="Sign out"
+                >
+                  <LogOut size={17} aria-hidden="true" />
+                </button>
+              ) : (
+                <Mail size={21} className="text-[#0a8f9c]" aria-hidden="true" />
+              )}
+            </div>
+
+            {!currentUser ? (
+              <div className="grid gap-3">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
+                />
+                {authStep === "code" ? (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    placeholder="6-digit code"
+                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    void (authStep === "email" ? requestOtp() : verifyOtp());
+                  }}
+                  disabled={authState === "loading"}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {authState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
+                  {authStep === "email" ? "Send code" : "Sign in"}
+                </button>
+              </div>
+            ) : null}
+            {currentUser ? (
+              <label className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm text-slate-700">
+                <span>Email almost-ready alerts</span>
+                <input
+                  type="checkbox"
+                  checked={emailNotificationsEnabled}
+                  onChange={(event) => {
+                    void updateEmailNotificationsEnabled(event.target.checked);
+                  }}
+                  disabled={preferencesState === "loading"}
+                  className="size-4 accent-[#10b9c4] disabled:cursor-not-allowed"
+                />
+              </label>
+            ) : null}
+          </section>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+          <section className="flex flex-col gap-5">
           {message ? (
             <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
               {message}
@@ -821,76 +909,6 @@ export default function Home() {
 
         <aside className="flex flex-col gap-5">
           <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-950">Patient session</h2>
-                <p className="text-sm text-slate-600">{currentUser ? currentUser.email : "Sign in with email OTP."}</p>
-              </div>
-              {currentUser ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void signOut();
-                  }}
-                  className="inline-flex size-9 items-center justify-center rounded-md border border-[#b9eaee] text-[#087884] hover:bg-[#eefbfc]"
-                  aria-label="Sign out"
-                >
-                  <LogOut size={17} aria-hidden="true" />
-                </button>
-              ) : (
-                <Mail size={21} className="text-[#0a8f9c]" aria-hidden="true" />
-              )}
-            </div>
-
-            {!currentUser ? (
-              <div className="grid gap-3">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@example.com"
-                  className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
-                />
-                {authStep === "code" ? (
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={code}
-                    onChange={(event) => setCode(event.target.value)}
-                    placeholder="6-digit code"
-                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
-                  />
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    void (authStep === "email" ? requestOtp() : verifyOtp());
-                  }}
-                  disabled={authState === "loading"}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
-                >
-                  {authState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
-                  {authStep === "email" ? "Send code" : "Sign in"}
-                </button>
-              </div>
-            ) : null}
-            {currentUser ? (
-              <label className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm text-slate-700">
-                <span>Email almost-ready alerts</span>
-                <input
-                  type="checkbox"
-                  checked={emailNotificationsEnabled}
-                  onChange={(event) => {
-                    void updateEmailNotificationsEnabled(event.target.checked);
-                  }}
-                  disabled={preferencesState === "loading"}
-                  className="size-4 accent-[#10b9c4] disabled:cursor-not-allowed"
-                />
-              </label>
-            ) : null}
-          </section>
-
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-3">
               <Clock3 size={21} className="text-[#0a8f9c]" aria-hidden="true" />
               <div>
@@ -950,6 +968,7 @@ export default function Home() {
             </div>
           </section>
         </aside>
+      </div>
       </div>
     </main>
   );

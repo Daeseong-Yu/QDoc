@@ -33,6 +33,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - Public endpoints must stay limited to documented API paths and must validate external input.
 - Preserve backward compatibility unless the user explicitly approves a breaking change.
 - Update `.ai/core` docs and `.ai/phases` plans before changing public APIs, deployment flow, secret handling, or data storage structure.
+- Record newly approved portfolio-readiness blockers in `.ai/execution/current.md` and the active `.ai/phases/{task}/step*.md` before implementation, so future work does not depend on chat history.
 - EC2 deployment must keep build work off the low-resource host; GitHub Actions should produce the deployable artifact.
 
 ## Portfolio Public Demo Gate

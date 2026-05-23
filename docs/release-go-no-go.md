@@ -2,6 +2,8 @@
 
 Use this checklist for a portfolio-ready launch-candidate decision. `GO` means QDoc can be presented publicly as a portfolio demo where visitors can test the main workflows without developer explanation. Record command status, short safe summaries, commit SHAs, artifact identifiers, and operator notes. Do not paste secrets, OTP codes, database dumps, private deployment logs, patient payloads, or raw connection strings into the evidence.
 
+Do not start final GO evidence collection while known portfolio blockers remain open. At minimum, finish the interactive provider map, first-time OTP delivery, real staff/admin demo access, user-friendly auth/map error handling, patient/staff smoke path, notification/outbox health, backup restore-check, rollback target, and staging rehearsal.
+
 ## Release Identity
 
 - Candidate Git SHA: `<40-character-sha>`

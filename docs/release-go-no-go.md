@@ -14,6 +14,18 @@ Track remaining evidence by Step 5 work package:
 
 Do not mark a package complete from local tests alone when it depends on real inboxes, real provider credentials, public browser restrictions, deployed host settings, backup restore-checks, or rollback artifacts.
 
+## Work Package Evidence
+
+Fill this table for each release candidate. Keep the notes safe: use short summaries, commit SHAs, command names, and pass/fail outcomes; do not paste secrets, OTPs, private logs, raw patient payloads, provider credentials, or connection strings.
+
+| Package | Required proof | Current status | Evidence location |
+| --- | --- | --- | --- |
+| P5-A Staff demo access | Real OTP-receivable staff/admin access, tester authorization path, unauthorized personal email denial | Pending staging/manual proof | `<link-or-note>` |
+| P5-B Provider map public-browser | Geolocation-centered provider map, pan/zoom, recentering, marker/card sync, QDoc-vs-provider distinction, fail-closed states | Pending staging/manual proof | `<link-or-note>` |
+| P5-C OTP delivery and auth errors | First-time SMTP delivery, readable retry/delivery/invalid/expired states, refresh/revisit session behavior | Pending staging/manual proof | `<link-or-note>` |
+| P5-D Public demo smoke | Patient/staff/queue/notification/outbox/membership/audit-log/map path tested as a visitor/tester | Pending local extension and staging/manual proof | `<link-or-note>` |
+| P5-E Operations evidence | Staging verifier, full rehearsal, backup restore-check, rollback target, GO/NO-GO decision | Pending staging/manual proof | `<link-or-note>` |
+
 ## Release Identity
 
 - Candidate Git SHA: `<40-character-sha>`

@@ -34,6 +34,8 @@ The default execution order is P5-A, P5-B, P5-C, P5-D, then P5-E. If staging/man
 
 Do not mark a package complete for `GO` from local tests alone when the package depends on real email delivery, public-browser provider behavior, deployed host settings, backup restore-checks, or rollback artifacts.
 
+If staging/manual evidence cannot be collected because the candidate has not been pushed, deployed, or configured with real SMTP, staff tester inboxes, map provider credentials, provider restrictions, backup storage, or rollback artifacts, record that prerequisite explicitly and continue only with local implementation or documentation work that reduces the relevant package blocker. Do not repeatedly retry external commands after approval or environment failures.
+
 ## Active Completion Rules
 
 These rules capture the newly defined product-completion expectations for future work:
@@ -217,5 +219,7 @@ When a work package is completed, redefined, or blocked by a new product/operati
 7. `.ai/core/ADR.md` for durable decisions and trade-offs
 8. `AGENTS.md` for rules future Codex sessions must follow
 9. `docs/release-go-no-go.md` or README for tester/operator procedure changes
+
+The `.ai/` files are local workflow state in this repository. Keep them current for execution continuity, but do not force-add or commit ignored `.ai` files unless the user explicitly asks and the diff has been reviewed for local paths, private host details, secrets, OTP values, provider/account identifiers, and operational evidence that should stay private.
 
 Do not record secrets, OTP values, private logs, raw patient payloads, provider credentials, database dumps, raw connection strings, or private operational identifiers in repository-safe evidence.

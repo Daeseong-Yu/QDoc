@@ -175,7 +175,7 @@ pnpm e2e
 
 `pnpm verify:ops` prints safe operational JSON for outbox status counts, oldest pending job age, failed almost-ready email jobs, active ticket counts, and current map guardrail state. It exits non-zero when failed outbox jobs, stale processing jobs, failed email jobs, or enabled map guardrail misconfiguration need operator attention.
 
-`pnpm verify:admin-data` prints safe operational JSON for organization, clinic site, queue, staff membership, audit-log count, ticket-count, and map budget configuration readiness. It does not print emails, OTPs, raw database URLs, ticket IDs, audit metadata, or patient payloads. Set `QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener` to require specific launch clinic IDs, and set `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS=staff@example.com` to verify that each launch site has the expected admin memberships without printing the addresses. Missing expected data exits non-zero and provides a failure-path check without changing database rows.
+`pnpm verify:admin-data` prints safe operational JSON for organization, clinic site, queue, staff membership, audit-log count, ticket-count, and map budget configuration readiness. It does not print emails, OTPs, raw database URLs, ticket IDs, audit metadata, or patient payloads. Set `QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener` to require specific launch clinic IDs, and set `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` to a real OTP-receivable staff/admin inbox to verify that each launch site has the expected admin memberships without printing the addresses. Missing expected data exits non-zero and provides a failure-path check without changing database rows.
 
 `pnpm verify:launch` prints safe launch-readiness JSON for required database and Redis configuration, session hardening, HTTPS origin settings, loopback web binding, OTP debug flags, SMTP readiness, and map-provider cost guardrails. It treats `APP_ENV=staging`, `APP_ENV=production`, and `NODE_ENV=production` as launch-like environments and exits non-zero when fail-closed settings are not ready. Nearby healthcare search is disabled by default until a server-side provider credential and a positive monthly search limit are configured.
 
@@ -234,6 +234,7 @@ Staging environment variables:
 | `REDIS_URL` | yes | Internal Redis URL used for OTP rate-limit counters. |
 | `SESSION_SECRET` | yes | Long random secret; never commit the value. |
 | `QDOC_SEED_STAFF_ADMIN_EMAILS` | staging bootstrap | Comma-separated real staff/admin emails to create or upsert during approved seed/bootstrap. Local defaults to `staff@example.com`; staging should use real OTP-receivable addresses. |
+| `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` | no | Comma-separated clinic site IDs that `pnpm verify:admin-data` must find. Defaults are not required locally, but staging should set the launch clinic IDs. |
 | `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` | no | Comma-separated staff/admin emails that `pnpm verify:admin-data` must find as site admins. The verifier prints counts and site IDs only, not the addresses. |
 | `EMAIL_PROVIDER` | yes | Use `smtp` for staging unless console delivery is explicitly allowed. |
 | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | yes for SMTP | SMTP sender and credentials; never print or commit secrets. |
@@ -412,7 +413,7 @@ Admin data operations:
 ```bash
 pnpm verify:admin-data
 QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener pnpm verify:admin-data
-QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS=staff@example.com pnpm verify:admin-data
+QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm verify:admin-data
 ```
 
 5. Exercise the failure path without mutating data:

@@ -62,6 +62,8 @@ function getChecks(): LaunchCheck[] {
     !mapSearchEnabled ||
     (getPositiveInteger("MAP_SEARCH_RATE_LIMIT_PER_MINUTE") > 0 && getPositiveInteger("MAP_SEARCH_RATE_LIMIT_PER_HOUR") > 0);
   const mapSearchCacheOk = !mapSearchEnabled || getPositiveInteger("MAP_SEARCH_CACHE_TTL_SECONDS") > 0;
+  const expectedStaffAdmins = env("QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS");
+  const staffDemoExpectationsOk = !productionLike || (expectedStaffAdmins.length > 0 && !hasPlaceholderValue(expectedStaffAdmins));
 
   return [
     check("database_url", env("DATABASE_URL").length > 0, "configured", "missing_database_url"),
@@ -142,6 +144,12 @@ function getChecks(): LaunchCheck[] {
       "map_search_rate_limits_invalid",
     ),
     check("map_search_cache", mapSearchCacheOk, mapSearchEnabled ? "configured" : "disabled", "map_search_cache_ttl_invalid"),
+    check(
+      "staff_demo_expectations",
+      staffDemoExpectationsOk,
+      productionLike ? "configured" : "not_required_for_non_launch_env",
+      "missing_real_staff_admin_expectation",
+    ),
   ];
 }
 

@@ -24,6 +24,16 @@ Documentation coverage for this newly defined work:
 - `.ai/phases/qdoc-launch-candidate/step5.md` keeps the active acceptance criteria, implementation order, and verification expectations.
 - `AGENTS.md` keeps the future-session rules so Step 5 work does not depend on chat history.
 
+Resume from these documents in this order when continuing the newly defined work:
+
+1. `.ai/execution/current.md` for the latest active status snapshot and current blockers.
+2. `.ai/phases/qdoc-launch-candidate/step5.md` for the active Step 5 acceptance criteria, implementation order, and package closure rules.
+3. This document and `.ai/docs/portfolio-go-work-packages.md` for P5-A through P5-E local state, staging/manual evidence, and verification commands.
+4. `docs/release-go-no-go.md` for the operator-facing evidence checklist and safe decision-record fields.
+5. `AGENTS.md` for future-session rules, commit review policy, `.ai` handling, and portfolio `GO` interpretation.
+
+The next work item should be selected from the first P5 package whose tester-facing product path or required staging/manual proof is still missing. Do not move directly from local automated coverage to `GO`.
+
 Do not close a package for `GO` from local tests alone when the behavior depends on:
 
 - real OTP-receivable inboxes

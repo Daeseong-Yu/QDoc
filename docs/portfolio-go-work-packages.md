@@ -114,7 +114,7 @@ Implementation state:
 - Seed/bootstrap supports expected staff/admin emails.
 - Existing staging databases can add or promote real staff/admin emails with `deploy/bootstrap-staff-admins.sh` or `pnpm db:bootstrap-staff-admins:staging` without rerunning the full seed, resetting tickets, changing queues, or changing map guardrail rows.
 - Launch/admin-data verification can assert staff/admin readiness without printing addresses.
-- Local E2E proves an admin-created staff tester membership path and role boundaries.
+- Local E2E proves admin-created staff tester membership, staff-only role boundaries, admin role update/delete flows, membership audit-log visibility, and last-admin protection.
 
 Remaining evidence:
 
@@ -197,7 +197,7 @@ Outcome: a visitor can test the patient path and an authorized tester can test t
 
 Implementation state:
 
-- Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, and core queue operations.
+- Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, core queue operations, membership role update/delete, membership audit-log visibility, and last-admin protection.
 - Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, marker selection, selected-state feedback, map fallback/provider surface expectations, `/staff` sign-in surface reachability, and absence of raw internal errors in the public UI. It does not request OTPs or prove staff authorization.
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`.
 

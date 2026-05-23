@@ -53,7 +53,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - The active implementation order for the current launch-candidate step is: staff demo access, provider-backed map/public-browser verification, first-time OTP delivery verification, full patient/staff smoke, notification/outbox evidence, backup restore-check, rollback target, then GO/NO-GO record.
 - Use the current Step 5 work packages as commit and evidence boundaries: P5-A staff demo access, P5-B provider map public-browser verification, P5-C OTP delivery and auth error usability, P5-D public demo smoke, and P5-E operations evidence and decision.
 - Distinguish local implementation completion from staging/manual evidence. A blocker is not closed for `GO` until the required staging/manual proof exists for behavior that depends on real email delivery, real provider credentials, public browser restrictions, deployed host config, backup restore-checks, or rollback artifacts.
-- When resuming Step 5, read the work package status snapshot in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md` before choosing the next task. The current next local implementation target is P5-D smoke coverage unless the user's latest instruction changes priority.
+- When resuming Step 5, read the work package status snapshot in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md` before choosing the next task. The current next local target is P5-E operations evidence readiness unless staging/manual P5-D smoke reveals a product gap or the user's latest instruction changes priority.
 - Current GO blockers must stay synchronized in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md`. Update `.ai/core/PRD.md`, `.ai/core/ARCHITECTURE.md`, `.ai/core/ADR.md`, `AGENTS.md`, README, or `docs/release-go-no-go.md` when the change affects product scope, architecture, durable decisions, future-agent rules, or tester/operator procedures.
 - Future changes that redefine `GO`, public demo scope, map provider behavior, staff bootstrap, session/auth behavior, deployment flow, or secret handling must be reflected in `.ai/core`, the active `.ai/phases` step, and this file before implementation continues.
 
@@ -111,7 +111,7 @@ Workflow structure:
 
 ```bash
 python3 .ai/scripts/validate_workflow.py
-python3 .ai/scripts/execute.py qdoc-mvp --check
+python3 .ai/scripts/execute.py qdoc-launch-candidate --check
 ```
 
 Repository hygiene:

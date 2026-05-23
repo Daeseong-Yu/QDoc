@@ -50,6 +50,31 @@ Do not downgrade one of these requirements to an accepted risk unless the user e
 
 Treat tester-facing usability gaps as implementation work. A map that renders but does not pan, zoom, recenter, or synchronize selection; staff access that only works after hidden database edits; OTP failures that expose raw API codes; or smoke steps that require developer explanation are blockers in their related P5 package.
 
+## Pre-GO Functional Completion List
+
+This is the concrete task list that remains before `GO`. It is broader than deployment success and narrower than the future product roadmap.
+
+1. Staff access
+   - Prepare real OTP-receivable staff/admin access.
+   - Prepare or add a real tester email through bootstrap or membership management.
+   - Verify unauthorized personal emails remain blocked with readable copy.
+2. Map experience
+   - Prove provider-backed map loading in a public browser.
+   - Verify browser-geolocation centering, pan/zoom, current-location recentering, marker/card synchronization, selected-state feedback, and QDoc-vs-provider discovery distinction.
+   - Verify disabled, denied-location, missing-credential, and over-budget states fail closed without internal cost-guard labels.
+3. OTP and session behavior
+   - Prove first-time staging OTP delivery for patient and staff paths.
+   - Verify readable delivery-unavailable, rate-limited, invalid-code, expired-code, and unauthorized-staff messages.
+   - Verify refresh/revisit session behavior on the deployed host.
+4. Patient public demo smoke
+   - Complete visitor-style OTP sign-in, map discovery, clinic/queue selection, check-in, active ticket viewing, notification preference review, refresh, and revisit.
+5. Staff public demo smoke
+   - Complete tester-style staff sign-in, site authorization, queue board use, call/start/complete, delay/restore, cancel, queue open/close, notification threshold, membership management, audit-log review, and role boundary checks.
+6. Notification and outbox proof
+   - Verify almost-ready notification generation, outbox processing, failed-job visibility, and duplicate-delivery prevention against the deployed worker.
+7. Operations proof
+   - Record staging verifier, staging rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and explicit GO/NO-GO decision.
+
 ## Work Packages
 
 Completion standard: a work package is not done only because the code path exists. It is done when the intended visitor or tester can execute the documented workflow in staging without developer explanation, direct database edits, placeholder-only accounts, or raw implementation errors. If evidence collection finds a gap, return to implementation in that package and update the status here.

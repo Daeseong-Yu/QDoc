@@ -16,6 +16,8 @@ The package-level source of truth for this newly defined work is `docs/portfolio
 
 Do not mark a package complete from local tests alone when it depends on real inboxes, real provider credentials, public browser restrictions, deployed host settings, backup restore-checks, or rollback artifacts.
 
+If any evidence step shows that a visitor or invited tester cannot complete a documented workflow from the UI and checklist alone, stop treating the release as evidence-only work. Return to the relevant P5 package, fix the implementation or documentation gap, and rerun the affected checks before recording a GO/NO-GO decision.
+
 ## Work Package Evidence
 
 Fill this table for each release candidate. Keep the notes safe: use short summaries, commit SHAs, command names, and pass/fail outcomes; do not paste secrets, OTPs, private logs, raw patient payloads, provider credentials, or connection strings.

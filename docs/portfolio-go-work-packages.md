@@ -22,6 +22,8 @@ Do not close a package for `GO` from local tests alone when the behavior depends
 
 ## Work Packages
 
+Completion standard: a work package is not done only because the code path exists. It is done when the intended visitor or tester can execute the documented workflow in staging without developer explanation, direct database edits, placeholder-only accounts, or raw implementation errors. If evidence collection finds a gap, return to implementation in that package and update the status here.
+
 ### P5-A Staff Demo Access
 
 Outcome: staging has at least one real OTP-receivable staff/admin account and a tester authorization path that does not require direct database edits.

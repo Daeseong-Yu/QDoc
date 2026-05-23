@@ -330,7 +330,7 @@ test("loads the patient map around the browser location without provider SDK whe
     page.getByText("Centered on your current area."),
   ).toBeVisible();
   await expect(
-    page.getByText("Provider map disabled by budget guard"),
+    page.getByText("Interactive map is unavailable. Showing available clinic locations."),
   ).toBeVisible();
   const clinicCard = page
     .locator("button")

@@ -10,7 +10,7 @@ import {
   type PatientSiteSummary,
 } from "@qdoc/contracts";
 import { Crosshair, Loader2, MapPin } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
 export type BrowserLocation = {
@@ -42,6 +42,8 @@ type MapDisplayPlace = {
 };
 
 type MapboxMap = {
+  addControl: (control: unknown, position?: string) => void;
+  flyTo: (options: Record<string, unknown>) => void;
   remove: () => void;
 };
 
@@ -59,11 +61,14 @@ type MapboxNamespace = {
   accessToken: string;
   Map: new (options: Record<string, unknown>) => MapboxMap;
   Marker: new (options?: Record<string, unknown>) => MapboxMarker;
+  NavigationControl: new (options?: Record<string, unknown>) => unknown;
   Popup: new (options?: Record<string, unknown>) => MapboxPopup;
 };
 
 type GoogleMap = {
   fitBounds: (bounds: GoogleBounds) => void;
+  panTo: (location: { lat: number; lng: number }) => void;
+  setZoom: (zoom: number) => void;
 };
 
 type GoogleBounds = {
@@ -73,9 +78,19 @@ type GoogleBounds = {
 type GoogleNamespace = {
   maps: {
     Map: new (element: HTMLElement, options: Record<string, unknown>) => GoogleMap;
-    Marker: new (options: Record<string, unknown>) => unknown;
+    Marker: new (options: Record<string, unknown>) => {
+      addListener: (event: string, handler: () => void) => void;
+      setIcon: (icon: string) => void;
+    };
     LatLngBounds: new () => GoogleBounds;
   };
+};
+
+type ProviderMapHandle = {
+  focusPlace: (place: MapDisplayPlace) => void;
+  recenter: (location: BrowserLocation) => void;
+  remove: () => void;
+  selectPlace: (placeId: string) => void;
 };
 
 const scriptLoads = new Map<string, Promise<void>>();
@@ -211,22 +226,69 @@ function getProviderDisplayPlaces(places: NearbyHealthcarePlace[]): MapDisplayPl
   }));
 }
 
+function getMarkerColor(place: MapDisplayPlace, isSelected: boolean) {
+  if (isSelected) {
+    return "#10b9c4";
+  }
+
+  return place.kind === "qdoc_site" ? "#087884" : "#475569";
+}
+
+function styleMapboxMarkerElement(element: HTMLButtonElement, place: MapDisplayPlace, isSelected: boolean) {
+  element.style.width = isSelected ? "34px" : "28px";
+  element.style.height = isSelected ? "34px" : "28px";
+  element.style.border = "2px solid white";
+  element.style.borderRadius = "9999px";
+  element.style.boxShadow = isSelected ? "0 0 0 8px rgba(16, 185, 196, 0.18)" : "0 8px 18px rgba(15, 23, 42, 0.2)";
+  element.style.background = getMarkerColor(place, isSelected);
+}
+
+function createMapboxMarkerElement(place: MapDisplayPlace, isSelected: boolean, onSelectPlace: (place: MapDisplayPlace) => void) {
+  const element = document.createElement("button");
+  element.type = "button";
+  element.setAttribute("aria-label", `Select ${place.name}`);
+  element.title = place.name;
+  styleMapboxMarkerElement(element, place, isSelected);
+  element.style.cursor = "pointer";
+  element.style.transition = "transform 150ms ease, box-shadow 150ms ease";
+  element.onclick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onSelectPlace(place);
+  };
+
+  return element;
+}
+
+function getGoogleMarkerIcon(place: MapDisplayPlace, isSelected: boolean) {
+  const color = getMarkerColor(place, isSelected);
+  const radius = isSelected ? 11 : 9;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="${radius}" fill="${color}" stroke="white" stroke-width="3"/></svg>`;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
 async function initializeProviderMap(
   container: HTMLElement,
   config: MapConfigResponse,
   places: MapDisplayPlace[],
   userLocation: BrowserLocation | null,
+  selectedPlaceId: string,
+  onSelectPlace: (place: MapDisplayPlace) => void,
 ) {
   if (!config.provider) {
     return null;
   }
 
+  const selectedPlace = places.find((place) => place.id === selectedPlaceId) ?? null;
   const firstPlace = places[0] ?? null;
-  const center = userLocation
-    ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
-    : firstPlace
-      ? { latitude: firstPlace.latitude, longitude: firstPlace.longitude }
-      : null;
+  const center = selectedPlace
+    ? { latitude: selectedPlace.latitude, longitude: selectedPlace.longitude }
+    : userLocation
+      ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+      : firstPlace
+        ? { latitude: firstPlace.latitude, longitude: firstPlace.longitude }
+        : null;
 
   if (!center) {
     return null;
@@ -253,19 +315,39 @@ async function initializeProviderMap(
       zoom: 12,
       attributionControl: false,
     });
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
 
     if (userLocation) {
       new mapboxgl.Marker({ color: "#087884" }).setLngLat([userLocation.longitude, userLocation.latitude]).addTo(map);
     }
 
+    const markerElements = new Map<string, { element: HTMLButtonElement; place: MapDisplayPlace }>();
+
     for (const place of places) {
-      new mapboxgl.Marker()
+      const element = createMapboxMarkerElement(place, place.id === selectedPlaceId, onSelectPlace);
+      markerElements.set(place.id, { element, place });
+      new mapboxgl.Marker({ element })
         .setLngLat([place.longitude, place.latitude])
         .setPopup(new mapboxgl.Popup({ offset: 16 }).setText(place.name))
         .addTo(map);
     }
 
-    return map;
+    return {
+      focusPlace: (place: MapDisplayPlace) => {
+        map.flyTo({ center: [place.longitude, place.latitude], zoom: 13, essential: true });
+      },
+      recenter: (location: BrowserLocation) => {
+        map.flyTo({ center: [location.longitude, location.latitude], zoom: 13, essential: true });
+      },
+      remove: () => {
+        map.remove();
+      },
+      selectPlace: (placeId: string) => {
+        for (const [id, marker] of markerElements) {
+          styleMapboxMarkerElement(marker.element, marker.place, id === placeId);
+        }
+      },
+    };
   }
 
   await loadScript(
@@ -281,7 +363,11 @@ async function initializeProviderMap(
 
   const map = new google.maps.Map(container, {
     center: { lat: center.latitude, lng: center.longitude },
-    disableDefaultUI: true,
+    disableDefaultUI: false,
+    fullscreenControl: false,
+    mapTypeControl: false,
+    streetViewControl: false,
+    zoomControl: true,
     zoom: 12,
   });
   const bounds = new google.maps.LatLngBounds();
@@ -296,14 +382,19 @@ async function initializeProviderMap(
     });
   }
 
+  const googleMarkers = new Map<string, { marker: { setIcon: (icon: string) => void }; place: MapDisplayPlace }>();
+
   for (const place of places) {
     const position = { lat: place.latitude, lng: place.longitude };
     bounds.extend(position);
-    new google.maps.Marker({
+    const marker = new google.maps.Marker({
+      icon: getGoogleMarkerIcon(place, place.id === selectedPlaceId),
       map,
       position,
       title: place.name,
     });
+    marker.addListener("click", () => onSelectPlace(place));
+    googleMarkers.set(place.id, { marker, place });
   }
 
   if (userLocation || places.length > 0) {
@@ -311,8 +402,21 @@ async function initializeProviderMap(
   }
 
   return {
+    focusPlace: (place: MapDisplayPlace) => {
+      map.panTo({ lat: place.latitude, lng: place.longitude });
+      map.setZoom(13);
+    },
+    recenter: (location: BrowserLocation) => {
+      map.panTo({ lat: location.latitude, lng: location.longitude });
+      map.setZoom(13);
+    },
     remove: () => {
       container.replaceChildren();
+    },
+    selectPlace: (placeId: string) => {
+      for (const [id, { marker, place }] of googleMarkers) {
+        marker.setIcon(getGoogleMarkerIcon(place, id === placeId));
+      }
     },
   };
 }
@@ -334,7 +438,7 @@ function getFallbackPosition(placeId: string, index: number, selectedPlaceId: st
 
 export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }: ClinicMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const providerMapRef = useRef<MapboxMap | null>(null);
+  const providerMapRef = useRef<ProviderMapHandle | null>(null);
   const locationSignature = userLocation
     ? `${userLocation.latitude.toFixed(5)}:${userLocation.longitude.toFixed(5)}`
     : "";
@@ -354,8 +458,31 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
 
     return getProviderDisplayPlaces(nearbyResult.places);
   }, [locationSignature, nearbyResult]);
-  const displayPlaces = hasLocationContext ? providerDisplayPlaces : siteDisplayPlaces;
+  const displayPlaces = useMemo(
+    () =>
+      hasLocationContext
+        ? [
+            ...siteDisplayPlaces,
+            ...providerDisplayPlaces.filter(
+              (place) => !place.qdocSiteId || !siteDisplayPlaces.some((site) => site.qdocSiteId === place.qdocSiteId),
+            ),
+          ]
+        : siteDisplayPlaces,
+    [hasLocationContext, providerDisplayPlaces, siteDisplayPlaces],
+  );
   const isNearbySearchSettled = !hasLocationContext || nearbyResult?.locationSignature === locationSignature;
+  const selectedNearbyPlace = selectedNearbyPlaceId
+    ? providerDisplayPlaces.find((place) => place.id === selectedNearbyPlaceId) ?? null
+    : null;
+  const selectedSite = sites.find((site) => site.id === selectedSiteId) ?? sites[0] ?? null;
+  const selectedSiteAddress =
+    selectedSite && !selectedNearbyPlace
+      ? [selectedSite.location.addressLine1, selectedSite.location.city, selectedSite.location.region].filter(Boolean).join(", ")
+      : "";
+  const selectedLabel = selectedNearbyPlace?.name ?? selectedSite?.name ?? (hasLocationContext ? "No nearby clinics found" : "Select a clinic");
+  const selectedAddress = selectedNearbyPlace?.address ?? selectedSiteAddress;
+  const selectedDisplayPlaceId = selectedNearbyPlace?.id ?? selectedSiteId;
+  const selectedDisplayPlaceIdRef = useRef(selectedDisplayPlaceId);
 
   const displaySignature = useMemo(
     () =>
@@ -371,6 +498,10 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
       providerMapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    selectedDisplayPlaceIdRef.current = selectedDisplayPlaceId;
+  }, [selectedDisplayPlaceId]);
 
   useEffect(() => {
     if (!userLocation) {
@@ -406,6 +537,21 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
     };
   }, [locationSignature, userLocation]);
 
+  const selectDisplayPlace = useCallback(
+    (place: MapDisplayPlace) => {
+      if (place.qdocSiteId) {
+        setSelectedNearbyPlaceId(null);
+        onSelectSite(place.qdocSiteId);
+        providerMapRef.current?.focusPlace(place);
+        return;
+      }
+
+      setSelectedNearbyPlaceId(place.id);
+      providerMapRef.current?.focusPlace(place);
+    },
+    [onSelectSite],
+  );
+
   useEffect(() => {
     if (!mapContainerRef.current || !isNearbySearchSettled) {
       return;
@@ -431,7 +577,14 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
           return;
         }
 
-        const providerMap = await initializeProviderMap(mapContainerRef.current, mapConfig, displayPlaces, userLocation);
+        const providerMap = await initializeProviderMap(
+          mapContainerRef.current,
+          mapConfig,
+          displayPlaces,
+          userLocation,
+          selectedDisplayPlaceIdRef.current,
+          selectDisplayPlace,
+        );
 
         if (cancelled) {
           providerMap?.remove();
@@ -454,18 +607,16 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
       providerMapRef.current?.remove();
       providerMapRef.current = null;
     };
-  }, [displaySignature, displayPlaces, isNearbySearchSettled, userLocation]);
+  }, [displaySignature, displayPlaces, isNearbySearchSettled, selectDisplayPlace, userLocation]);
 
-  const selectedNearbyPlace = selectedNearbyPlaceId
-    ? providerDisplayPlaces.find((place) => place.id === selectedNearbyPlaceId) ?? null
-    : null;
-  const selectedSite = hasLocationContext ? null : sites.find((site) => site.id === selectedSiteId) ?? sites[0] ?? null;
-  const selectedSiteAddress = selectedSite && !selectedNearbyPlace
-    ? [selectedSite.location.addressLine1, selectedSite.location.city, selectedSite.location.region].filter(Boolean).join(", ")
-    : "";
-  const selectedLabel = selectedNearbyPlace?.name ?? selectedSite?.name ?? (hasLocationContext ? "No nearby clinics found" : "Select a clinic");
-  const selectedAddress = selectedNearbyPlace?.address ?? selectedSiteAddress;
-  const selectedDisplayPlaceId = selectedNearbyPlace?.id ?? selectedSiteId;
+  useEffect(() => {
+    providerMapRef.current?.selectPlace(selectedDisplayPlaceId);
+
+    const place = displayPlaces.find((item) => item.id === selectedDisplayPlaceId);
+    if (place && mapState === "ready") {
+      providerMapRef.current?.focusPlace(place);
+    }
+  }, [displayPlaces, mapState, selectedDisplayPlaceId]);
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -505,17 +656,13 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
                 <button
                   key={place.id}
                   type="button"
-                  onClick={() => {
-                    if (place.kind === "qdoc_site" && place.qdocSiteId) {
-                      setSelectedNearbyPlaceId(null);
-                      onSelectSite(place.qdocSiteId);
-                      return;
-                    }
-
-                    setSelectedNearbyPlaceId(place.id);
-                  }}
+                  onClick={() => selectDisplayPlace(place)}
                   className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full p-2 shadow-md transition ${
-                    isSelected ? "bg-[#10b9c4] text-white ring-8 ring-[#10b9c4]/20" : "bg-white text-[#087884]"
+                    isSelected
+                      ? "bg-[#10b9c4] text-white ring-8 ring-[#10b9c4]/20"
+                      : place.kind === "qdoc_site"
+                        ? "bg-white text-[#087884]"
+                        : "bg-slate-700 text-white"
                   }`}
                   style={position}
                   aria-label={`Select ${place.name}`}
@@ -524,7 +671,21 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
                 </button>
               );
             })}
+            <div className="absolute bottom-3 left-3 z-20 rounded-md bg-white/90 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm">
+              Interactive map is unavailable. Showing available clinic locations.
+            </div>
           </div>
+        ) : null}
+        {userLocation && mapState === "ready" ? (
+          <button
+            type="button"
+            onClick={() => providerMapRef.current?.recenter(userLocation)}
+            className="absolute bottom-3 right-3 z-30 inline-flex h-10 items-center gap-2 rounded-md bg-white px-3 text-sm font-medium text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+            aria-label="Recenter map to your location"
+          >
+            <Crosshair size={16} aria-hidden="true" />
+            Current area
+          </button>
         ) : null}
       </div>
 

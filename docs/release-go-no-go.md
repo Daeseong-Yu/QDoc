@@ -154,6 +154,7 @@ QDOC_BOOTSTRAP_STAFF_DRY_RUN=true \
 QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" \
 bash deploy/bootstrap-staff-admins.sh
 
+QDOC_BOOTSTRAP_STAFF_CONFIRM=apply \
 QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" \
 bash deploy/bootstrap-staff-admins.sh
 ```
@@ -246,7 +247,7 @@ Confirm these account-level and host-level items before go:
 - Host Caddy proxies the launch domain to `127.0.0.1:${QDOC_WEB_PORT}`.
 - `/opt/qdoc/shared/.env.staging` or production env contains HTTPS `APP_URL`, long `SESSION_SECRET`, SMTP settings, Redis URL, database URL, and disabled OTP debug flags.
 - `/opt/qdoc/shared/.env.staging` contains real OTP-receivable `QDOC_SEED_STAFF_ADMIN_EMAILS` and matching verification expectations when staff smoke is required.
-- If the staging database already has demo tickets or reviewed map settings, prefer `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS` plus `deploy/bootstrap-staff-admins.sh` to add or promote staff/admin access without resetting that data.
+- If the staging database already has demo tickets or reviewed map settings, prefer `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS` plus `deploy/bootstrap-staff-admins.sh` to add or promote staff/admin access without resetting that data. Run dry-run first; production-like apply requires `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply`.
 - GitHub OIDC role, S3 bucket lifecycle, SSM document, EC2 instance profile, and environment secrets are configured in the operating account.
 - `/opt/qdoc/shared/deploy-bucket` contains only the trusted private deployment bucket name.
 - S3 contains both the app artifact and matching ops bundle for the candidate SHA.

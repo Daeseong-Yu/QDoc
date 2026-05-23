@@ -60,10 +60,21 @@ function isDryRun() {
   return process.env.QDOC_BOOTSTRAP_STAFF_DRY_RUN === "true";
 }
 
+function assertApplyConfirmed(dryRun: boolean) {
+  if (dryRun || !isProductionLikeBootstrap()) {
+    return;
+  }
+
+  if (process.env.QDOC_BOOTSTRAP_STAFF_CONFIRM !== "apply") {
+    throw new BootstrapInputError("staff_admin_bootstrap_apply_confirmation_required");
+  }
+}
+
 async function main() {
   const emails = getStaffAdminEmails();
   const requestedSiteIds = getRequestedSiteIds();
   const dryRun = isDryRun();
+  assertApplyConfirmed(dryRun);
 
   const sites = await prisma.site.findMany({
     where: requestedSiteIds.length > 0 ? { id: { in: requestedSiteIds } } : {},

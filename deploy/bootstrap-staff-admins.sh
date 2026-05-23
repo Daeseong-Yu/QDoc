@@ -86,12 +86,14 @@ fi
 export QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS
 export QDOC_BOOTSTRAP_STAFF_SITE_IDS
 export QDOC_BOOTSTRAP_STAFF_DRY_RUN="${QDOC_BOOTSTRAP_STAFF_DRY_RUN:-false}"
+export QDOC_BOOTSTRAP_STAFF_CONFIRM="${QDOC_BOOTSTRAP_STAFF_CONFIRM:-}"
 
 log "Bootstrapping staff admin memberships in the staging image"
 compose run --rm --no-deps \
   -e QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS \
   -e QDOC_BOOTSTRAP_STAFF_SITE_IDS \
   -e QDOC_BOOTSTRAP_STAFF_DRY_RUN \
+  -e QDOC_BOOTSTRAP_STAFF_CONFIRM \
   worker pnpm db:bootstrap-staff-admins:staging
 
 log "Staff admin bootstrap finished"

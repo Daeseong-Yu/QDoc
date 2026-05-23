@@ -55,6 +55,13 @@ is_true() {
   esac
 }
 
+has_placeholder_value() {
+  case "$1" in
+    *replace-with* | *REPLACE-WITH* | *change-me* | *CHANGE-ME* | *example* | *EXAMPLE*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 env_file_value() {
   local key="$1"
   local line value
@@ -215,7 +222,12 @@ redacted_path() {
 }
 
 if [ -z "$EXPECTED_APP_IMAGE" ]; then
-  EXPECTED_APP_IMAGE="$(env_file_value QDOC_APP_IMAGE || true)"
+  env_app_image="$(env_file_value QDOC_APP_IMAGE || true)"
+  if [ -n "$env_app_image" ] && ! has_placeholder_value "$env_app_image"; then
+    EXPECTED_APP_IMAGE="$env_app_image"
+  elif [ -n "$env_app_image" ] && has_placeholder_value "$env_app_image"; then
+    record_fail "Docker image tag is not supplied; $ENV_FILE still contains placeholder QDOC_APP_IMAGE, so set QDOC_EXPECTED_APP_IMAGE=${IMAGE_NAME}:<40-character-git-sha> for release evidence"
+  fi
 fi
 
 log "Checking release evidence inputs"

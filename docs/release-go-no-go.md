@@ -63,6 +63,8 @@ bash deploy/release-evidence.sh
 
 For final GO evidence, set `QDOC_EVIDENCE_STRICT=true` and mark each required package/status as `passed` with `QDOC_EVIDENCE_P5A_STATUS`, `QDOC_EVIDENCE_P5B_STATUS`, `QDOC_EVIDENCE_P5C_STATUS`, `QDOC_EVIDENCE_P5D_STATUS`, `QDOC_EVIDENCE_P5E_STATUS`, `QDOC_EVIDENCE_LOCAL_CHECKS_STATUS`, `QDOC_EVIDENCE_STAGING_VERIFIER_STATUS`, `QDOC_EVIDENCE_STAGING_REHEARSAL_STATUS`, `QDOC_EVIDENCE_BACKUP_RESTORE_CHECK_STATUS`, and `QDOC_EVIDENCE_MANUAL_SMOKE_STATUS`. If any value remains pending, the decision should remain `NO-GO`.
 
+Set `QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha>` explicitly for release evidence. `/opt/qdoc/shared/.env.staging` may intentionally keep `QDOC_APP_IMAGE="qdoc-app:replace-with-git-sha"` because the deployment and rehearsal scripts export the actual candidate image at runtime.
+
 Set `QDOC_EVIDENCE_PRIVATE_OUTPUT=true` only for local/private release notes that will not be committed. Public or repository evidence should keep S3 bucket names, SSM command IDs, backup paths, operator identity, and free-form risk details redacted.
 
 Before setting the P5-A through P5-D status variables, use the portfolio smoke helper to roll up the manual browser/inbox checks into package statuses. The helper is read-only and does not call AWS, Docker, SMTP, map providers, or the public site. It validates the status values you provide and prints export lines for `deploy/release-evidence.sh`.
@@ -189,6 +191,8 @@ QDOC_REHEARSAL_LOAD_DRILLS=true \
 QDOC_BACKUP_DIR=/opt/qdoc/backups \
 bash deploy/staging-rehearsal.sh
 ```
+
+Use the 40-character candidate Git SHA in both `QDOC_EXPECTED_RELEASE_SHA` and the `qdoc-app:<git-sha>` image tag. Do not type the literal `<git-sha>` placeholder. The rehearsal script exports `QDOC_APP_IMAGE` from `QDOC_EXPECTED_APP_IMAGE`, so the shared staging env file does not need to be edited for each release. If you run `docker compose` manually outside the deployment or rehearsal scripts, pass `QDOC_APP_IMAGE=qdoc-app:<git-sha>` in the command environment or Docker Compose will try to use the placeholder image.
 
 Go criteria:
 

@@ -209,6 +209,7 @@ Implementation state:
 - `docs/release-go-no-go.md` contains the release checklist.
 - `deploy/release-evidence.sh` and `pnpm verify:release-evidence` provide a read-only evidence preflight and redacted decision-record block.
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide the manual P5-A through P5-D smoke status rollup that feeds the release evidence preflight.
+- Staging rehearsal and release evidence use `QDOC_EXPECTED_APP_IMAGE=qdoc-app:<40-character-git-sha>` as the candidate image, so the shared staging env file can retain its deploy-time `QDOC_APP_IMAGE` placeholder.
 
 Remaining evidence:
 

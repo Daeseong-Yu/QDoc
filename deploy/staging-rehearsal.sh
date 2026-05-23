@@ -7,6 +7,7 @@ PUBLIC_URL="${QDOC_PUBLIC_URL:-}"
 BACKUP_DIR="${QDOC_BACKUP_DIR:-backups}"
 EXPECTED_RELEASE_SHA="${QDOC_EXPECTED_RELEASE_SHA:-}"
 EXPECTED_APP_IMAGE="${QDOC_EXPECTED_APP_IMAGE:-}"
+IMAGE_NAME="${QDOC_IMAGE_NAME:-qdoc-app}"
 DRY_RUN="${QDOC_REHEARSAL_DRY_RUN:-false}"
 REQUIRE_PUBLIC_URL="${QDOC_REHEARSAL_REQUIRE_PUBLIC_URL:-true}"
 RUN_BACKUP="${QDOC_REHEARSAL_BACKUP:-false}"
@@ -87,16 +88,30 @@ check_expected_release_sha() {
 
 check_expected_app_image() {
   local configured_image
+  local expected_tag
 
-  [ -z "$EXPECTED_APP_IMAGE" ] && return 0
-
-  configured_image="${QDOC_APP_IMAGE:-}"
-  if [ -z "$configured_image" ]; then
-    configured_image="$(env_file_value QDOC_APP_IMAGE || true)"
+  if [ -z "$EXPECTED_APP_IMAGE" ]; then
+    return 0
   fi
 
-  [ -n "$configured_image" ] || fail "QDOC_APP_IMAGE is required when QDOC_EXPECTED_APP_IMAGE is set"
-  [ "$configured_image" = "$EXPECTED_APP_IMAGE" ] || fail "QDOC_APP_IMAGE mismatch: expected $EXPECTED_APP_IMAGE, got $configured_image"
+  case "$EXPECTED_APP_IMAGE" in
+    "$IMAGE_NAME":*)
+      expected_tag="${EXPECTED_APP_IMAGE#"$IMAGE_NAME:"}"
+      ;;
+    *)
+      fail "QDOC_EXPECTED_APP_IMAGE must be ${IMAGE_NAME}:<40-character-git-sha>"
+      ;;
+  esac
+
+  [[ "$expected_tag" =~ ^[0-9a-fA-F]{40}$ ]] || fail "QDOC_EXPECTED_APP_IMAGE must be ${IMAGE_NAME}:<40-character-git-sha>"
+
+  configured_image="${QDOC_APP_IMAGE:-}"
+
+  if [ -n "$configured_image" ] && [ "$configured_image" != "$EXPECTED_APP_IMAGE" ]; then
+    fail "QDOC_APP_IMAGE mismatch: expected $EXPECTED_APP_IMAGE, got $configured_image"
+  fi
+
+  export QDOC_APP_IMAGE="$EXPECTED_APP_IMAGE"
 }
 
 print_dry_run() {

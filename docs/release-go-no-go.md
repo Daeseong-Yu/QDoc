@@ -80,6 +80,7 @@ Go criteria:
 - Public Caddy route returns success for the expected domain.
 - Outbox, ops, admin-data, launch-hardening, backup restore-check, and bounded drill checks exit zero.
 - The staging staff/admin account is backed by a real OTP-receivable email through `QDOC_SEED_STAFF_ADMIN_EMAILS` or an approved membership operation.
+- A tester email that is not on a site roster is expected to be denied staff access, and the evidence records the bootstrap or membership-management path used to authorize the actual staff tester email.
 - The map provider is either intentionally disabled for a documented fail-closed test or fully configured with provider restrictions, QDoc monthly limits, usage reservations, and interactive map behavior.
 - The operator records SSM command ID, app artifact SHA, ops bundle SHA, candidate source SHA, backup filename, and restore-check pass/fail without copying private logs or dump files into Git.
 
@@ -180,3 +181,5 @@ Decision time:
 Choose `GO` only when all local checks, staging evidence, manual smoke checks, environment work, and rollback readiness are complete or any remaining risk has an explicit owner and accepted launch impact. Otherwise choose `NO-GO` and record the blocking items.
 
 For a portfolio public demo, do not choose `GO` if the map is only decorative, staff access depends on `staff@example.com`, first-time OTP attempts fail, or raw implementation errors are visible to visitors.
+
+Also do not choose `GO` if the only tested staff path requires direct database edits, or if the only tested map path is the static/fallback rendering while provider-backed interaction is expected for the public demo.

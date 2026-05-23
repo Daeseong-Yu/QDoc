@@ -47,6 +47,8 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - A static or decorative fallback map is acceptable only as a fail-closed disabled-provider state; it is not sufficient as the final portfolio map experience.
 - Before `GO`, OTP delivery and user-facing errors must be understandable to a non-technical visitor. Do not expose raw internal error codes such as `rate_limited`, `otp_delivery_unavailable`, or map cost-guardrail implementation details directly in the UI.
 - Before `GO`, staging must have real OTP-receivable staff/admin accounts prepared through documented bootstrap or membership workflows.
+- An unrostered personal email must not gain staff access. If a tester needs staff access, preparing that exact email through seed bootstrap or admin membership management is part of the active work, not an assumed manual database edit.
+- A fallback/static map is only acceptable as the disabled-provider or fail-closed path. Do not treat it as the final portfolio map experience while provider-backed public-browser interaction remains unverified.
 - The active implementation order for the current launch-candidate step is: staff demo access, provider-backed map/public-browser verification, first-time OTP delivery verification, full patient/staff smoke, notification/outbox evidence, backup restore-check, rollback target, then GO/NO-GO record.
 - Future changes that redefine `GO`, public demo scope, map provider behavior, staff bootstrap, session/auth behavior, deployment flow, or secret handling must be reflected in `.ai/core`, the active `.ai/phases` step, and this file before implementation continues.
 

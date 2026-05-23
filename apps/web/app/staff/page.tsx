@@ -313,6 +313,7 @@ export default function StaffPage() {
   const staffMemberships = useMemo(() => {
     return currentUser?.memberships.filter((membership) => membership.role === "staff" || membership.role === "admin") ?? [];
   }, [currentUser]);
+  const hasStaffAccess = staffMemberships.length > 0;
 
   const selectedMembership = useMemo(() => {
     return staffMemberships.find((membership) => membership.siteId === selectedSiteId) ?? null;
@@ -597,7 +598,11 @@ export default function StaffPage() {
       setCurrentUser(user);
       setSelectedSiteId(firstStaffSite?.siteId || "");
       setAuthState("success");
-      setMessage(firstStaffSite ? "Signed in." : "This account does not have staff access.");
+      setMessage(
+        firstStaffSite
+          ? "Signed in."
+          : "This email is not on a staff roster. Ask a site admin to add it before using the staff board.",
+      );
     } catch (error) {
       setAuthState("error");
       setMessage(getMessage(error));
@@ -923,8 +928,11 @@ export default function StaffPage() {
                   <p className="text-sm text-slate-600">Choose a staffed location.</p>
                 </div>
               </div>
-              {staffMemberships.length === 0 ? (
-                <p className="text-sm text-slate-500">No staff memberships. Ask a site admin to add this email.</p>
+              {currentUser && !hasStaffAccess ? (
+                <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                  <p className="font-medium text-slate-800">No staff roster match.</p>
+                  <p className="mt-1">Ask a site admin to add {currentUser.email} to a staffed location.</p>
+                </div>
               ) : null}
               <div className="grid gap-2">
                 {staffMemberships.map((membership) => (
@@ -960,6 +968,35 @@ export default function StaffPage() {
           </aside>
 
           <section className="flex flex-col gap-4">
+            {currentUser && !hasStaffAccess ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#eefbfc] text-[#087884]">
+                      <Users size={21} aria-hidden="true" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-950">Staff access required</h2>
+                      <p className="mt-1 break-all text-sm text-slate-600">Signed in as {currentUser.email}</p>
+                      <p className="mt-3 max-w-2xl text-sm text-slate-600">
+                        This email can use patient check-in, but it is not attached to a staff location. A site admin must add this exact email before the queue board is available.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void signOut();
+                    }}
+                    className="inline-flex h-10 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] shadow-sm hover:bg-[#eefbfc]"
+                  >
+                    <LogOut size={16} aria-hidden="true" />
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
@@ -1454,6 +1491,8 @@ export default function StaffPage() {
                 </section>
               ))}
             </div>
+              </>
+            )}
           </section>
         </section>
       </div>

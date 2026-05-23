@@ -285,7 +285,7 @@ async function signIn(page: Page, emailPlaceholder: string) {
   });
   await page.getByPlaceholder("6-digit code").fill(e2eOtpCode);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText(e2eEmail)).toBeVisible();
+  await expect(page.getByText(e2eEmail, { exact: true })).toBeVisible();
 }
 
 async function selectE2eSite(page: Page) {
@@ -500,7 +500,7 @@ test("lets staff close a queue and blocks patient check-ins", async ({
   page,
 }) => {
   await page.goto("/staff");
-  await signIn(page, "staff@example.com");
+  await signIn(page, "Staff email");
   await expect(
     page.getByRole("heading", { name: "Staff queue board" }),
   ).toBeVisible();
@@ -566,13 +566,28 @@ test("lets staff close a queue and blocks patient check-ins", async ({
 
 test("shows launch-safe empty staff board states", async ({ page }) => {
   await page.goto("/staff");
-  await signIn(page, "staff@example.com");
+  await signIn(page, "Staff email");
   await selectE2eSite(page);
 
   await expect(page.getByText("0 active tickets")).toBeVisible();
   await expect(staffColumn(page, "Waiting")).toContainText("No patients waiting.");
   await expect(staffColumn(page, "Delayed")).toContainText("No delayed patients.");
   await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+});
+
+test("explains staff access when the signed-in email is not on a staff roster", async ({
+  page,
+}) => {
+  await prisma.membership.deleteMany({ where: { siteId: e2eSiteId } });
+
+  await page.goto("/staff");
+  await signIn(page, "Staff email");
+
+  await expect(page.getByRole("heading", { name: "Staff access required" })).toBeVisible();
+  await expect(page.getByText(`Signed in as ${e2eEmail}`)).toBeVisible();
+  await expect(page.getByText("A site admin must add this exact email before the queue board is available.")).toBeVisible();
+  await expect(page.getByText("No staff roster match.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Queue board", exact: true })).toHaveCount(0);
 });
 
 test("covers patient check-in and staff queue transitions", async ({
@@ -597,7 +612,7 @@ test("covers patient check-in and staff queue transitions", async ({
     "x-forwarded-for": getE2eRequesterIp(testInfo, 2),
   });
   await page.goto("/staff");
-  await signIn(page, "staff@example.com");
+  await signIn(page, "Staff email");
   await expect(
     page.getByRole("heading", { name: "Staff queue board" }),
   ).toBeVisible();

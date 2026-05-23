@@ -4,6 +4,8 @@ Use this checklist for a portfolio-ready launch-candidate decision. `GO` means Q
 
 Do not start final GO evidence collection while known portfolio blockers remain open. At minimum, finish the interactive provider map, first-time OTP delivery, real staff/admin demo access, user-friendly auth/map error handling, patient/staff smoke path, notification/outbox health, backup restore-check, rollback target, and staging rehearsal.
 
+Current GO gate policy: treat this checklist as the final evidence record after the product-completion work is done, not as a substitute for that work. A successful deployment, visible staff page, rendered fallback map, or local-only E2E proof is not enough for `GO` while the deployed portfolio user cannot complete the documented staff, map, OTP, patient, notification/outbox, backup, rollback, and decision paths.
+
 Track remaining evidence by Step 5 work package:
 
 1. P5-A Staff demo access

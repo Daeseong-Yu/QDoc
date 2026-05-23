@@ -12,6 +12,8 @@ Future roadmap items such as SMS, push, EMR/EHR integration, real travel-time es
 
 Step 5 remains in progress. Local implementation and automated coverage exist for large parts of the gate, but portfolio `GO` is still blocked until staging/manual evidence is collected with real external systems.
 
+Current GO gate policy: this document is the active pre-GO product-completion board. It should make clear that the remaining work is not only deployment validation or a plan for the next small step. Staff access, provider-backed map interaction, first-time OTP delivery, public patient/staff smoke, notification/outbox proof, backup/rollback proof, and safe release evidence must all close before `GO` unless the user explicitly excludes a path from the public demo.
+
 The newly defined work has been written into the required durable and active handoff documents. Future sessions should treat this file, its `.ai/docs` mirror, `.ai/execution/current.md`, and `.ai/phases/qdoc-launch-candidate/step5.md` as the active source of task order and package status. Core docs keep the product and architecture boundaries; `AGENTS.md` keeps future-session rules such as commit review, `.ai` handling, and portfolio GO interpretation.
 
 Documentation coverage for this newly defined work:

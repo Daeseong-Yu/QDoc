@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 
@@ -63,6 +63,79 @@ function hashOtpForTest(email: string, code: string) {
   return createHmac("sha256", sessionSecret).update(`otp:${email}:${code}`).digest("base64url");
 }
 
+function getMapSearchQueryKey(provider: "mapbox", latitude: number, longitude: number, radiusMeters: number) {
+  const roundedLatitude = Math.round(latitude * 100) / 100;
+  const roundedLongitude = Math.round(longitude * 100) / 100;
+  const roundedRadiusMeters = Math.max(500, Math.min(10_000, Math.round(radiusMeters / 500) * 500));
+
+  return createHash("sha256")
+    .update(`${provider}:${roundedLatitude.toFixed(2)}:${roundedLongitude.toFixed(2)}:${roundedRadiusMeters}`)
+    .digest("hex");
+}
+
+async function installMapboxStub(page: Page) {
+  await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css", async (route) => {
+    await route.fulfill({
+      contentType: "text/css",
+      body: ".mapboxgl-map{position:absolute;inset:0}",
+    });
+  });
+  await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js", async (route) => {
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: `
+        window.__qdocMapboxEvents = [];
+        window.mapboxgl = {
+          accessToken: "",
+          Map: class {
+            constructor(options) {
+              this._container = options.container;
+              window.__qdocMapboxEvents.push({ type: "map", center: options.center, zoom: options.zoom });
+              const surface = document.createElement("div");
+              surface.dataset.testid = "mapbox-surface";
+              surface.style.position = "absolute";
+              surface.style.inset = "0";
+              surface.style.pointerEvents = "none";
+              this._container.appendChild(surface);
+            }
+            addControl() {}
+            flyTo(options) {
+              window.__qdocMapboxEvents.push({ type: "flyTo", center: options.center, zoom: options.zoom });
+            }
+            remove() {
+              this._container.replaceChildren();
+            }
+          },
+          Marker: class {
+            constructor(options = {}) {
+              this._element = options.element || document.createElement("div");
+              this._element.dataset.testid = this._element.dataset.testid || "mapbox-marker";
+            }
+            setLngLat(coordinates) {
+              this._coordinates = coordinates;
+              this._element.dataset.lngLat = coordinates.join(",");
+              return this;
+            }
+            setPopup() {
+              return this;
+            }
+            addTo(map) {
+              map._container.appendChild(this._element);
+              return this;
+            }
+          },
+          NavigationControl: class {},
+          Popup: class {
+            setText() {
+              return this;
+            }
+          },
+        };
+      `,
+    });
+  });
+}
+
 async function resetE2eData() {
   const user = await prisma.user.findUnique({
     where: { email: e2eEmail },
@@ -94,6 +167,7 @@ async function resetE2eData() {
   }
 
   await prisma.mapUsagePeriod.deleteMany({ where: { provider: "mapbox" } });
+  await prisma.mapSearchCache.deleteMany({ where: { provider: "mapbox" } });
   await prisma.mapProviderConfigAudit.deleteMany({
     where: { provider: "mapbox" },
   });
@@ -163,6 +237,7 @@ async function resetE2eData() {
 
 async function resetMapGuardrailsAfterE2e() {
   await prisma.mapUsagePeriod.deleteMany({ where: { provider: "mapbox" } });
+  await prisma.mapSearchCache.deleteMany({ where: { provider: "mapbox" } });
   await prisma.mapProviderConfigAudit.deleteMany({
     where: { provider: "mapbox" },
   });
@@ -337,6 +412,88 @@ test("loads the patient map around the browser location without provider SDK whe
     .filter({ has: page.getByRole("heading", { name: e2eSiteName }) });
   await expect(clinicCard).toContainText("0.2 km");
   expect(providerRequests).toHaveLength(0);
+});
+
+test("loads the provider map and keeps marker, clinic, and refresh selection in sync", async ({
+  page,
+  context,
+}) => {
+  await prisma.mapProviderConfig.update({
+    where: { provider: "mapbox" },
+    data: {
+      isEnabled: true,
+      monthlyMapLoadLimit: 5,
+      monthlyPlacesSearchLimit: 0,
+      hardStopEnabled: true,
+    },
+  });
+  await prisma.mapSearchCache.upsert({
+    where: {
+      provider_queryKey: {
+        provider: "mapbox",
+        queryKey: getMapSearchQueryKey("mapbox", 43.465, -80.522, 5000),
+      },
+    },
+    update: {
+      responseJson: [
+        {
+          id: "mapbox:e2e-provider-care",
+          providerPlaceId: "e2e-provider-care",
+          name: "Provider Urgent Care",
+          address: "2 Provider Way, Waterloo, ON",
+          latitude: 43.466,
+          longitude: -80.523,
+          qdocSiteId: null,
+        },
+      ],
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    },
+    create: {
+      provider: "mapbox",
+      queryKey: getMapSearchQueryKey("mapbox", 43.465, -80.522, 5000),
+      responseJson: [
+        {
+          id: "mapbox:e2e-provider-care",
+          providerPlaceId: "e2e-provider-care",
+          name: "Provider Urgent Care",
+          address: "2 Provider Way, Waterloo, ON",
+          latitude: 43.466,
+          longitude: -80.523,
+          qdocSiteId: null,
+        },
+      ],
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    },
+  });
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({
+    latitude: 43.465,
+    longitude: -80.522,
+  });
+  await installMapboxStub(page);
+
+  await page.goto("/");
+  await expect(page.getByTestId("mapbox-surface")).toBeVisible();
+  await expect(page.getByText("Interactive map is unavailable. Showing available clinic locations.")).toHaveCount(0);
+  await page.getByLabel("Select Provider Urgent Care").click();
+  await expect(page.getByText("Provider Urgent Care")).toBeVisible();
+  await expect(page.getByText("2 Provider Way, Waterloo, ON")).toBeVisible();
+
+  await page.getByLabel("Select E2E Clinic").click();
+  await expect(page.getByText("1 E2E Way, Waterloo, ON").first()).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocMapboxEvents?: Array<{ type: string; center?: [number, number] }> })
+          .__qdocMapboxEvents ?? [];
+        return events.some((event) => event.type === "flyTo" && event.center?.[0] === -80.5204 && event.center?.[1] === 43.4643);
+      }),
+    )
+    .toBe(true);
+
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.getByTestId("mapbox-surface")).toBeVisible();
+  await expect(page.getByText("1 E2E Way, Waterloo, ON").first()).toBeVisible();
 });
 
 test("lets staff close a queue and blocks patient check-ins", async ({

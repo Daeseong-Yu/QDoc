@@ -2,6 +2,12 @@
 
 This repository is the source of truth for QDoc implementation, deployment automation, and agentic execution state.
 
+## Commit Review Policy
+
+- A user request to create a commit is considered an explicit request to use the reviewer subagent for the required `precommit-security-review`.
+- Before creating a commit, run the reviewer subagent to check for security, operational, regression, and commit-hygiene risks.
+- If a higher-priority runtime tool policy blocks reviewer subagent usage, perform the same review criteria locally and briefly tell the user why the subagent could not be used.
+
 ## Repository
 
 - Repository path: `.`

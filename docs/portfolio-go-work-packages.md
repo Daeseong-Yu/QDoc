@@ -12,6 +12,8 @@ Future roadmap items such as SMS, push, EMR/EHR integration, real travel-time es
 
 Step 5 remains in progress. Local implementation and automated coverage exist for large parts of the gate, but portfolio `GO` is still blocked until staging/manual evidence is collected with real external systems.
 
+The newly defined work has been written into the required durable and active handoff documents. Future sessions should treat this file, its `.ai/docs` mirror, `.ai/execution/current.md`, and `.ai/phases/qdoc-launch-candidate/step5.md` as the active source of task order and package status. Core docs keep the product and architecture boundaries; `AGENTS.md` keeps future-session rules such as commit review, `.ai` handling, and portfolio GO interpretation.
+
 Documentation coverage for this newly defined work:
 
 - `.ai/core/PRD.md` defines the portfolio-demo product scope and final success criteria.

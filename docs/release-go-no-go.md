@@ -106,6 +106,7 @@ pnpm db:validate
 pnpm verify:outbox
 pnpm verify:ops
 pnpm verify:launch
+pnpm verify:email
 pnpm e2e
 git diff --check
 ```
@@ -115,6 +116,7 @@ Go criteria:
 - Every command exits zero.
 - `verify:ops` has no stale processing outbox jobs, failed notification jobs, failed almost-ready email jobs, or map guardrail attention states.
 - `verify:launch` reports launch-like hardening ready for the target environment when staging or production env is loaded.
+- `verify:email` reports API OTP delivery policy, worker delivery policy, SMTP config shape, placeholder-value checks, and any approved SMTP connectivity check as ready without printing SMTP credentials, provider diagnostics, OTP values, or recipient addresses.
 - E2E runs against a local or explicitly isolated test database only.
 - No local-only config, `.env`, backup, screenshot, trace, or generated secret material is staged.
 - Automated coverage includes patient OTP/check-in, staff OTP/queue operations, invalid/expired OTP states, refresh/revisit session continuity, notification preference persistence, almost-ready notification/outbox creation, failed notification job visibility, duplicate-delivery prevention, cancel, delay/restore, audit-log visibility, and map guardrail behavior.
@@ -136,6 +138,17 @@ QDOC_VERIFY_OUTBOX=true \
 QDOC_VERIFY_OPS=true \
 QDOC_VERIFY_ADMIN_DATA=true \
 QDOC_VERIFY_LAUNCH=true \
+QDOC_VERIFY_EMAIL=true \
+bash deploy/verify-staging.sh
+```
+
+For P5-C SMTP diagnostics, add live SMTP connectivity/auth verification only when the staging provider is allowed to accept a connection from the deployed host. This does not send an OTP and does not replace real inbox smoke:
+
+```bash
+cd /opt/qdoc/current
+QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_VERIFY_EMAIL=true \
+QDOC_VERIFY_SMTP_CONNECTIVITY=true \
 bash deploy/verify-staging.sh
 ```
 
@@ -157,6 +170,7 @@ Go criteria:
 - Compose services are healthy and only web is bound to host loopback.
 - Public Caddy route returns success for the expected domain.
 - Outbox, ops, admin-data, launch-hardening, backup restore-check, and bounded drill checks exit zero.
+- Email verification exits zero and does not report `smtp_config_incomplete`, `placeholder_smtp_values_detected`, `smtp_required_for_launch`, `console_delivery_not_allowed`, or SMTP connectivity failure when live connectivity is requested.
 - The staging staff/admin account is backed by a real OTP-receivable email through `QDOC_SEED_STAFF_ADMIN_EMAILS` or an approved membership operation.
 - A tester email that is not on a site roster is expected to be denied staff access, and the evidence records the bootstrap or membership-management path used to authorize the actual staff tester email.
 - The map provider is either intentionally disabled for a documented fail-closed test or fully configured with provider restrictions, QDoc monthly limits, usage reservations, and interactive map behavior.
@@ -168,6 +182,7 @@ No-go criteria:
 - Backup restore-check has not passed for the launch database.
 - `verify:admin-data` shows missing launch clinic, queue, expected staff admin, or map guardrail records.
 - `verify:launch` reports console/fixed OTP enabled, missing SMTP, weak session secret, non-HTTPS app URL, public web bind, or map hard-stop misconfiguration in a launch-like environment.
+- `verify:email` reports that the API or worker would fail OTP/email delivery, SMTP values are placeholders, or approved SMTP connectivity/auth verification fails.
 
 ## Manual Smoke Checks
 

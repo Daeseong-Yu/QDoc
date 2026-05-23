@@ -6,7 +6,7 @@ type EmailProvider = "console" | "smtp";
 let smtpTransporter: Transporter | null = null;
 
 function getEmailProvider(): EmailProvider {
-  const provider = process.env.EMAIL_PROVIDER;
+  const provider = process.env.EMAIL_PROVIDER ?? "console";
 
   if (provider === "console" || provider === "smtp") {
     return provider;

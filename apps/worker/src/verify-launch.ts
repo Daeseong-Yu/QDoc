@@ -7,6 +7,7 @@ type LaunchCheck = {
 const productionLikeEnvironments = new Set(["staging", "production"]);
 const allowedMapProviders = new Set(["mapbox", "google"]);
 const placeholderPatterns = [/replace-with/i, /change-me/i, /example/i];
+const smtpRequiredEnv = ["EMAIL_FROM", "SMTP_HOST", "SMTP_USER", "SMTP_PASS"];
 
 function env(name: string) {
   return process.env[name]?.trim() ?? "";
@@ -26,6 +27,10 @@ function hasPlaceholderValue(value: string) {
 
 function hasRequiredEnv(names: string[]) {
   return names.every((name) => env(name).length > 0);
+}
+
+function hasPlaceholderEnv(names: string[]) {
+  return names.some((name) => hasPlaceholderValue(env(name)));
 }
 
 function getPositiveInteger(name: string) {
@@ -64,6 +69,8 @@ function getChecks(): LaunchCheck[] {
   const mapSearchCacheOk = !mapSearchEnabled || getPositiveInteger("MAP_SEARCH_CACHE_TTL_SECONDS") > 0;
   const expectedStaffAdmins = env("QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS");
   const staffDemoExpectationsOk = !productionLike || (expectedStaffAdmins.length > 0 && !hasPlaceholderValue(expectedStaffAdmins));
+  const smtpShapeOk = emailProvider !== "smtp" || (hasRequiredEnv(smtpRequiredEnv) && isValidPort("SMTP_PORT"));
+  const smtpPlaceholderOk = emailProvider !== "smtp" || !productionLike || !hasPlaceholderEnv(smtpRequiredEnv);
 
   return [
     check("database_url", env("DATABASE_URL").length > 0, "configured", "missing_database_url"),
@@ -102,9 +109,15 @@ function getChecks(): LaunchCheck[] {
     ),
     check(
       "smtp_config",
-      emailProvider !== "smtp" || (hasRequiredEnv(["EMAIL_FROM", "SMTP_HOST", "SMTP_USER", "SMTP_PASS"]) && isValidPort("SMTP_PORT")),
+      smtpShapeOk,
       emailProvider === "smtp" ? "configured" : "not_required_for_console_provider",
       "smtp_config_incomplete",
+    ),
+    check(
+      "smtp_placeholder_values",
+      smtpPlaceholderOk,
+      emailProvider === "smtp" && productionLike ? "no_launch_placeholders_detected" : "not_required_for_non_launch_env",
+      "placeholder_smtp_values_detected",
     ),
     check(
       "map_provider",

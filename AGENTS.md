@@ -61,6 +61,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - Keep each P5 package status in three separate buckets: local implementation/automated coverage, staging/manual evidence, and release decision status. Do not collapse those into a single "done" state.
 - Use `deploy/release-evidence.sh` or `pnpm verify:release-evidence` as the read-only P5-E evidence preflight before copying identifiers into `docs/release-go-no-go.md`; strict final evidence should use `QDOC_EVIDENCE_STRICT=true`, and public/repository evidence should keep the default redacted output.
 - Use `deploy/portfolio-smoke-evidence.sh` or `pnpm verify:portfolio-smoke` after staging manual smoke to roll P5-A through P5-D outcomes into package status exports for the release evidence preflight; strict final smoke evidence should use `QDOC_SMOKE_STRICT=true`.
+- Use `pnpm verify:email` locally and `QDOC_VERIFY_EMAIL=true bash deploy/verify-staging.sh` in staging for P5-C email readiness. Add `QDOC_VERIFY_SMTP_CONNECTIVITY=true` only when an approved live SMTP connectivity/auth check is intended. This verifier must remain safe: no SMTP secrets, provider diagnostics, OTP values, recipient addresses, or real email sends in output.
 - When resuming Step 5, read the work package status snapshot in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md` before choosing the next task. Choose work from P5-A through P5-E based on the latest blocker, and treat staging/manual product gaps as implementation work in the relevant package before returning to evidence collection.
 - Also read `docs/portfolio-go-work-packages.md` and its local `.ai/docs/portfolio-go-work-packages.md` mirror when resuming Step 5. The committed docs file is the package-level source of truth for the newly defined P5-A staff demo access, P5-B provider map public-browser verification, P5-C OTP delivery and auth error usability, P5-D public demo smoke, and P5-E operations evidence and decision work.
 - Current GO blockers must stay synchronized in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md`. Update `.ai/core/PRD.md`, `.ai/core/ARCHITECTURE.md`, `.ai/core/ADR.md`, `AGENTS.md`, README, or `docs/release-go-no-go.md` when the change affects product scope, architecture, durable decisions, future-agent rules, or tester/operator procedures.
@@ -137,6 +138,10 @@ pnpm lint
 pnpm build
 pnpm db:validate
 pnpm verify:outbox
+pnpm verify:ops
+pnpm verify:admin-data
+pnpm verify:launch
+pnpm verify:email
 ```
 
 ## Notes

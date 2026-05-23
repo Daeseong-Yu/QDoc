@@ -94,10 +94,13 @@ Implementation state:
 - Local UI renders readable delivery-unavailable, rate-limit, invalid-code, expired-code, unauthorized-staff, and retry states.
 - Local E2E verifies patient and staff error rendering without exposing raw internal codes.
 - Session continuity across refresh/revisit is covered locally.
+- `pnpm verify:email` safely checks API OTP delivery policy, worker provider policy, SMTP config shape, placeholder SMTP values, and optional SMTP connectivity/auth without sending email or printing provider diagnostics.
+- `deploy/verify-staging.sh` can run the same check from the staging worker image with `QDOC_VERIFY_EMAIL=true`; `QDOC_VERIFY_SMTP_CONNECTIVITY=true` adds an approved live SMTP `verify()` connection.
 
 Remaining evidence:
 
 - Verify first-time OTP delivery with staging SMTP settings.
+- Verify `pnpm verify:email` or `QDOC_VERIFY_EMAIL=true bash deploy/verify-staging.sh` passes with the deployed staging env, and use `QDOC_VERIFY_SMTP_CONNECTIVITY=true` when SMTP connectivity/auth should be tested before requesting a real OTP.
 - Verify real inbox receipt for patient and staff paths.
 - Verify delivery-unavailable behavior without leaking SMTP/provider diagnostics.
 - Verify refresh/revisit behavior on the deployed host.
@@ -105,6 +108,8 @@ Remaining evidence:
 Verification:
 
 - local OTP/session E2E
+- `pnpm verify:email`
+- `QDOC_VERIFY_EMAIL=true bash deploy/verify-staging.sh`
 - staging manual smoke with real SMTP settings
 - release evidence that excludes OTP values and provider diagnostics
 

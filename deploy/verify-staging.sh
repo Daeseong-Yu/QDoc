@@ -7,6 +7,7 @@ RUN_OUTBOX="${QDOC_VERIFY_OUTBOX:-false}"
 RUN_OPS="${QDOC_VERIFY_OPS:-false}"
 RUN_ADMIN_DATA="${QDOC_VERIFY_ADMIN_DATA:-false}"
 RUN_LAUNCH="${QDOC_VERIFY_LAUNCH:-false}"
+RUN_EMAIL="${QDOC_VERIFY_EMAIL:-false}"
 
 if [ -z "$ENV_FILE" ]; then
   if [ -f ".env.staging" ]; then
@@ -138,6 +139,13 @@ if [ "$RUN_LAUNCH" = "true" ]; then
   compose run --rm --no-deps worker pnpm verify:launch
 else
   log "Skipping launch hardening verification; set QDOC_VERIFY_LAUNCH=true to enable it"
+fi
+
+if [ "$RUN_EMAIL" = "true" ]; then
+  log "Running email delivery configuration verification in the staging image"
+  compose run --rm --no-deps -e QDOC_VERIFY_SMTP_CONNECTIVITY -e QDOC_VERIFY_SMTP_TIMEOUT_MS worker pnpm verify:email
+else
+  log "Skipping email delivery configuration verification; set QDOC_VERIFY_EMAIL=true to enable it"
 fi
 
 log "Staging verification passed"

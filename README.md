@@ -168,6 +168,7 @@ pnpm verify:outbox
 pnpm verify:ops
 pnpm verify:admin-data
 pnpm verify:launch
+pnpm verify:email
 pnpm e2e
 ```
 
@@ -178,6 +179,8 @@ pnpm e2e
 `pnpm verify:admin-data` prints safe operational JSON for organization, clinic site, queue, staff membership, audit-log count, ticket-count, and map budget configuration readiness. It does not print emails, OTPs, raw database URLs, ticket IDs, audit metadata, or patient payloads. Set `QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener` to require specific launch clinic IDs, and set `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` to a real OTP-receivable staff/admin inbox to verify that each launch site has the expected admin memberships without printing the addresses. Missing expected data exits non-zero and provides a failure-path check without changing database rows.
 
 `pnpm verify:launch` prints safe launch-readiness JSON for required database and Redis configuration, session hardening, HTTPS origin settings, loopback web binding, OTP debug flags, SMTP readiness, and map-provider cost guardrails. It treats `APP_ENV=staging`, `APP_ENV=production`, and `NODE_ENV=production` as launch-like environments and exits non-zero when fail-closed settings are not ready. Nearby healthcare search is disabled by default until a server-side provider credential and a positive monthly search limit are configured.
+
+`pnpm verify:email` prints safe email-delivery readiness JSON for OTP and worker delivery gates. It distinguishes API OTP delivery policy, worker provider policy, SMTP config shape, placeholder SMTP values, and optional SMTP transport connectivity without sending an email or printing SMTP host, username, password, sender, provider diagnostics, OTP values, or recipient addresses. Set `QDOC_VERIFY_SMTP_CONNECTIVITY=true` only when the environment is allowed to make a live SMTP `verify()` connection; this checks connectivity/authentication but still does not prove inbox receipt, so P5-C staging smoke must include a real first-time OTP request.
 
 Install the Playwright Chromium browser once before running E2E tests locally:
 
@@ -329,10 +332,11 @@ Or run the bundled staging verifier from the current release:
 cd /opt/qdoc/current
 QDOC_PUBLIC_URL=https://qdoc.example.com bash deploy/verify-staging.sh
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh
-QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_ADMIN_DATA=true QDOC_VERIFY_LAUNCH=true bash deploy/verify-staging.sh
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_OUTBOX=true QDOC_VERIFY_OPS=true QDOC_VERIFY_ADMIN_DATA=true QDOC_VERIFY_LAUNCH=true QDOC_VERIFY_EMAIL=true bash deploy/verify-staging.sh
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_VERIFY_EMAIL=true QDOC_VERIFY_SMTP_CONNECTIVITY=true bash deploy/verify-staging.sh
 ```
 
-The verifier checks the Compose service state, healthchecks for web/API/worker/PostgreSQL/Redis, the loopback web endpoint, API health and readiness from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` runs the scoped outbox processor verification against the staging database. `QDOC_VERIFY_OPS=true` runs the safe operational summary for queue, notification, outbox, and map guardrail state. `QDOC_VERIFY_ADMIN_DATA=true` checks launch-critical organization, clinic, queue, staff access, and map budget records without printing sensitive fields. `QDOC_VERIFY_LAUNCH=true` runs the fail-closed launch hardening checks for secrets, OTP debug flags, SMTP readiness, web binding, and map budget controls.
+The verifier checks the Compose service state, healthchecks for web/API/worker/PostgreSQL/Redis, the loopback web endpoint, API health and readiness from inside the private Compose network, and the public Caddy route when `QDOC_PUBLIC_URL` is set. `QDOC_VERIFY_OUTBOX=true` runs the scoped outbox processor verification against the staging database. `QDOC_VERIFY_OPS=true` runs the safe operational summary for queue, notification, outbox, and map guardrail state. `QDOC_VERIFY_ADMIN_DATA=true` checks launch-critical organization, clinic, queue, staff access, and map budget records without printing sensitive fields. `QDOC_VERIFY_LAUNCH=true` runs the fail-closed launch hardening checks for secrets, OTP debug flags, SMTP readiness, web binding, and map budget controls. `QDOC_VERIFY_EMAIL=true` runs the safe email-delivery readiness check from the worker image; add `QDOC_VERIFY_SMTP_CONNECTIVITY=true` only when live SMTP connectivity/auth verification is approved for the staging provider.
 
 Bounded load and failure drills:
 
@@ -356,7 +360,7 @@ Pass criteria:
 
 Failure-mode expectations:
 
-- Email provider failure: `verify:launch` blocks launch-like environments unless SMTP is configured, and `verify:ops` reports failed almost-ready email jobs. Restore SMTP settings, restart API/worker, and rerun `verify:ops`.
+- Email provider failure: `verify:launch` blocks launch-like environments unless SMTP is configured with non-placeholder values, `verify:email` distinguishes API OTP delivery gates, worker delivery gates, SMTP shape, placeholder values, and optional SMTP connectivity/auth failures, and `verify:ops` reports failed almost-ready email jobs. Restore SMTP settings, restart API/worker, rerun `QDOC_VERIFY_EMAIL=true bash deploy/verify-staging.sh`, and then verify a real first-time OTP inbox receipt.
 - Redis outage: API `/ready` should fail because OTP abuse-control counters are not available. Restore Redis, restart affected services if needed, and rerun `deploy/verify-staging.sh`.
 - Map guardrail exhaustion: map config/usage should fail closed once the QDoc monthly hard limit is exhausted, and `verify:ops` should report the budget attention state. Keep maps disabled or raise the approved limit only after provider console restrictions are confirmed.
 - Worker processing failure: `verify:outbox` and `verify:ops` should identify stuck, retrying, or failed outbox work. Inspect worker logs, fix the provider or database issue, restart worker, and rerun the verifiers.
@@ -373,7 +377,7 @@ QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_REHEARSAL_BACKUP=true QDOC_BACKUP_
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_REHEARSAL_LOAD_DRILLS=true bash deploy/staging-rehearsal.sh
 ```
 
-The rehearsal validates the Compose configuration, optional release-directory SHA, optional app image tag, public route requirement, full staging verifier, outbox verification, operational checks, and launch hardening checks. When `QDOC_REHEARSAL_BACKUP=true`, it also creates a PostgreSQL custom-format backup and restores it into a temporary database through `deploy/db-restore-check.sh`; it never restores the primary database. When `QDOC_REHEARSAL_LOAD_DRILLS=true`, it also runs the bounded load/failure drill script after the main verifier.
+The rehearsal validates the Compose configuration, optional release-directory SHA, optional app image tag, public route requirement, full staging verifier, outbox verification, operational checks, launch hardening checks, and safe email delivery readiness checks. When `QDOC_REHEARSAL_BACKUP=true`, it also creates a PostgreSQL custom-format backup and restores it into a temporary database through `deploy/db-restore-check.sh`; it never restores the primary database. When `QDOC_REHEARSAL_LOAD_DRILLS=true`, it also runs the bounded load/failure drill script after the main verifier.
 
 For local command validation without running staging containers:
 

@@ -10,6 +10,7 @@
     "verify:ops": "node --import tsx src/verify-ops.ts",
     "verify:admin-data": "node --import tsx src/verify-admin-data.ts",
     "verify:launch": "node --import tsx src/verify-launch.ts",
+    "verify:email": "node --import tsx src/verify-email.ts",
     "build": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit"

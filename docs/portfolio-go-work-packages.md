@@ -20,6 +20,18 @@ Do not close a package for `GO` from local tests alone when the behavior depends
 - backup restore-checks
 - rollback artifacts
 
+## Execution Boundaries
+
+Use these packages as the implementation, verification, and commit-unit boundaries for the rest of Step 5. Keep three states separate for each package:
+
+- Local implementation and automated coverage: code, UI, scripts, and local E2E or verifier proof.
+- Staging/manual evidence: real public URL, real inboxes, real provider credentials/restrictions, deployed worker behavior, backup restore-check, or rollback artifact proof.
+- Release decision status: `GO`, `NO-GO`, or accepted non-public-demo risk recorded safely.
+
+The default execution order is P5-A, P5-B, P5-C, P5-D, then P5-E. If staging/manual evidence exposes a product gap, return to implementation in that same package before continuing evidence collection.
+
+Do not mark a package complete for `GO` from local tests alone when the package depends on real email delivery, public-browser provider behavior, deployed host settings, backup restore-checks, or rollback artifacts.
+
 ## Work Packages
 
 Completion standard: a work package is not done only because the code path exists. It is done when the intended visitor or tester can execute the documented workflow in staging without developer explanation, direct database edits, placeholder-only accounts, or raw implementation errors. If evidence collection finds a gap, return to implementation in that package and update the status here.

@@ -73,12 +73,17 @@ function maskEmail(email: string) {
 function reserveCooldown(map: Map<string, number>, key: string, ttlMs: number) {
   pruneExpiredEntries(map);
 
-  if ((map.get(key) ?? 0) > Date.now()) {
-    return false;
+  const existingExpiry = map.get(key) ?? 0;
+
+  if (existingExpiry > Date.now()) {
+    return {
+      reserved: false as const,
+      retryAfterSeconds: Math.max(1, Math.ceil((existingExpiry - Date.now()) / 1000)),
+    };
   }
 
   map.set(key, Date.now() + ttlMs);
-  return true;
+  return { reserved: true as const };
 }
 
 function clearCooldown(map: Map<string, number>, key: string) {
@@ -125,6 +130,15 @@ function getOtpRequestCooldownKey(request: IncomingMessage, email: string) {
 
 function getOtpVerifyCooldownKey(request: IncomingMessage, email: string) {
   return `${getRequesterKey(request)}:${email}`;
+}
+
+function sendRateLimited(response: ServerResponse, retryAfterSeconds: number) {
+  sendJson(
+    response,
+    429,
+    { error: "rate_limited", retryAfterSeconds },
+    { "retry-after": String(retryAfterSeconds) },
+  );
 }
 
 function generateOtpCode() {
@@ -247,19 +261,21 @@ export async function handleOtpRequest(request: IncomingMessage, response: Serve
 
   const requestCooldownKey = getOtpRequestCooldownKey(request, input.data.email);
 
-  if (!reserveCooldown(otpRequestCooldowns, requestCooldownKey, otpRequestCooldownMs)) {
-    sendJson(response, 429, { error: "rate_limited" });
+  const requestCooldown = reserveCooldown(otpRequestCooldowns, requestCooldownKey, otpRequestCooldownMs);
+
+  if (!requestCooldown.reserved) {
+    sendRateLimited(response, requestCooldown.retryAfterSeconds);
     return;
   }
 
   if (!reserveRequestEmail(input.data.email)) {
-    sendJson(response, 429, { error: "rate_limited" });
+    sendRateLimited(response, 10);
     return;
   }
 
   if (await hasTooManyPendingChallenges(input.data.email)) {
     releaseRequestEmail(input.data.email);
-    sendJson(response, 429, { error: "rate_limited" });
+    sendRateLimited(response, Math.ceil(otpTtlMs / 1000));
     return;
   }
 
@@ -271,7 +287,7 @@ export async function handleOtpRequest(request: IncomingMessage, response: Serve
       policy: redisRateLimit.policy,
       email: maskEmail(input.data.email),
     });
-    sendJson(response, 429, { error: "rate_limited" }, { "retry-after": String(redisRateLimit.retryAfterSeconds) });
+    sendRateLimited(response, redisRateLimit.retryAfterSeconds);
     return;
   }
 
@@ -322,8 +338,10 @@ export async function handleOtpVerify(request: IncomingMessage, response: Server
 
   const verifyCooldownKey = getOtpVerifyCooldownKey(request, input.data.email);
 
-  if (!reserveCooldown(otpVerifyCooldowns, verifyCooldownKey, otpVerifyCooldownMs)) {
-    sendJson(response, 429, { error: "rate_limited" });
+  const verifyCooldown = reserveCooldown(otpVerifyCooldowns, verifyCooldownKey, otpVerifyCooldownMs);
+
+  if (!verifyCooldown.reserved) {
+    sendRateLimited(response, verifyCooldown.retryAfterSeconds);
     return;
   }
 
@@ -334,7 +352,7 @@ export async function handleOtpVerify(request: IncomingMessage, response: Server
       policy: redisRateLimit.policy,
       email: maskEmail(input.data.email),
     });
-    sendJson(response, 429, { error: "rate_limited" }, { "retry-after": String(redisRateLimit.retryAfterSeconds) });
+    sendRateLimited(response, redisRateLimit.retryAfterSeconds);
     return;
   }
 

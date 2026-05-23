@@ -72,6 +72,7 @@ export const authErrorSchema = z.object({
     "unauthorized",
     "not_found",
   ]),
+  retryAfterSeconds: z.number().int().positive().optional(),
 });
 
 export type AuthError = z.infer<typeof authErrorSchema>;

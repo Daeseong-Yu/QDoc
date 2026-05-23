@@ -75,6 +75,7 @@ type MapSettingsForm = {
 type ApiError = {
   status: number;
   error: string;
+  retryAfterSeconds?: number;
 };
 
 const siteSettingsResponseSchema = z.object({
@@ -153,6 +154,7 @@ async function readApiResponse<T>(response: Response, schema: z.ZodSchema<T>) {
     const error = new Error(parsedError.success ? parsedError.data.error : "request_failed") as Error & ApiError;
     error.status = response.status;
     error.error = parsedError.success ? parsedError.data.error : "request_failed";
+    error.retryAfterSeconds = parsedError.success ? parsedError.data.retryAfterSeconds : undefined;
     throw error;
   }
 
@@ -161,6 +163,15 @@ async function readApiResponse<T>(response: Response, schema: z.ZodSchema<T>) {
 
 function isApiError(error: unknown): error is ApiError {
   return error instanceof Error && "status" in error && "error" in error;
+}
+
+function formatRetryAfter(seconds: number) {
+  if (seconds < 60) {
+    return `${seconds} seconds`;
+  }
+
+  const minutes = Math.ceil(seconds / 60);
+  return minutes === 1 ? "1 minute" : `${minutes} minutes`;
 }
 
 function getMessage(error: unknown) {
@@ -193,7 +204,9 @@ function getMessage(error: unknown) {
   }
 
   if (error.error === "rate_limited") {
-    return "Too many attempts. Wait a few minutes before trying again.";
+    return error.retryAfterSeconds
+      ? `Too many attempts. Try again in ${formatRetryAfter(error.retryAfterSeconds)}.`
+      : "Too many attempts. Wait a few minutes before trying again.";
   }
 
   return "Request failed. Try again.";

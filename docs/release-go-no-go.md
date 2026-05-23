@@ -103,11 +103,12 @@ Run the read-only public browser smoke against the deployed URL before marking P
 
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<git-sha> \
 QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true \
 pnpm e2e:portfolio
 ```
 
-This public browser smoke checks the patient page, map controls, Refresh/site-selection behavior, marker selected-state feedback, and `/staff` sign-in surface without database writes or OTP requests. It does not replace first-time inbox delivery, staff authorization, queue operation, worker/outbox, backup, or rollback evidence.
+This public browser smoke first compares the expected 40-character candidate SHA with `/api/release`, then checks the patient page, map controls, Refresh/site-selection behavior, marker selected-state feedback, and `/staff` sign-in surface without database writes or OTP requests. It does not replace first-time inbox delivery, staff authorization, queue operation, worker/outbox, backup, or rollback evidence.
 
 ## Local Required Checks
 
@@ -123,7 +124,7 @@ pnpm verify:ops
 pnpm verify:launch
 pnpm verify:email
 pnpm e2e
-QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true pnpm e2e:portfolio
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<git-sha> QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true pnpm e2e:portfolio
 git diff --check
 ```
 

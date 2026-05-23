@@ -1,6 +1,7 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type APIRequestContext, type Page, test } from "@playwright/test";
 
 const expectProviderMap = process.env.QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP === "true";
+const expectedReleaseSha = process.env.QDOC_PORTFOLIO_EXPECT_RELEASE_SHA?.trim().toLowerCase();
 const configuredBaseURL = process.env.QDOC_PORTFOLIO_BASE_URL ?? process.env.QDOC_PUBLIC_URL ?? "http://127.0.0.1";
 const internalTokens = [
   "cost guard active",
@@ -31,6 +32,23 @@ function collectFailingApiResponses(page: Page) {
   });
 
   return failingApiResponses;
+}
+
+async function expectCandidateRelease(request: APIRequestContext) {
+  if (!expectedReleaseSha) {
+    return;
+  }
+
+  expect(expectedReleaseSha, "QDOC_PORTFOLIO_EXPECT_RELEASE_SHA must be a 40-character Git SHA").toMatch(/^[0-9a-f]{40}$/);
+
+  const response = await request.get("/api/release");
+  expect(response.ok(), "public URL should expose safe release identity at /api/release").toBe(true);
+
+  const payload = (await response.json()) as { releaseSha?: unknown };
+  expect(
+    payload.releaseSha,
+    "public URL is not serving the expected candidate release; redeploy before collecting portfolio smoke evidence",
+  ).toBe(expectedReleaseSha);
 }
 
 async function expectNoInternalCopy(page: Page) {
@@ -94,7 +112,9 @@ async function pollNumericMapAttribute(page: Page, attribute: string) {
 }
 
 test.describe("portfolio public browser smoke", () => {
-  test("loads the patient map and keeps public controls usable", async ({ page }) => {
+  test("loads the patient map and keeps public controls usable", async ({ page, request }) => {
+    await expectCandidateRelease(request);
+
     const failingApiResponses = collectFailingApiResponses(page);
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -171,7 +191,9 @@ test.describe("portfolio public browser smoke", () => {
     expect.soft(failingApiResponses, "same-origin API calls should not return 5xx responses").toEqual([]);
   });
 
-  test("loads the staff sign-in surface without exposing internal errors", async ({ page }) => {
+  test("loads the staff sign-in surface without exposing internal errors", async ({ page, request }) => {
+    await expectCandidateRelease(request);
+
     const failingApiResponses = collectFailingApiResponses(page);
 
     await page.goto("/staff", { waitUntil: "domcontentloaded" });

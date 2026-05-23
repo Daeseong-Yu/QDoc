@@ -14,6 +14,7 @@ import {
   handleUpdatePatientNotificationPreferences,
 } from "./patient.js";
 import { handleReadiness } from "./readiness.js";
+import { handleReleaseIdentity } from "./release.js";
 import {
   handleCreateStaffMembership,
   handleDeleteStaffMembership,
@@ -51,6 +52,11 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/ready") {
       await handleReadiness(response);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/release") {
+      handleReleaseIdentity(response);
       return;
     }
 

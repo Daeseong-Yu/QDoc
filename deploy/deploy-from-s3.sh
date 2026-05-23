@@ -95,6 +95,7 @@ echo "$LOAD_OUTPUT"
 docker image inspect "${IMAGE_NAME}:${IMAGE_TAG}" >/dev/null
 
 export QDOC_APP_IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
+export QDOC_RELEASE_SHA="$IMAGE_TAG"
 export QDOC_WEB_BIND="${QDOC_WEB_BIND:-127.0.0.1}"
 
 if [ "$QDOC_WEB_BIND" != "127.0.0.1" ]; then

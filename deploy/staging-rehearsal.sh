@@ -112,6 +112,7 @@ check_expected_app_image() {
   fi
 
   export QDOC_APP_IMAGE="$EXPECTED_APP_IMAGE"
+  export QDOC_RELEASE_SHA="$expected_tag"
 }
 
 print_dry_run() {

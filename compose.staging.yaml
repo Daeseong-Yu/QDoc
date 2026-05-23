@@ -32,6 +32,8 @@ services:
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in .env.staging}
+      QDOC_RELEASE_SHA: ${QDOC_RELEASE_SHA:-}
+      QDOC_APP_IMAGE: ${QDOC_APP_IMAGE:?Set QDOC_APP_IMAGE in .env.staging or the shell}
       ALLOW_CONSOLE_OTP: ${ALLOW_CONSOLE_OTP:-false}
       ALLOW_FIXED_OTP: ${ALLOW_FIXED_OTP:-false}
       FIXED_OTP_EMAIL: ${FIXED_OTP_EMAIL:-}
@@ -83,6 +85,8 @@ services:
     environment:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in .env.staging}
+      QDOC_RELEASE_SHA: ${QDOC_RELEASE_SHA:-}
+      QDOC_APP_IMAGE: ${QDOC_APP_IMAGE:?Set QDOC_APP_IMAGE in .env.staging or the shell}
       ALLOW_CONSOLE_OTP: ${ALLOW_CONSOLE_OTP:-false}
       ALLOW_FIXED_OTP: ${ALLOW_FIXED_OTP:-false}
       APP_URL: ${APP_URL:?Set APP_URL in .env.staging}

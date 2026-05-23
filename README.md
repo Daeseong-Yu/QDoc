@@ -185,7 +185,7 @@ pnpm e2e
 
 `pnpm verify:portfolio-smoke` rolls manually observed P5-A through P5-D staging smoke outcomes into safe release-evidence status exports. For P5-A, set `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after `pnpm verify:admin-data` or `QDOC_VERIFY_ADMIN_DATA=true bash deploy/verify-staging.sh` passes with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` configured for the real staff/admin inbox. The helper does not print the email address and does not contact staging by itself.
 
-`pnpm e2e:portfolio` runs a read-only Playwright smoke test against a deployed public URL. Set `QDOC_PUBLIC_URL=https://qdoc.example.com` or `QDOC_PORTFOLIO_BASE_URL=https://qdoc.example.com` before running it. When the provider map is expected to be live, add `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true`; the test then requires granted browser geolocation, a ready provider-backed map surface, no fallback map, at least one QDoc clinic marker, at least one provider discovery place, geolocation recentering, usable Refresh/site-selection controls, and no raw internal error tokens in the public UI. The same smoke also checks that `/staff` loads the staff sign-in surface without exposing raw internal auth/map errors, but it does not request an OTP or prove staff authorization. Optional `QDOC_PORTFOLIO_GEO_LATITUDE` and `QDOC_PORTFOLIO_GEO_LONGITUDE` override the default Waterloo-area browser geolocation used by the test.
+`pnpm e2e:portfolio` runs a read-only Playwright smoke test against a deployed public URL. Set `QDOC_PUBLIC_URL=https://qdoc.example.com` or `QDOC_PORTFOLIO_BASE_URL=https://qdoc.example.com` before running it. Add `QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<40-character-git-sha>` to fail early when the public URL is serving a stale candidate; the smoke compares that value with the safe public `/api/release` identity endpoint. When the provider map is expected to be live, add `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true`; the test then requires granted browser geolocation, a ready provider-backed map surface, no fallback map, at least one QDoc clinic marker, at least one provider discovery place, geolocation recentering, usable Refresh/site-selection controls, and no raw internal error tokens in the public UI. The same smoke also checks that `/staff` loads the staff sign-in surface without exposing raw internal auth/map errors, but it does not request an OTP or prove staff authorization. Optional `QDOC_PORTFOLIO_GEO_LATITUDE` and `QDOC_PORTFOLIO_GEO_LONGITUDE` override the default Waterloo-area browser geolocation used by the test.
 
 Install the Playwright Chromium browser once before running E2E tests locally:
 
@@ -235,6 +235,7 @@ Staging environment variables:
 | `APP_URL` | yes | Public origin, for example `https://qdoc.example.com`. |
 | `APP_ENV` | yes | Use `staging` for staging. |
 | `QDOC_APP_IMAGE` | yes | Docker image tag loaded from the S3 artifact, normally `qdoc-app:<git-sha>`. |
+| `QDOC_RELEASE_SHA` | no | Exported by deploy/rehearsal scripts from the 40-character image tag so `/api/release` can prove which candidate the public URL is serving. |
 | `QDOC_WEB_BIND` | yes | Must remain `127.0.0.1`; the deploy script rejects public binds. |
 | `QDOC_WEB_PORT` | yes | Host loopback port Caddy proxies to, for example `13000`. |
 | `DATABASE_URL` | yes | Internal PostgreSQL URL matching the Compose database service. |

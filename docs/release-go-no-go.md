@@ -4,6 +4,16 @@ Use this checklist for a portfolio-ready launch-candidate decision. `GO` means Q
 
 Do not start final GO evidence collection while known portfolio blockers remain open. At minimum, finish the interactive provider map, first-time OTP delivery, real staff/admin demo access, user-friendly auth/map error handling, patient/staff smoke path, notification/outbox health, backup restore-check, rollback target, and staging rehearsal.
 
+Track remaining evidence by Step 5 work package:
+
+1. P5-A Staff demo access
+2. P5-B Provider map public-browser verification
+3. P5-C OTP delivery and auth error usability
+4. P5-D Public demo smoke
+5. P5-E Operations evidence and decision
+
+Do not mark a package complete from local tests alone when it depends on real inboxes, real provider credentials, public browser restrictions, deployed host settings, backup restore-checks, or rollback artifacts.
+
 ## Release Identity
 
 - Candidate Git SHA: `<40-character-sha>`
@@ -167,6 +177,11 @@ Ops bundle URI:
 App artifact SHA-256:
 Ops bundle SHA-256:
 Staging URL:
+P5-A Staff demo access:
+P5-B Provider map public-browser:
+P5-C OTP delivery and auth errors:
+P5-D Public demo smoke:
+P5-E Operations evidence:
 Local checks:
 Staging verifier:
 Staging rehearsal:

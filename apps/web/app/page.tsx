@@ -297,7 +297,6 @@ export default function Home() {
     }
 
     setTicketState("loading");
-    setMessage("");
 
     try {
       await loadTickets();

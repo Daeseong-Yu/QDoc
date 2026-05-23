@@ -632,10 +632,14 @@ export default function StaffPage() {
         body: JSON.stringify({ siteId: selectedSiteId }),
       });
       await readApiResponse(response, staffTicketResponseSchema);
-      const applied = await loadBoard();
+      const [appliedBoard, appliedOps] = await Promise.all([loadBoard(), loadOps()]);
 
-      if (applied) {
+      if (appliedBoard) {
         setBoardState("success");
+      }
+
+      if (appliedOps) {
+        setOpsState("success");
       }
     } catch (error) {
       setMessage(getMessage(error));

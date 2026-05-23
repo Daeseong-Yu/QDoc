@@ -35,6 +35,8 @@ const e2eSiteName = "E2E Clinic";
 const e2eQueueName = "E2E Walk-in";
 let e2eEmail = "e2e.staff@example.com";
 const e2eOtpCode = "123456";
+const almostReadyMessage = "Your turn is coming up. Please stay nearby.";
+const notificationOutboxTypes = ["ticket.status_changed", "ticket.almost_ready_email"];
 
 function getE2eEmail(testInfo: TestInfo) {
   const slug = `${testInfo.project.name}-${testInfo.title}`
@@ -50,6 +52,12 @@ function getE2eMemberEmail(email = e2eEmail) {
   const token = createHash("sha256").update(email).digest("hex").slice(0, 12);
 
   return `e2e.member.${token}@example.com`;
+}
+
+function getE2ePatientEmail(testInfo: TestInfo, suffix: string) {
+  const token = createHash("sha256").update(`${testInfo.project.name}-${testInfo.title}-${suffix}`).digest("hex").slice(0, 12);
+
+  return `e2e.patient.${token}@example.com`;
 }
 
 function getE2eRequesterIp(testInfo: TestInfo, offset = 0) {
@@ -161,6 +169,16 @@ async function resetE2eData() {
     })
   ).map((ticket) => ticket.id);
 
+  await prisma.outbox.deleteMany({
+    where: {
+      type: { in: notificationOutboxTypes },
+      OR: [
+        { payload: { path: ["siteId"], equals: e2eSiteId } },
+        ...ticketIds.map((ticketId) => ({ payload: { path: ["ticketId"], equals: ticketId } })),
+      ],
+    },
+  });
+
   if (ticketIds.length > 0) {
     await prisma.notificationLog.deleteMany({
       where: { ticketId: { in: ticketIds } },
@@ -191,8 +209,8 @@ async function resetE2eData() {
 
   const e2eUser = await prisma.user.upsert({
     where: { email: e2eEmail },
-    update: {},
-    create: { email: e2eEmail },
+    update: { emailNotificationsEnabled: true },
+    create: { email: e2eEmail, emailNotificationsEnabled: true },
   });
 
   await prisma.organization.upsert({
@@ -301,7 +319,7 @@ async function signIn(page: Page, emailPlaceholder: string, email = e2eEmail) {
   });
   await page.getByPlaceholder("6-digit code").fill(e2eOtpCode);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText(email, { exact: true })).toBeVisible();
+  await expect(page.getByText(email, { exact: true }).first()).toBeVisible();
 }
 
 async function selectE2eSite(page: Page) {
@@ -330,6 +348,66 @@ async function expectLatestE2eTicketStatus(status: string) {
       return ticket?.status ?? null;
     })
     .toBe(status);
+}
+
+async function createWaitingTicket(email: string, sortRank: Date) {
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: {
+      emailNotificationsEnabled: true,
+    },
+    create: {
+      email,
+      emailNotificationsEnabled: true,
+    },
+  });
+
+  return prisma.ticket.create({
+    data: {
+      siteId: e2eSiteId,
+      queueId: e2eQueueId,
+      userId: user.id,
+      status: "waiting",
+      sortRank,
+      events: {
+        create: {
+          status: "waiting",
+          note: "e2e_seed",
+        },
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+}
+
+function getPayloadString(payload: unknown, key: string) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const value = (payload as Record<string, unknown>)[key];
+
+  return typeof value === "string" ? value : null;
+}
+
+async function countAlmostReadyEmailOutboxes(ticketId: string) {
+  const outboxes = await prisma.outbox.findMany({
+    where: { type: "ticket.almost_ready_email" },
+    select: { payload: true },
+  });
+
+  return outboxes.filter((outbox) => getPayloadString(outbox.payload, "ticketId") === ticketId).length;
+}
+
+async function getTicketStatus(ticketId: string) {
+  const ticket = await prisma.ticket.findUnique({
+    where: { id: ticketId },
+    select: { status: true },
+  });
+
+  return ticket?.status ?? null;
 }
 
 async function expectNoRawAuthErrorCodes(page: Page) {
@@ -579,6 +657,43 @@ test("keeps signed-in sessions across refresh and revisit", async ({
   await page.reload();
   await expect(page.getByRole("heading", { name: "Staff queue board" })).toBeVisible();
   await expect(page.getByText(e2eEmail, { exact: true })).toBeVisible();
+});
+
+test("lets patients change notification preferences", async ({
+  page,
+}, testInfo) => {
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": getE2eRequesterIp(testInfo, 1),
+  });
+
+  await page.goto("/");
+  await signIn(page, "you@example.com");
+
+  const alerts = page.getByLabel("Alerts");
+  await expect(alerts).toBeChecked();
+  await expect(alerts).toBeEnabled();
+  const preferencesResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/patients/me/notification-preferences") &&
+      response.request().method() === "PATCH",
+  );
+  await alerts.click();
+  expect((await preferencesResponse).ok()).toBe(true);
+  await expect(alerts).not.toBeChecked();
+  await expect
+    .poll(async () => {
+      const user = await prisma.user.findUnique({
+        where: { email: e2eEmail },
+        select: { emailNotificationsEnabled: true },
+      });
+
+      return user?.emailNotificationsEnabled ?? null;
+    })
+    .toBe(false);
+
+  await page.reload();
+  await expect(page.getByText(e2eEmail, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Alerts")).not.toBeChecked();
 });
 
 test("enforces the monthly map load guard before exposing provider usage", async ({
@@ -942,6 +1057,79 @@ test("lets an admin add a staff tester through membership management", async ({
   await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Staff membership" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Map budget" })).toHaveCount(0);
+});
+
+test("shows staff notification health, almost-ready outbox evidence, cancel flow, and audit logs", async ({
+  page,
+}, testInfo) => {
+  await prisma.site.update({
+    where: { id: e2eSiteId },
+    data: { notificationAheadCount: 1 },
+  });
+
+  const now = Date.now();
+  const frontTicket = await createWaitingTicket(getE2ePatientEmail(testInfo, "front"), new Date(now));
+  const middleTicket = await createWaitingTicket(getE2ePatientEmail(testInfo, "middle"), new Date(now + 1000));
+  const almostReadyTicket = await createWaitingTicket(getE2ePatientEmail(testInfo, "almost-ready"), new Date(now + 2000));
+  const failedOutbox = await prisma.outbox.create({
+    data: {
+      type: "ticket.almost_ready_email",
+      payload: {
+        ticketId: "e2e-failed-notification",
+        siteId: e2eSiteId,
+        queueId: e2eQueueId,
+        notificationLogId: "e2e-failed-notification",
+      },
+      status: "failed",
+      attempts: 5,
+    },
+    select: { id: true },
+  });
+
+  try {
+    await page.goto("/staff");
+    await signIn(page, "Staff email");
+    await expect(page.getByRole("heading", { name: "Staff queue board" })).toBeVisible();
+    await selectE2eSite(page);
+
+    const notificationHealth = page.getByRole("heading", { name: "Notification health" }).locator("../..");
+    await expect(notificationHealth).toContainText("Failed");
+    await expect(notificationHealth).toContainText("1");
+    await expect(notificationHealth).toContainText("ticket.almost_ready_email");
+    await expect(notificationHealth).toContainText("failed");
+
+    await staffColumn(page, "Waiting").getByRole("button", { name: "Call" }).first().click();
+    await expect(staffColumn(page, "Called")).toContainText(e2eQueueName);
+    await expect.poll(() => getTicketStatus(frontTicket.id)).toBe("called");
+    await expect
+      .poll(async () =>
+        prisma.notificationLog.count({
+          where: {
+            ticketId: almostReadyTicket.id,
+            channel: "email",
+            message: almostReadyMessage,
+          },
+        }),
+      )
+      .toBe(1);
+    await expect.poll(() => countAlmostReadyEmailOutboxes(almostReadyTicket.id)).toBe(1);
+
+    await staffColumn(page, "Called").getByRole("button", { name: "Delay" }).click();
+    await expect(staffColumn(page, "Delayed")).toContainText(e2eQueueName);
+    await expect.poll(() => getTicketStatus(frontTicket.id)).toBe("delay");
+    await expect.poll(() => countAlmostReadyEmailOutboxes(almostReadyTicket.id)).toBe(1);
+
+    await staffColumn(page, "Waiting").getByRole("button", { name: "Cancel" }).first().click();
+    await expect.poll(() => getTicketStatus(middleTicket.id)).toBe("cancelled");
+    await expect.poll(() => countAlmostReadyEmailOutboxes(almostReadyTicket.id)).toBe(1);
+
+    const auditLog = page.getByRole("heading", { name: "Audit log" }).locator("..");
+    await expect(auditLog).toContainText("ticket.call");
+    await expect(auditLog).toContainText("ticket.delay");
+    await expect(auditLog).toContainText("ticket.cancel");
+  } finally {
+    await prisma.outbox.deleteMany({ where: { id: failedOutbox.id } });
+  }
 });
 
 test("covers patient check-in and staff queue transitions", async ({

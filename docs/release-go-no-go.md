@@ -23,7 +23,7 @@ Fill this table for each release candidate. Keep the notes safe: use short summa
 | P5-A Staff demo access | Real OTP-receivable staff/admin access, tester authorization path, unauthorized personal email denial | Pending staging/manual proof | `<link-or-note>` |
 | P5-B Provider map public-browser | Geolocation-centered provider map, pan/zoom, recentering, marker/card sync, QDoc-vs-provider distinction, fail-closed states | Pending staging/manual proof | `<link-or-note>` |
 | P5-C OTP delivery and auth errors | First-time SMTP delivery, readable retry/delivery/invalid/expired states, refresh/revisit session behavior | Pending staging/manual proof | `<link-or-note>` |
-| P5-D Public demo smoke | Patient/staff/queue/notification/outbox/membership/audit-log/map path tested as a visitor/tester | Pending local extension and staging/manual proof | `<link-or-note>` |
+| P5-D Public demo smoke | Patient/staff/queue/notification/outbox/membership/audit-log/map path tested as a visitor/tester | Local automated extension passed; staging/manual proof pending | Local: `pnpm e2e --grep "notification preferences|notification health"` and `pnpm e2e`; staging: `<link-or-note>` |
 | P5-E Operations evidence | Staging verifier, full rehearsal, backup restore-check, rollback target, GO/NO-GO decision | Pending staging/manual proof | `<link-or-note>` |
 
 ## Release Identity
@@ -61,7 +61,7 @@ Go criteria:
 - `verify:launch` reports launch-like hardening ready for the target environment when staging or production env is loaded.
 - E2E runs against a local or explicitly isolated test database only.
 - No local-only config, `.env`, backup, screenshot, trace, or generated secret material is staged.
-- Automated coverage includes patient OTP/check-in, staff OTP/queue operations, invalid/expired OTP states, refresh/revisit session continuity, delay/restore, and map guardrail behavior.
+- Automated coverage includes patient OTP/check-in, staff OTP/queue operations, invalid/expired OTP states, refresh/revisit session continuity, notification preference persistence, almost-ready notification/outbox creation, failed notification job visibility, duplicate-delivery prevention, cancel, delay/restore, audit-log visibility, and map guardrail behavior.
 
 No-go criteria:
 

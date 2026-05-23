@@ -182,6 +182,8 @@ pnpm e2e
 
 `pnpm verify:email` prints safe email-delivery readiness JSON for OTP and worker delivery gates. It distinguishes API OTP delivery policy, worker provider policy, SMTP config shape, placeholder SMTP values, and optional SMTP transport connectivity without sending an email or printing SMTP host, username, password, sender, provider diagnostics, OTP values, or recipient addresses. Set `QDOC_VERIFY_SMTP_CONNECTIVITY=true` only when the environment is allowed to make a live SMTP `verify()` connection; this checks connectivity/authentication but still does not prove inbox receipt, so P5-C staging smoke must include a real first-time OTP request.
 
+`pnpm verify:portfolio-smoke` rolls manually observed P5-A through P5-D staging smoke outcomes into safe release-evidence status exports. For P5-A, set `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after `pnpm verify:admin-data` or `QDOC_VERIFY_ADMIN_DATA=true bash deploy/verify-staging.sh` passes with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` configured for the real staff/admin inbox. The helper does not print the email address and does not contact staging by itself.
+
 Install the Playwright Chromium browser once before running E2E tests locally:
 
 ```bash

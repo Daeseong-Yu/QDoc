@@ -130,6 +130,7 @@ validate_public_url() {
   fi
 }
 
+P5A_STAFF_ADMIN_DATA="$(status_value QDOC_SMOKE_STAFF_ADMIN_DATA)"
 P5A_STAFF_ADMIN_SIGNIN="$(status_value QDOC_SMOKE_STAFF_ADMIN_SIGNIN)"
 P5A_STAFF_TESTER_AUTH="$(status_value QDOC_SMOKE_STAFF_TESTER_AUTH)"
 P5A_UNROSTERED_DENIAL="$(status_value QDOC_SMOKE_UNROSTERED_STAFF_DENIAL)"
@@ -153,7 +154,7 @@ P5D_MEMBERSHIP_AUDIT="$(status_value QDOC_SMOKE_MEMBERSHIP_AUDIT)"
 P5D_NOTIFICATION_OUTBOX="$(status_value QDOC_SMOKE_NOTIFICATION_OUTBOX)"
 P5D_WORKER_DUPLICATE_GUARD="$(status_value QDOC_SMOKE_WORKER_DUPLICATE_GUARD)"
 
-P5A_STATUS="$(package_status "$P5A_STAFF_ADMIN_SIGNIN" "$P5A_STAFF_TESTER_AUTH" "$P5A_UNROSTERED_DENIAL")"
+P5A_STATUS="$(package_status "$P5A_STAFF_ADMIN_DATA" "$P5A_STAFF_ADMIN_SIGNIN" "$P5A_STAFF_TESTER_AUTH" "$P5A_UNROSTERED_DENIAL")"
 P5B_STATUS="$(package_status "$P5B_PROVIDER_RESTRICTIONS" "$P5B_MAP_GEO_CENTER" "$P5B_MAP_PAN_ZOOM" "$P5B_MAP_RECENTER" "$P5B_MARKER_SYNC" "$P5B_MARKER_DISTINCTION" "$P5B_FAIL_CLOSED")"
 P5C_STATUS="$(package_status "$P5C_PATIENT_OTP_DELIVERY" "$P5C_STAFF_OTP_DELIVERY" "$P5C_AUTH_ERROR_COPY" "$P5C_SESSION_REVISIT")"
 P5D_STATUS="$(package_status "$P5D_PATIENT_CHECKIN" "$P5D_STAFF_QUEUE_OPS" "$P5D_MEMBERSHIP_AUDIT" "$P5D_NOTIFICATION_OUTBOX" "$P5D_WORKER_DUPLICATE_GUARD")"
@@ -163,6 +164,7 @@ log "Checking portfolio smoke evidence inputs"
 validate_public_url
 
 log "Checking P5-A staff demo access"
+validate_status "P5-A expected staff/admin admin-data verifier" "$P5A_STAFF_ADMIN_DATA"
 validate_status "P5-A staff/admin OTP sign-in" "$P5A_STAFF_ADMIN_SIGNIN"
 validate_status "P5-A authorized staff tester access" "$P5A_STAFF_TESTER_AUTH"
 validate_status "P5-A unrostered staff denial" "$P5A_UNROSTERED_DENIAL"
@@ -197,6 +199,7 @@ fi
 cat <<EOF
 Portfolio smoke public URL: $(redacted_public_url "$PUBLIC_URL")
 P5-A Staff demo access: $P5A_STATUS
+  Expected staff/admin admin-data verifier: $P5A_STAFF_ADMIN_DATA
   Staff/admin OTP sign-in: $P5A_STAFF_ADMIN_SIGNIN
   Authorized tester access: $P5A_STAFF_TESTER_AUTH
   Unrostered staff denial: $P5A_UNROSTERED_DENIAL

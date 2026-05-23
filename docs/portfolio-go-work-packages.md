@@ -61,7 +61,7 @@ Implementation state:
 Remaining evidence:
 
 - Configure a real staff/admin inbox through `QDOC_SEED_STAFF_ADMIN_EMAILS` or admin membership management.
-- Verify the expected staff/admin account with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS`.
+- Verify the expected staff/admin account with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS`, then record `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only when the staging admin-data verifier passed without printing the address.
 - Sign in at `/staff` using a real inbox.
 - Add or verify a tester membership through the UI.
 - Confirm an unrostered personal email is denied staff access with readable copy.
@@ -71,6 +71,7 @@ Verification:
 - `pnpm verify:admin-data`
 - `pnpm verify:launch`
 - staff membership E2E or manual staging smoke
+- `QDOC_SMOKE_STAFF_ADMIN_DATA=passed bash deploy/portfolio-smoke-evidence.sh` as part of the P5-A smoke rollup after staging verification
 - safe release evidence that does not disclose real email addresses unless explicitly approved
 
 ### P5-B Provider Map Public-Browser Verification

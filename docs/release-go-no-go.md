@@ -69,6 +69,7 @@ Before setting the P5-A through P5-D status variables, use the portfolio smoke h
 
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_SMOKE_STAFF_ADMIN_DATA=passed \
 QDOC_SMOKE_STAFF_ADMIN_SIGNIN=passed \
 QDOC_SMOKE_STAFF_TESTER_AUTH=passed \
 QDOC_SMOKE_UNROSTERED_STAFF_DENIAL=passed \
@@ -172,6 +173,7 @@ Go criteria:
 - Outbox, ops, admin-data, launch-hardening, backup restore-check, and bounded drill checks exit zero.
 - Email verification exits zero and does not report `smtp_config_incomplete`, `placeholder_smtp_values_detected`, `smtp_required_for_launch`, `console_delivery_not_allowed`, or SMTP connectivity failure when live connectivity is requested.
 - The staging staff/admin account is backed by a real OTP-receivable email through `QDOC_SEED_STAFF_ADMIN_EMAILS` or an approved membership operation.
+- P5-A smoke status uses `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after `verify:admin-data` passed with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` configured for the real staff/admin inbox.
 - A tester email that is not on a site roster is expected to be denied staff access, and the evidence records the bootstrap or membership-management path used to authorize the actual staff tester email.
 - The map provider is either intentionally disabled for a documented fail-closed test or fully configured with provider restrictions, QDoc monthly limits, usage reservations, and interactive map behavior.
 - The operator records SSM command ID, app artifact SHA, ops bundle SHA, candidate source SHA, backup filename, and restore-check pass/fail without copying private logs or dump files into Git.

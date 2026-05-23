@@ -12,6 +12,16 @@ Future roadmap items such as SMS, push, EMR/EHR integration, real travel-time es
 
 Step 5 remains in progress. Local implementation and automated coverage exist for large parts of the gate, but portfolio `GO` is still blocked until staging/manual evidence is collected with real external systems.
 
+Documentation coverage for this newly defined work:
+
+- `.ai/core/PRD.md` defines the portfolio-demo product scope and final success criteria.
+- `.ai/core/ARCHITECTURE.md` defines the implementation boundaries for staff access, provider maps, OTP, deployment, and operations.
+- `.ai/core/ADR.md` records the durable `GO` gate, staff bootstrap, provider-map, and evidence decisions.
+- `.ai/phases/index.json` and `.ai/phases/qdoc-launch-candidate/index.json` keep the launch-candidate task and P5-A through P5-E package list discoverable.
+- `.ai/execution/current.md` keeps the active status snapshot and next-action guidance.
+- `.ai/phases/qdoc-launch-candidate/step5.md` keeps the active acceptance criteria, implementation order, and verification expectations.
+- `AGENTS.md` keeps the future-session rules so Step 5 work does not depend on chat history.
+
 Do not close a package for `GO` from local tests alone when the behavior depends on:
 
 - real OTP-receivable inboxes

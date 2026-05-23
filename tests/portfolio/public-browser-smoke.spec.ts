@@ -51,7 +51,28 @@ async function selectLastClinicCard(page: Page) {
   const siteName = (await heading.innerText()).trim();
 
   await target.click();
+  await expect(target).toHaveAttribute("data-selected", "true");
   await expect(page.getByTestId("clinic-map-selected-label")).toContainText(siteName);
+}
+
+async function selectVisibleMapMarker(page: Page) {
+  const markerButtons = page.locator('[data-testid="qdoc-map-marker"], [data-testid="provider-map-marker"]');
+  const count = await markerButtons.count();
+
+  if (count === 0) {
+    return;
+  }
+
+  const target = markerButtons.nth(count - 1);
+  const markerLabel = (await target.getAttribute("aria-label"))?.replace(/^Select\s+/, "").trim();
+
+  await target.click();
+
+  if (markerLabel) {
+    await expect(page.getByTestId("clinic-map-selected-label")).toContainText(markerLabel);
+  }
+
+  await expect(target).toHaveAttribute("data-selected", "true");
 }
 
 async function expectPositiveMapCount(page: Page, attribute: string, message: string) {
@@ -101,11 +122,7 @@ test.describe("portfolio public browser smoke", () => {
       await expect(page.getByTestId("clinic-map-zoom-out")).toBeVisible();
     }
 
-    const markerButtons = page.locator('[data-testid="qdoc-map-marker"], [data-testid="provider-map-marker"]');
-    if ((await markerButtons.count()) > 0) {
-      await markerButtons.first().click();
-      await expect(page.getByTestId("clinic-map-selected-label")).not.toHaveText("");
-    }
+    await selectVisibleMapMarker(page);
 
     expect.soft(failingApiResponses, "same-origin API calls should not return 5xx responses").toEqual([]);
   });

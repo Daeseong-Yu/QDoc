@@ -806,7 +806,9 @@ export default function Home() {
                 key={site.id}
                 type="button"
                 data-testid="clinic-site-card"
+                data-selected={selectedSiteId === site.id ? "true" : "false"}
                 onClick={() => setSelectedSiteId(site.id)}
+                aria-pressed={selectedSiteId === site.id}
                 className={`rounded-lg border bg-white p-5 text-left shadow-sm transition hover:border-[#10b9c4] ${
                   selectedSiteId === site.id ? "border-[#10b9c4] ring-2 ring-[#10b9c4]/15" : "border-slate-200"
                 }`}

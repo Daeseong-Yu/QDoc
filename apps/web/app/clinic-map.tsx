@@ -244,6 +244,8 @@ function getMarkerColor(place: MapDisplayPlace, isSelected: boolean) {
 }
 
 function styleMapboxMarkerElement(element: HTMLButtonElement, place: MapDisplayPlace, isSelected: boolean) {
+  element.dataset.selected = isSelected ? "true" : "false";
+  element.setAttribute("aria-pressed", isSelected ? "true" : "false");
   element.style.width = isSelected ? "34px" : "28px";
   element.style.height = isSelected ? "34px" : "28px";
   element.style.border = "2px solid white";
@@ -750,9 +752,11 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
                         : "bg-slate-700 text-white"
                   }`}
                   data-map-kind={place.kind}
+                  data-selected={isSelected ? "true" : "false"}
                   data-testid={place.kind === "qdoc_site" ? "qdoc-map-marker" : "provider-map-marker"}
                   style={getFallbackPosition(place, fallbackViewport, isSelected)}
                   aria-label={`Select ${place.name}`}
+                  aria-pressed={isSelected}
                 >
                   <MapPin size={18} aria-hidden="true" />
                 </button>

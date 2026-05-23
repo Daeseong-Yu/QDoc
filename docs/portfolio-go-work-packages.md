@@ -126,10 +126,10 @@ Outcome: the public patient map behaves like an interactive provider-backed map 
 Implementation state:
 
 - Local provider map interaction is implemented.
-- Marker/card synchronization, selected state, current-location recentering, Refresh-triggered provider retry, and hidden internal guardrail copy are covered locally.
+- Marker/card synchronization, accessible selected-state feedback, current-location recentering, Refresh-triggered provider retry, and hidden internal guardrail copy are covered locally.
 - Disabled-provider fallback now supports visible marker selection, zoom controls, current-location recentering, and patient-readable copy so the fail-closed state is still usable during local or guarded verification.
 - Local E2E uses a stubbed provider SDK/cache path to avoid paid provider traffic.
-- Public browser Playwright smoke is available through `pnpm e2e:portfolio`. It is read-only, requires `QDOC_PUBLIC_URL` or `QDOC_PORTFOLIO_BASE_URL`, and can require provider-backed map behavior with `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true`. Strict provider mode now fails unless browser geolocation is available, the provider map reaches ready state, at least one QDoc clinic marker is present, and at least one provider nearby discovery place is rendered.
+- Public browser Playwright smoke is available through `pnpm e2e:portfolio`. It is read-only, requires `QDOC_PUBLIC_URL` or `QDOC_PORTFOLIO_BASE_URL`, and can require provider-backed map behavior with `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true`. Strict provider mode now fails unless browser geolocation is available, the provider map reaches ready state, at least one QDoc clinic marker is present, and at least one provider nearby discovery place is rendered. The smoke also asserts clinic-card and marker selected-state feedback so a map that renders but does not respond to selection remains a blocker.
 
 Remaining evidence:
 
@@ -182,7 +182,7 @@ Outcome: a visitor can test the patient path and an authorized tester can test t
 Implementation state:
 
 - Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, and core queue operations.
-- Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, map fallback/provider surface expectations, `/staff` sign-in surface reachability, and absence of raw internal errors in the public UI. It does not request OTPs or prove staff authorization.
+- Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, marker selection, selected-state feedback, map fallback/provider surface expectations, `/staff` sign-in surface reachability, and absence of raw internal errors in the public UI. It does not request OTPs or prove staff authorization.
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`.
 
 Remaining evidence:

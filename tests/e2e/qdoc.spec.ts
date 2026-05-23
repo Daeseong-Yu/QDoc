@@ -875,17 +875,23 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
 
   const providerMarker = page.getByLabel("Select Provider Urgent Care");
   const qdocMarker = page.getByLabel("Select E2E Clinic");
+  await expect(qdocMarker).toHaveAttribute("aria-pressed", "true");
+  await expect(providerMarker).toHaveAttribute("aria-pressed", "false");
   await expect(qdocMarker).toHaveCSS("background-color", "rgb(16, 185, 196)");
   await expect(providerMarker).toHaveCSS("background-color", "rgb(71, 85, 105)");
 
   await providerMarker.click();
   await expect(page.getByText("Provider Urgent Care")).toBeVisible();
   await expect(page.getByText("2 Provider Way, Waterloo, ON")).toBeVisible();
+  await expect(providerMarker).toHaveAttribute("aria-pressed", "true");
+  await expect(qdocMarker).toHaveAttribute("aria-pressed", "false");
   await expect(providerMarker).toHaveCSS("background-color", "rgb(16, 185, 196)");
   await expect(qdocMarker).toHaveCSS("background-color", "rgb(8, 120, 132)");
 
   await qdocMarker.click();
   await expect(page.getByText("1 E2E Way, Waterloo, ON").first()).toBeVisible();
+  await expect(qdocMarker).toHaveAttribute("aria-pressed", "true");
+  await expect(providerMarker).toHaveAttribute("aria-pressed", "false");
   await expect(qdocMarker).toHaveCSS("background-color", "rgb(16, 185, 196)");
   await expect
     .poll(async () =>

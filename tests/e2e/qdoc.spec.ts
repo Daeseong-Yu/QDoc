@@ -1072,6 +1072,107 @@ test("lets an admin add a staff tester through membership management", async ({
   await expect(page.getByRole("heading", { name: "Map budget" })).toHaveCount(0);
 });
 
+test("lets admins update memberships while preserving one site admin", async ({
+  page,
+}, testInfo) => {
+  const testerEmail = getE2eMemberEmail(`${e2eEmail}-${testInfo.retry}`);
+
+  await page.goto("/staff");
+  await signIn(page, "Staff email");
+  await expect(
+    page.getByRole("heading", { name: "Staff queue board" }),
+  ).toBeVisible();
+  await selectE2eSite(page);
+
+  const membershipSection = page.getByRole("heading", { name: "Staff membership" }).locator("../..");
+  const membershipRow = (email: string) =>
+    membershipSection.getByLabel(`Remove ${email}`).locator("../..");
+
+  await membershipSection.getByPlaceholder("Staff email").fill(testerEmail);
+  await membershipSection.getByRole("combobox").selectOption("staff");
+  await membershipSection.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByText("Staff membership saved.")).toBeVisible();
+
+  await membershipRow(testerEmail).getByRole("button", { name: "Make admin" }).click();
+  await expect(page.getByText("Staff role updated.")).toBeVisible();
+  await expect
+    .poll(async () => {
+      const membership = await prisma.membership.findFirst({
+        where: {
+          siteId: e2eSiteId,
+          user: { email: testerEmail },
+        },
+        select: { role: true },
+      });
+
+      return membership?.role ?? null;
+    })
+    .toBe("admin");
+
+  await membershipRow(testerEmail).getByRole("button", { name: "Make staff" }).click();
+  await expect(page.getByText("Staff role updated.")).toBeVisible();
+  await expect
+    .poll(async () => {
+      const membership = await prisma.membership.findFirst({
+        where: {
+          siteId: e2eSiteId,
+          user: { email: testerEmail },
+        },
+        select: { role: true },
+      });
+
+      return membership?.role ?? null;
+    })
+    .toBe("staff");
+
+  await membershipSection.getByLabel(`Remove ${testerEmail}`).click();
+  await expect(page.getByText("Staff membership removed.")).toBeVisible();
+  await expect(membershipSection).not.toContainText(testerEmail);
+  await expect
+    .poll(async () =>
+      prisma.membership.count({
+        where: {
+          siteId: e2eSiteId,
+          user: { email: testerEmail },
+        },
+      }),
+    )
+    .toBe(0);
+
+  const auditLog = page.getByRole("heading", { name: "Audit log" }).locator("..");
+  await expect(auditLog).toContainText("membership.update");
+  await expect(auditLog).toContainText("membership.delete");
+
+  await membershipRow(e2eEmail).getByRole("button", { name: "Make staff" }).click();
+  await expect(page.getByText("That change conflicts with the current state. Keep at least one site admin.")).toBeVisible();
+  await expect
+    .poll(async () => {
+      const membership = await prisma.membership.findFirst({
+        where: {
+          siteId: e2eSiteId,
+          user: { email: e2eEmail },
+        },
+        select: { role: true },
+      });
+
+      return membership?.role ?? null;
+    })
+    .toBe("admin");
+
+  await membershipSection.getByLabel(`Remove ${e2eEmail}`).click();
+  await expect(page.getByText("That change conflicts with the current state. Keep at least one site admin.")).toBeVisible();
+  await expect
+    .poll(async () =>
+      prisma.membership.count({
+        where: {
+          siteId: e2eSiteId,
+          user: { email: e2eEmail },
+        },
+      }),
+    )
+    .toBe(1);
+});
+
 test("shows staff notification health, almost-ready outbox evidence, cancel flow, and audit logs", async ({
   page,
 }, testInfo) => {

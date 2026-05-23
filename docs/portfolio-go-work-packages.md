@@ -4,6 +4,8 @@ This document is the committed handoff for the newly defined portfolio-readiness
 
 `GO` means QDoc can be presented as a public portfolio demo where a visitor can test the patient flow and an authorized tester can test staff operations without developer explanation, direct database edits, placeholder-only accounts, or visible internal implementation errors.
 
+The latest portfolio-test clarification is that this site must support normal tester use for the documented QDoc flows. Future roadmap features remain out of scope, but documented patient, staff, map, OTP, queue, notification/outbox, refresh/revisit, membership, audit-log, backup, rollback, and staging verification paths cannot be left half-finished for `GO`.
+
 Future roadmap items such as SMS, push, EMR/EHR integration, real travel-time estimates, multi-department operations, and a full clinic marketplace are out of scope for this gate.
 
 ## Current Status
@@ -43,6 +45,8 @@ These rules capture the newly defined product-completion expectations for future
 - P5-E remains open until staging verifier, rehearsal, backup restore-check, rollback target, and safe GO/NO-GO evidence are recorded.
 
 Do not downgrade one of these requirements to an accepted risk unless the user explicitly decides that the behavior is outside the public portfolio demo.
+
+Treat tester-facing usability gaps as implementation work. A map that renders but does not pan, zoom, recenter, or synchronize selection; staff access that only works after hidden database edits; OTP failures that expose raw API codes; or smoke steps that require developer explanation are blockers in their related P5 package.
 
 ## Work Packages
 

@@ -16,7 +16,7 @@ import {
   type PatientSiteSummary,
   type PatientTicketSummary,
 } from "@qdoc/contracts";
-import { Bell, Check, ClipboardList, Clock3, Loader2, LogOut, Mail, MapPin, RefreshCcw, Stethoscope } from "lucide-react";
+import { Bell, Check, ClipboardList, Clock3, Loader2, LogOut, MapPin, RefreshCcw, Stethoscope } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { ClinicMap, type BrowserLocation } from "./clinic-map";
@@ -646,60 +646,26 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f4fbfb] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-5">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-[#10b9c4] text-white">
-                <Stethoscope size={22} aria-hidden="true" />
-              </div>
-              <div>
-                <p className="text-sm font-medium uppercase text-slate-500">QDoc</p>
-                <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Clinic queue</h1>
-              </div>
+        <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-[#10b9c4] text-white">
+              <Stethoscope size={22} aria-hidden="true" />
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                refreshDashboard();
-              }}
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] shadow-sm hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isRefreshing}
-            >
-              {isRefreshing ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <RefreshCcw size={16} aria-hidden="true" />}
-              Refresh
-            </button>
-          </header>
-
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-950">Patient session</h2>
-                <p className="text-sm text-slate-600">{currentUser ? currentUser.email : "Sign in with email OTP."}</p>
-              </div>
-              {currentUser ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void signOut();
-                  }}
-                  className="inline-flex size-9 items-center justify-center rounded-md border border-[#b9eaee] text-[#087884] hover:bg-[#eefbfc]"
-                  aria-label="Sign out"
-                >
-                  <LogOut size={17} aria-hidden="true" />
-                </button>
-              ) : (
-                <Mail size={21} className="text-[#0a8f9c]" aria-hidden="true" />
-              )}
+            <div>
+              <p className="text-sm font-medium uppercase text-slate-500">QDoc</p>
+              <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">Clinic queue</h1>
             </div>
+          </div>
 
+          <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
             {!currentUser ? (
-              <div className="grid gap-3">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-none">
                 <input
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
-                  className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
+                  className="h-10 min-w-0 flex-[1_1_14rem] rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4] sm:flex-none sm:w-56"
                 />
                 {authStep === "code" ? (
                   <input
@@ -708,7 +674,7 @@ export default function Home() {
                     value={code}
                     onChange={(event) => setCode(event.target.value)}
                     placeholder="6-digit code"
-                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
+                    className="h-10 w-32 shrink-0 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
                   />
                 ) : null}
                 <button
@@ -717,29 +683,52 @@ export default function Home() {
                     void (authStep === "email" ? requestOtp() : verifyOtp());
                   }}
                   disabled={authState === "loading"}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
+                  className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
                   {authState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
                   {authStep === "email" ? "Send code" : "Sign in"}
                 </button>
               </div>
-            ) : null}
-            {currentUser ? (
-              <label className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-3 text-sm text-slate-700">
-                <span>Email almost-ready alerts</span>
-                <input
-                  type="checkbox"
-                  checked={emailNotificationsEnabled}
-                  onChange={(event) => {
-                    void updateEmailNotificationsEnabled(event.target.checked);
+            ) : (
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-none">
+                <span className="max-w-full truncate text-sm font-medium text-slate-700 lg:max-w-52">{currentUser.email}</span>
+                <label className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm">
+                  <span>Alerts</span>
+                  <input
+                    type="checkbox"
+                    checked={emailNotificationsEnabled}
+                    onChange={(event) => {
+                      void updateEmailNotificationsEnabled(event.target.checked);
+                    }}
+                    disabled={preferencesState === "loading"}
+                    className="size-4 accent-[#10b9c4] disabled:cursor-not-allowed"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void signOut();
                   }}
-                  disabled={preferencesState === "loading"}
-                  className="size-4 accent-[#10b9c4] disabled:cursor-not-allowed"
-                />
-              </label>
-            ) : null}
-          </section>
-        </div>
+                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-[#b9eaee] bg-white text-[#087884] shadow-sm hover:bg-[#eefbfc]"
+                  aria-label="Sign out"
+                >
+                  <LogOut size={17} aria-hidden="true" />
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                refreshDashboard();
+              }}
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-[#b9eaee] bg-white px-3 text-sm font-medium text-[#087884] shadow-sm hover:bg-[#eefbfc] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? <Loader2 className="animate-spin" size={16} aria-hidden="true" /> : <RefreshCcw size={16} aria-hidden="true" />}
+              Refresh
+            </button>
+          </div>
+        </header>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
           <section className="flex flex-col gap-5">

@@ -22,6 +22,7 @@ export type BrowserLocation = {
 type ClinicMapProps = {
   sites: PatientSiteSummary[];
   selectedSiteId: string;
+  refreshKey: number;
   userLocation: BrowserLocation | null;
   onSelectSite: (siteId: string) => void;
 };
@@ -436,7 +437,7 @@ function getFallbackPosition(placeId: string, index: number, selectedPlaceId: st
   return positions[index % positions.length];
 }
 
-export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }: ClinicMapProps) {
+export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onSelectSite }: ClinicMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const providerMapRef = useRef<ProviderMapHandle | null>(null);
   const locationSignature = userLocation
@@ -504,6 +505,10 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
   }, [selectedDisplayPlaceId]);
 
   useEffect(() => {
+    setSelectedNearbyPlaceId(null);
+  }, [selectedSiteId]);
+
+  useEffect(() => {
     if (!userLocation) {
       setNearbyResult(null);
       setSelectedNearbyPlaceId(null);
@@ -535,7 +540,7 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
     return () => {
       cancelled = true;
     };
-  }, [locationSignature, userLocation]);
+  }, [locationSignature, refreshKey, userLocation]);
 
   const selectDisplayPlace = useCallback(
     (place: MapDisplayPlace) => {
@@ -607,7 +612,7 @@ export function ClinicMap({ sites, selectedSiteId, userLocation, onSelectSite }:
       providerMapRef.current?.remove();
       providerMapRef.current = null;
     };
-  }, [displaySignature, displayPlaces, isNearbySearchSettled, selectDisplayPlace, userLocation]);
+  }, [displaySignature, displayPlaces, isNearbySearchSettled, refreshKey, selectDisplayPlace, userLocation]);
 
   useEffect(() => {
     providerMapRef.current?.selectPlace(selectedDisplayPlaceId);

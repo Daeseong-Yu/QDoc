@@ -767,6 +767,7 @@ export default function Home() {
           <ClinicMap
             sites={orderedSites}
             selectedSiteId={selectedSiteId}
+            refreshKey={sitesReloadKey}
             userLocation={userLocation}
             onSelectSite={setSelectedSiteId}
           />

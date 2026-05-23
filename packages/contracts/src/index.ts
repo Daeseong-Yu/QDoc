@@ -62,6 +62,7 @@ export const authErrorSchema = z.object({
     "forbidden",
     "invalid_request",
     "invalid_otp",
+    "expired_otp",
     "invalid_transition",
     "internal_error",
     "map_budget_exhausted",

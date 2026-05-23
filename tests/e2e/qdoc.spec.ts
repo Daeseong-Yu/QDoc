@@ -338,6 +338,7 @@ async function expectNoRawAuthErrorCodes(page: Page) {
   await expect(body).not.toContainText("otp_delivery_unavailable");
   await expect(body).not.toContainText("rate_limited");
   await expect(body).not.toContainText("invalid_otp");
+  await expect(body).not.toContainText("expired_otp");
 }
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -418,6 +419,22 @@ test("renders patient-friendly OTP errors without exposing auth error codes", as
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Enter the latest 6-digit verification code.")).toBeVisible();
   await expectNoRawAuthErrorCodes(page);
+
+  await page.route(
+    "**/api/auth/otp/verify",
+    async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "expired_otp" }),
+      });
+    },
+    { times: 1 },
+  );
+  await page.getByPlaceholder("6-digit code").fill("123456");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("That code expired. Request a new code.")).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
 });
 
 test("renders staff-friendly OTP errors without exposing auth error codes", async ({
@@ -485,6 +502,83 @@ test("renders staff-friendly OTP errors without exposing auth error codes", asyn
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByText("Enter the latest 6-digit verification code.")).toBeVisible();
   await expectNoRawAuthErrorCodes(page);
+
+  await page.route(
+    "**/api/auth/otp/verify",
+    async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "expired_otp" }),
+      });
+    },
+    { times: 1 },
+  );
+  await page.getByPlaceholder("6-digit code").fill("123456");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("That code expired. Request a new code.")).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
+});
+
+test("rejects expired OTP codes with readable copy", async ({
+  page,
+}, testInfo) => {
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": getE2eRequesterIp(testInfo, 1),
+  });
+
+  await page.goto("/");
+  await page.getByPlaceholder("you@example.com").fill(e2eEmail);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByText("Enter the verification code sent to your email.")).toBeVisible();
+  await prisma.otpChallenge.updateMany({
+    where: {
+      email: e2eEmail,
+      verifiedAt: null,
+    },
+    data: {
+      codeHash: hashOtpForTest(e2eEmail, e2eOtpCode),
+      expiresAt: new Date(Date.now() - 1000),
+    },
+  });
+
+  await page.getByPlaceholder("6-digit code").fill(e2eOtpCode);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("That code expired. Request a new code.")).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
+
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText(/Too many attempts\. Try again in \d+ seconds?\./)).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
+});
+
+test("keeps signed-in sessions across refresh and revisit", async ({
+  page,
+}, testInfo) => {
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": getE2eRequesterIp(testInfo, 1),
+  });
+
+  await page.goto("/");
+  await signIn(page, "you@example.com");
+  await page.reload();
+  await expect(page.getByText(e2eEmail, { exact: true })).toBeVisible();
+
+  await selectE2eSite(page);
+  await page.getByRole("radio", { name: new RegExp(e2eQueueName) }).check();
+  await page.getByRole("button", { name: "Check in" }).click();
+  await expect(page.getByText("Check-in complete.")).toBeVisible();
+  await expect(patientTicket(page)).toContainText("Waiting");
+
+  await page.reload();
+  await expect(patientTicket(page)).toContainText("Waiting");
+
+  await page.goto("/staff");
+  await expect(page.getByRole("heading", { name: "Staff queue board" })).toBeVisible();
+  await selectE2eSite(page);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Staff queue board" })).toBeVisible();
+  await expect(page.getByText(e2eEmail, { exact: true })).toBeVisible();
 });
 
 test("enforces the monthly map load guard before exposing provider usage", async ({

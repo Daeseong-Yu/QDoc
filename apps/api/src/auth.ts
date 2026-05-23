@@ -360,9 +360,6 @@ export async function handleOtpVerify(request: IncomingMessage, response: Server
     where: {
       email: input.data.email,
       verifiedAt: null,
-      expiresAt: {
-        gt: new Date(),
-      },
     },
     orderBy: {
       createdAt: "desc",
@@ -371,6 +368,11 @@ export async function handleOtpVerify(request: IncomingMessage, response: Server
 
   if (!challenge || !isMatchingHash(challenge.codeHash, hashOtp(input.data.email, input.data.code))) {
     sendJson(response, 401, { error: "invalid_otp" });
+    return;
+  }
+
+  if (challenge.expiresAt <= new Date()) {
+    sendJson(response, 401, { error: "expired_otp" });
     return;
   }
 
@@ -411,7 +413,7 @@ export async function handleOtpVerify(request: IncomingMessage, response: Server
   });
 
   if (!user) {
-    sendJson(response, 401, { error: "invalid_otp" });
+    sendJson(response, 401, { error: "expired_otp" });
     return;
   }
 

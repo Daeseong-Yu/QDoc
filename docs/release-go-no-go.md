@@ -49,7 +49,7 @@ Go criteria:
 - `verify:launch` reports launch-like hardening ready for the target environment when staging or production env is loaded.
 - E2E runs against a local or explicitly isolated test database only.
 - No local-only config, `.env`, backup, screenshot, trace, or generated secret material is staged.
-- Automated coverage includes patient OTP/check-in, staff OTP/queue operations, delay/restore, and map guardrail behavior.
+- Automated coverage includes patient OTP/check-in, staff OTP/queue operations, invalid/expired OTP states, refresh/revisit session continuity, delay/restore, and map guardrail behavior.
 
 No-go criteria:
 
@@ -115,7 +115,7 @@ Run these in staging after automated checks pass and real email delivery is appr
 8. Staff delays and restores another eligible ticket; restored ticket returns to the front of the waiting queue.
 9. Staff verifies queue open/close, notification threshold, membership management, and audit-log review.
 10. Almost-ready notification work appears in operational checks without duplicate delivery.
-11. User-facing OTP/map failures are readable and do not expose raw internal error codes such as `rate_limited` or `otp_delivery_unavailable`.
+11. User-facing OTP/map failures are readable and do not expose raw internal error codes such as `rate_limited`, `otp_delivery_unavailable`, `invalid_otp`, or `expired_otp`.
 
 Go criteria:
 

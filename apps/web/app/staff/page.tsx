@@ -203,6 +203,10 @@ function getMessage(error: unknown) {
     return "Enter the latest 6-digit verification code.";
   }
 
+  if (error.error === "expired_otp") {
+    return "That code expired. Request a new code.";
+  }
+
   if (error.error === "rate_limited") {
     return error.retryAfterSeconds
       ? `Too many attempts. Try again in ${formatRetryAfter(error.retryAfterSeconds)}.`

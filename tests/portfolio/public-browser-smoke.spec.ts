@@ -79,6 +79,20 @@ async function expectPositiveMapCount(page: Page, attribute: string, message: st
   await expect(page.getByTestId("clinic-map-section"), message).toHaveAttribute(attribute, /^[1-9]\d*$/);
 }
 
+async function readNumericMapAttribute(page: Page, attribute: string) {
+  const rawValue = await page.getByTestId("clinic-map-section").getAttribute(attribute);
+  expect(rawValue, `${attribute} should be present`).not.toBeNull();
+
+  const value = Number(rawValue);
+  expect(Number.isFinite(value), `${attribute} should be numeric`).toBe(true);
+
+  return value;
+}
+
+async function pollNumericMapAttribute(page: Page, attribute: string) {
+  return page.getByTestId("clinic-map-section").evaluate((element, name) => Number(element.getAttribute(name)), attribute);
+}
+
 test.describe("portfolio public browser smoke", () => {
   test("loads the patient map and keeps public controls usable", async ({ page }) => {
     const failingApiResponses = collectFailingApiResponses(page);
@@ -115,11 +129,41 @@ test.describe("portfolio public browser smoke", () => {
       await expect(providerSurface, "provider-backed map surface should render in a public browser").toBeVisible();
       await page.getByTestId("clinic-map-provider-container").hover();
       await page.mouse.wheel(0, -300);
-      await expect(page.getByRole("button", { name: "Recenter map to your location" })).toBeVisible();
+      const recenterCount = await readNumericMapAttribute(page, "data-provider-recenter-count");
+      await page.getByTestId("clinic-map-provider-recenter").click();
+      await expect
+        .poll(() => pollNumericMapAttribute(page, "data-provider-recenter-count"), {
+          message: "provider recenter control should call the live map",
+        })
+        .toBeGreaterThan(recenterCount);
     } else if ((await fallback.count()) > 0) {
       await expect(fallback).toContainText("Showing clinic locations.");
       await expect(page.getByTestId("clinic-map-zoom-in")).toBeVisible();
       await expect(page.getByTestId("clinic-map-zoom-out")).toBeVisible();
+      const fallbackZoom = await readNumericMapAttribute(page, "data-fallback-zoom");
+      await page.getByTestId("clinic-map-zoom-in").click();
+      await expect
+        .poll(() => pollNumericMapAttribute(page, "data-fallback-zoom"), {
+          message: "fallback zoom-in should change the map viewport",
+        })
+        .toBeGreaterThan(fallbackZoom);
+      await page.getByTestId("clinic-map-zoom-out").click();
+      await expect
+        .poll(() => pollNumericMapAttribute(page, "data-fallback-zoom"), {
+          message: "fallback zoom-out should restore the map viewport",
+        })
+        .toBe(fallbackZoom);
+
+      const fallbackRecenter = page.getByTestId("clinic-map-fallback-recenter");
+      if ((await fallbackRecenter.count()) > 0) {
+        const fallbackRecenterCount = await readNumericMapAttribute(page, "data-fallback-recenter-count");
+        await page.getByTestId("clinic-map-fallback-recenter").click();
+        await expect
+          .poll(() => pollNumericMapAttribute(page, "data-fallback-recenter-count"), {
+            message: "fallback recenter should update the map viewport",
+          })
+          .toBeGreaterThan(fallbackRecenterCount);
+      }
     }
 
     await selectVisibleMapMarker(page);

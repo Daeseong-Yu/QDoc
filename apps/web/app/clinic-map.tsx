@@ -100,6 +100,12 @@ type FallbackViewport = {
   zoom: number;
 };
 
+type ProviderInteractionState = {
+  fallbackRecenterCount: number;
+  focusCount: number;
+  recenterCount: number;
+};
+
 const scriptLoads = new Map<string, Promise<void>>();
 const fallbackMinZoom = 1;
 const fallbackMaxZoom = 4;
@@ -495,6 +501,11 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     longitude: -80.522,
     zoom: 2,
   });
+  const [providerInteraction, setProviderInteraction] = useState<ProviderInteractionState>({
+    fallbackRecenterCount: 0,
+    focusCount: 0,
+    recenterCount: 0,
+  });
 
   const hasLocationContext = userLocation !== null;
   const siteDisplayPlaces = useMemo(() => getSiteDisplayPlaces(sites), [sites]);
@@ -562,6 +573,30 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     setSelectedNearbyPlaceId(null);
   }, [selectedSiteId]);
 
+  const focusProviderPlace = useCallback((place: MapDisplayPlace) => {
+    if (!providerMapRef.current) {
+      return;
+    }
+
+    providerMapRef.current.focusPlace(place);
+    setProviderInteraction((current) => ({
+      ...current,
+      focusCount: current.focusCount + 1,
+    }));
+  }, []);
+
+  const recenterProviderMap = useCallback((location: BrowserLocation) => {
+    if (!providerMapRef.current) {
+      return;
+    }
+
+    providerMapRef.current.recenter(location);
+    setProviderInteraction((current) => ({
+      ...current,
+      recenterCount: current.recenterCount + 1,
+    }));
+  }, []);
+
   useEffect(() => {
     if (!userLocation) {
       setNearbyResult(null);
@@ -607,14 +642,14 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
       if (place.qdocSiteId) {
         setSelectedNearbyPlaceId(null);
         onSelectSite(place.qdocSiteId);
-        providerMapRef.current?.focusPlace(place);
+        focusProviderPlace(place);
         return;
       }
 
       setSelectedNearbyPlaceId(place.id);
-      providerMapRef.current?.focusPlace(place);
+      focusProviderPlace(place);
     },
-    [onSelectSite],
+    [focusProviderPlace, onSelectSite],
   );
 
   useEffect(() => {
@@ -679,7 +714,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
 
     const place = displayPlaces.find((item) => item.id === selectedDisplayPlaceId);
     if (place && mapState === "ready") {
-      providerMapRef.current?.focusPlace(place);
+      focusProviderPlace(place);
     } else if (place) {
       setFallbackViewport((current) => ({
         latitude: place.latitude,
@@ -687,16 +722,20 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
         zoom: Math.max(current.zoom, 2),
       }));
     }
-  }, [displayPlaces, mapState, selectedDisplayPlaceId]);
+  }, [displayPlaces, focusProviderPlace, mapState, selectedDisplayPlaceId]);
 
   return (
     <section
       className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+      data-fallback-recenter-count={providerInteraction.fallbackRecenterCount}
+      data-fallback-zoom={fallbackViewport.zoom}
       data-has-user-location={userLocation ? "true" : "false"}
       data-map-display-place-count={displayPlaces.length}
       data-map-state={mapState}
       data-nearby-search-settled={isNearbySearchSettled ? "true" : "false"}
+      data-provider-focus-count={providerInteraction.focusCount}
       data-provider-place-count={providerDisplayPlaces.length}
+      data-provider-recenter-count={providerInteraction.recenterCount}
       data-qdoc-site-count={siteDisplayPlaces.length}
       data-testid="clinic-map-section"
     >
@@ -794,13 +833,17 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
               {userLocation ? (
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
                     setFallbackViewport((current) => ({
                       latitude: userLocation.latitude,
                       longitude: userLocation.longitude,
                       zoom: Math.max(current.zoom, 2),
-                    }))
-                  }
+                    }));
+                    setProviderInteraction((current) => ({
+                      ...current,
+                      fallbackRecenterCount: current.fallbackRecenterCount + 1,
+                    }));
+                  }}
                   className="inline-flex size-9 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
                   aria-label="Recenter map to your location"
                   data-testid="clinic-map-fallback-recenter"
@@ -817,9 +860,10 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
         {userLocation && mapState === "ready" ? (
           <button
             type="button"
-            onClick={() => providerMapRef.current?.recenter(userLocation)}
+            onClick={() => recenterProviderMap(userLocation)}
             className="absolute bottom-3 right-3 z-30 inline-flex h-10 items-center gap-2 rounded-md bg-white px-3 text-sm font-medium text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
             aria-label="Recenter map to your location"
+            data-testid="clinic-map-provider-recenter"
           >
             <Crosshair size={16} aria-hidden="true" />
             Current area

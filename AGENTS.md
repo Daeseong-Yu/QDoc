@@ -39,12 +39,14 @@ This repository is the source of truth for QDoc implementation, deployment autom
 ## Portfolio Public Demo Gate
 
 - Treat `GO` as permission to present QDoc as a public portfolio demo, not merely as a minimal staging deployment.
+- `Launch` in the current task means portfolio-ready public demo. It does not mean every future roadmap item is complete, but every documented core patient, staff, map, OTP, queue, notification, and operational smoke path must be implemented, testable, and understandable without developer explanation.
 - Before `GO`, a visitor must be able to complete the patient flow without external explanation: location/map discovery, OTP sign-in, clinic/queue selection, check-in, refresh/session continuity, and active ticket status.
 - Before `GO`, an authorized staff tester must be able to complete staff operations: OTP sign-in, site selection, queue board review, call/start/complete, delay/restore, cancel, queue open/close, notification threshold, membership management, and audit-log review.
 - Before `GO`, the map must behave like an interactive map when a provider is enabled: browser-geolocation centering, pan/zoom controls, current-location recentering, marker click selection, selected marker/site highlighting, and clear distinction between QDoc check-in sites and provider discovery places.
 - A static or decorative fallback map is acceptable only as a fail-closed disabled-provider state; it is not sufficient as the final portfolio map experience.
 - Before `GO`, OTP delivery and user-facing errors must be understandable to a non-technical visitor. Do not expose raw internal error codes such as `rate_limited`, `otp_delivery_unavailable`, or map cost-guardrail implementation details directly in the UI.
 - Before `GO`, staging must have real OTP-receivable staff/admin accounts prepared through documented bootstrap or membership workflows.
+- The active implementation order for the current launch-candidate step is: staff demo access, provider-backed map/public-browser verification, first-time OTP delivery verification, full patient/staff smoke, notification/outbox evidence, backup restore-check, rollback target, then GO/NO-GO record.
 
 ## Work Process
 

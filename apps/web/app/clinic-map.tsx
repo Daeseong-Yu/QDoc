@@ -9,7 +9,7 @@ import {
   type NearbyHealthcarePlace,
   type PatientSiteSummary,
 } from "@qdoc/contracts";
-import { Crosshair, Loader2, MapPin } from "lucide-react";
+import { Crosshair, Loader2, MapPin, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
@@ -94,7 +94,15 @@ type ProviderMapHandle = {
   selectPlace: (placeId: string) => void;
 };
 
+type FallbackViewport = {
+  latitude: number;
+  longitude: number;
+  zoom: number;
+};
+
 const scriptLoads = new Map<string, Promise<void>>();
+const fallbackMinZoom = 1;
+const fallbackMaxZoom = 4;
 
 async function readApiResponse<T>(response: Response, schema: z.ZodSchema<T>) {
   const data: unknown = await response.json();
@@ -424,19 +432,48 @@ async function initializeProviderMap(
   };
 }
 
-function getFallbackPosition(placeId: string, index: number, selectedPlaceId: string) {
-  if (placeId === selectedPlaceId) {
-    return { left: "50%", top: "45%" };
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getFallbackPosition(
+  place: Pick<MapDisplayPlace, "latitude" | "longitude">,
+  viewport: FallbackViewport,
+  selected: boolean,
+) {
+  const kmPerLatitudeDegree = 111;
+  const kmPerLongitudeDegree = Math.max(28, 111 * Math.cos((viewport.latitude * Math.PI) / 180));
+  const percentPerKm = 7 * 2 ** (viewport.zoom - 1);
+  const xOffset = (place.longitude - viewport.longitude) * kmPerLongitudeDegree * percentPerKm;
+  const yOffset = (viewport.latitude - place.latitude) * kmPerLatitudeDegree * percentPerKm;
+
+  return {
+    left: `${clamp(50 + xOffset, 8, 92)}%`,
+    top: `${clamp(50 + yOffset + (selected ? -3 : 0), 12, 88)}%`,
+  };
+}
+
+function getInitialFallbackViewport(
+  displayPlaces: MapDisplayPlace[],
+  selectedDisplayPlaceId: string,
+  userLocation: BrowserLocation | null,
+): FallbackViewport {
+  const selectedPlace = displayPlaces.find((place) => place.id === selectedDisplayPlaceId);
+  const firstPlace = displayPlaces[0];
+
+  if (selectedPlace) {
+    return { latitude: selectedPlace.latitude, longitude: selectedPlace.longitude, zoom: 2 };
   }
 
-  const positions = [
-    { left: "28%", top: "34%" },
-    { left: "66%", top: "38%" },
-    { left: "40%", top: "68%" },
-    { left: "72%", top: "66%" },
-  ];
+  if (userLocation) {
+    return { latitude: userLocation.latitude, longitude: userLocation.longitude, zoom: 2 };
+  }
 
-  return positions[index % positions.length];
+  if (firstPlace) {
+    return { latitude: firstPlace.latitude, longitude: firstPlace.longitude, zoom: 2 };
+  }
+
+  return { latitude: 43.465, longitude: -80.522, zoom: 2 };
 }
 
 export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onSelectSite }: ClinicMapProps) {
@@ -451,6 +488,11 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
   } | null>(null);
   const [selectedNearbyPlaceId, setSelectedNearbyPlaceId] = useState<string | null>(null);
   const [mapState, setMapState] = useState<"idle" | "loading" | "ready" | "fallback">("idle");
+  const [fallbackViewport, setFallbackViewport] = useState<FallbackViewport>({
+    latitude: 43.465,
+    longitude: -80.522,
+    zoom: 2,
+  });
 
   const hasLocationContext = userLocation !== null;
   const siteDisplayPlaces = useMemo(() => getSiteDisplayPlaces(sites), [sites]);
@@ -507,6 +549,14 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
   }, [selectedDisplayPlaceId]);
 
   useEffect(() => {
+    setFallbackViewport((current) => {
+      const next = getInitialFallbackViewport(displayPlaces, selectedDisplayPlaceId, userLocation);
+
+      return { ...next, zoom: current.zoom };
+    });
+  }, [displayPlaces, selectedDisplayPlaceId, userLocation]);
+
+  useEffect(() => {
     setSelectedNearbyPlaceId(null);
   }, [selectedSiteId]);
 
@@ -546,6 +596,12 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
 
   const selectDisplayPlace = useCallback(
     (place: MapDisplayPlace) => {
+      setFallbackViewport((current) => ({
+        latitude: place.latitude,
+        longitude: place.longitude,
+        zoom: Math.max(current.zoom, 2),
+      }));
+
       if (place.qdocSiteId) {
         setSelectedNearbyPlaceId(null);
         onSelectSite(place.qdocSiteId);
@@ -622,6 +678,12 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     const place = displayPlaces.find((item) => item.id === selectedDisplayPlaceId);
     if (place && mapState === "ready") {
       providerMapRef.current?.focusPlace(place);
+    } else if (place) {
+      setFallbackViewport((current) => ({
+        latitude: place.latitude,
+        longitude: place.longitude,
+        zoom: Math.max(current.zoom, 2),
+      }));
     }
   }, [displayPlaces, mapState, selectedDisplayPlaceId]);
 
@@ -656,12 +718,15 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
             <div className="absolute left-[18%] top-[-8%] h-[120%] w-24 rotate-[25deg] bg-white/55" />
             <div className="absolute left-[5%] top-[54%] h-20 w-[110%] rotate-[8deg] bg-white/60" />
             {userLocation ? (
-              <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#087884] p-2 text-white shadow-md ring-8 ring-[#087884]/15">
+              <div
+                className="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#087884] p-2 text-white shadow-md ring-8 ring-[#087884]/15"
+                style={getFallbackPosition(userLocation, fallbackViewport, false)}
+                data-testid="clinic-map-current-location"
+              >
                 <Crosshair size={18} aria-hidden="true" />
               </div>
             ) : null}
-            {displayPlaces.map((place, index) => {
-              const position = getFallbackPosition(place.id, index, selectedDisplayPlaceId);
+            {displayPlaces.map((place) => {
               const isSelected = place.id === selectedDisplayPlaceId;
               return (
                 <button
@@ -677,15 +742,62 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
                   }`}
                   data-map-kind={place.kind}
                   data-testid={place.kind === "qdoc_site" ? "qdoc-map-marker" : "provider-map-marker"}
-                  style={position}
+                  style={getFallbackPosition(place, fallbackViewport, isSelected)}
                   aria-label={`Select ${place.name}`}
                 >
                   <MapPin size={18} aria-hidden="true" />
                 </button>
               );
             })}
+            <div className="absolute right-3 top-3 z-20 grid gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setFallbackViewport((current) => ({
+                    ...current,
+                    zoom: Math.min(fallbackMaxZoom, current.zoom + 1),
+                  }))
+                }
+                className="inline-flex size-9 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+                aria-label="Zoom in map"
+                data-testid="clinic-map-zoom-in"
+              >
+                <Plus size={16} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setFallbackViewport((current) => ({
+                    ...current,
+                    zoom: Math.max(fallbackMinZoom, current.zoom - 1),
+                  }))
+                }
+                className="inline-flex size-9 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+                aria-label="Zoom out map"
+                data-testid="clinic-map-zoom-out"
+              >
+                <Minus size={16} aria-hidden="true" />
+              </button>
+              {userLocation ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFallbackViewport((current) => ({
+                      latitude: userLocation.latitude,
+                      longitude: userLocation.longitude,
+                      zoom: Math.max(current.zoom, 2),
+                    }))
+                  }
+                  className="inline-flex size-9 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+                  aria-label="Recenter map to your location"
+                  data-testid="clinic-map-fallback-recenter"
+                >
+                  <Crosshair size={16} aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
             <div className="absolute bottom-3 left-3 z-20 rounded-md bg-white/90 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm">
-              Interactive map is unavailable. Showing available clinic locations.
+              Showing clinic locations.
             </div>
           </div>
         ) : null}

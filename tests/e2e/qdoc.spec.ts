@@ -772,8 +772,14 @@ test("loads the patient map around the browser location without provider SDK whe
     page.getByText("Centered on your current area."),
   ).toBeVisible();
   await expect(
-    page.getByText("Interactive map is unavailable. Showing available clinic locations."),
+    page.getByText("Showing clinic locations."),
   ).toBeVisible();
+  await expect(page.getByTestId("clinic-map-zoom-in")).toBeVisible();
+  await expect(page.getByTestId("clinic-map-zoom-out")).toBeVisible();
+  await expect(page.getByTestId("clinic-map-fallback-recenter")).toBeVisible();
+  await page.getByTestId("clinic-map-zoom-in").click();
+  await page.getByTestId("clinic-map-zoom-out").click();
+  await page.getByTestId("clinic-map-fallback-recenter").click();
   const clinicCard = page
     .locator("button")
     .filter({ has: page.getByRole("heading", { name: e2eSiteName }) });
@@ -854,7 +860,7 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
 
   await page.goto("/");
   await expect(page.getByTestId("mapbox-surface")).toBeVisible();
-  await expect(page.getByText("Interactive map is unavailable. Showing available clinic locations.")).toHaveCount(0);
+  await expect(page.getByText("Showing clinic locations.")).toHaveCount(0);
   await expect
     .poll(async () =>
       page.evaluate(() => {

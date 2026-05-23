@@ -76,7 +76,9 @@ test.describe("portfolio public browser smoke", () => {
       await page.mouse.wheel(0, -300);
       await expect(page.getByRole("button", { name: "Recenter map to your location" })).toBeVisible();
     } else if ((await fallback.count()) > 0) {
-      await expect(fallback).toContainText("Interactive map is unavailable. Showing available clinic locations.");
+      await expect(fallback).toContainText("Showing clinic locations.");
+      await expect(page.getByTestId("clinic-map-zoom-in")).toBeVisible();
+      await expect(page.getByTestId("clinic-map-zoom-out")).toBeVisible();
     }
 
     const markerButtons = page.locator('[data-testid="qdoc-map-marker"], [data-testid="provider-map-marker"]');

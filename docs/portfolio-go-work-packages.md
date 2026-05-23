@@ -87,6 +87,7 @@ Implementation state:
 - Local provider map interaction is implemented.
 - Marker/card synchronization, selected state, current-location recentering, Refresh-triggered provider retry, and hidden internal guardrail copy are covered locally.
 - Local E2E uses a stubbed provider SDK/cache path to avoid paid provider traffic.
+- Public browser Playwright smoke is available through `pnpm e2e:portfolio`. It is read-only, requires `QDOC_PUBLIC_URL` or `QDOC_PORTFOLIO_BASE_URL`, and can require provider-backed map behavior with `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true`.
 
 Remaining evidence:
 
@@ -98,6 +99,7 @@ Remaining evidence:
 Verification:
 
 - targeted/full Playwright E2E locally
+- `QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true pnpm e2e:portfolio`
 - staging manual public-browser smoke
 - `pnpm verify:ops`
 - `pnpm verify:admin-data`
@@ -137,6 +139,7 @@ Outcome: a visitor can test the patient path and an authorized tester can test t
 Implementation state:
 
 - Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, and core queue operations.
+- Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, map fallback/provider surface expectations, and absence of raw internal errors in the public UI.
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`.
 
 Remaining evidence:
@@ -148,6 +151,7 @@ Remaining evidence:
 Verification:
 
 - `pnpm e2e`
+- `QDOC_PUBLIC_URL=https://qdoc.example.com pnpm e2e:portfolio`
 - `pnpm verify:portfolio-smoke`
 - staging manual patient/staff smoke
 - `pnpm verify:outbox`

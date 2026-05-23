@@ -184,6 +184,8 @@ pnpm e2e
 
 `pnpm verify:portfolio-smoke` rolls manually observed P5-A through P5-D staging smoke outcomes into safe release-evidence status exports. For P5-A, set `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after `pnpm verify:admin-data` or `QDOC_VERIFY_ADMIN_DATA=true bash deploy/verify-staging.sh` passes with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` configured for the real staff/admin inbox. The helper does not print the email address and does not contact staging by itself.
 
+`pnpm e2e:portfolio` runs a read-only Playwright smoke test against a deployed public URL. Set `QDOC_PUBLIC_URL=https://qdoc.example.com` or `QDOC_PORTFOLIO_BASE_URL=https://qdoc.example.com` before running it. When the provider map is expected to be live, add `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true`; the test then requires a real provider-backed map surface, no fallback map, geolocation recentering, usable Refresh/site-selection controls, and no raw internal error tokens in the public UI. Optional `QDOC_PORTFOLIO_GEO_LATITUDE` and `QDOC_PORTFOLIO_GEO_LONGITUDE` override the default Waterloo-area browser geolocation used by the test.
+
 Install the Playwright Chromium browser once before running E2E tests locally:
 
 ```bash

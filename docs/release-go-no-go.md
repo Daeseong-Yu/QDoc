@@ -95,6 +95,14 @@ bash deploy/portfolio-smoke-evidence.sh
 
 Use `pending`, `not_run`, or `failed` for checks that are not actually proven. Do not mark a value `passed` from local tests when the check depends on real inboxes, a public browser, provider credentials, deployed worker behavior, or staging host settings.
 
+Run the read-only public browser smoke against the deployed URL before marking P5-B or P5-D browser checks complete. Use provider strict mode only when the map provider should be live for the candidate.
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true \
+pnpm e2e:portfolio
+```
+
 ## Local Required Checks
 
 Run these from the repository root before staging promotion.
@@ -109,6 +117,7 @@ pnpm verify:ops
 pnpm verify:launch
 pnpm verify:email
 pnpm e2e
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true pnpm e2e:portfolio
 git diff --check
 ```
 
@@ -121,6 +130,7 @@ Go criteria:
 - E2E runs against a local or explicitly isolated test database only.
 - No local-only config, `.env`, backup, screenshot, trace, or generated secret material is staged.
 - Automated coverage includes patient OTP/check-in, staff OTP/queue operations, invalid/expired OTP states, refresh/revisit session continuity, notification preference persistence, almost-ready notification/outbox creation, failed notification job visibility, duplicate-delivery prevention, cancel, delay/restore, audit-log visibility, and map guardrail behavior.
+- Public browser smoke passes against the candidate URL when the public domain and provider credentials are expected to be live.
 
 No-go criteria:
 

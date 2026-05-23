@@ -247,6 +247,8 @@ function styleMapboxMarkerElement(element: HTMLButtonElement, place: MapDisplayP
 function createMapboxMarkerElement(place: MapDisplayPlace, isSelected: boolean, onSelectPlace: (place: MapDisplayPlace) => void) {
   const element = document.createElement("button");
   element.type = "button";
+  element.dataset.testid = place.kind === "qdoc_site" ? "qdoc-map-marker" : "provider-map-marker";
+  element.dataset.mapKind = place.kind;
   element.setAttribute("aria-label", `Select ${place.name}`);
   element.title = place.name;
   styleMapboxMarkerElement(element, place, isSelected);
@@ -624,7 +626,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
   }, [displayPlaces, mapState, selectedDisplayPlaceId]);
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" data-testid="clinic-map-section">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-950">Nearby clinics</h2>
@@ -641,11 +643,15 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
       <div className="relative h-[280px] bg-[#e4f5f3]">
         <div
           ref={mapContainerRef}
+          data-testid="clinic-map-provider-container"
           className={`absolute inset-0 z-10 ${mapState === "ready" ? "" : "pointer-events-none"}`}
           aria-hidden={mapState !== "ready"}
         />
         {mapState !== "ready" ? (
-          <div className="absolute inset-0 overflow-hidden bg-[linear-gradient(135deg,#dcf4f1_0%,#f8fafc_56%,#eaf7ef_100%)]">
+          <div
+            className="absolute inset-0 overflow-hidden bg-[linear-gradient(135deg,#dcf4f1_0%,#f8fafc_56%,#eaf7ef_100%)]"
+            data-testid="clinic-map-fallback"
+          >
             <div className="absolute left-[-8%] top-[20%] h-24 w-[120%] rotate-[-7deg] bg-white/70" />
             <div className="absolute left-[18%] top-[-8%] h-[120%] w-24 rotate-[25deg] bg-white/55" />
             <div className="absolute left-[5%] top-[54%] h-20 w-[110%] rotate-[8deg] bg-white/60" />
@@ -669,6 +675,8 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
                         ? "bg-white text-[#087884]"
                         : "bg-slate-700 text-white"
                   }`}
+                  data-map-kind={place.kind}
+                  data-testid={place.kind === "qdoc_site" ? "qdoc-map-marker" : "provider-map-marker"}
                   style={position}
                   aria-label={`Select ${place.name}`}
                 >
@@ -695,8 +703,14 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm">
-        <span className="font-medium text-slate-950">{selectedLabel}</span>
-        {selectedAddress ? <span className="text-slate-500">{selectedAddress}</span> : null}
+        <span className="font-medium text-slate-950" data-testid="clinic-map-selected-label">
+          {selectedLabel}
+        </span>
+        {selectedAddress ? (
+          <span className="text-slate-500" data-testid="clinic-map-selected-address">
+            {selectedAddress}
+          </span>
+        ) : null}
       </div>
     </section>
   );

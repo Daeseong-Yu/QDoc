@@ -695,6 +695,7 @@ export default function Home() {
                 ) : null}
                 <button
                   type="button"
+                  data-testid="patient-auth-submit"
                   onClick={() => {
                     void (authStep === "email" ? requestOtp() : verifyOtp());
                   }}
@@ -734,6 +735,7 @@ export default function Home() {
             )}
             <button
               type="button"
+              data-testid="patient-refresh-button"
               onClick={() => {
                 refreshDashboard();
               }}
@@ -803,6 +805,7 @@ export default function Home() {
               <button
                 key={site.id}
                 type="button"
+                data-testid="clinic-site-card"
                 onClick={() => setSelectedSiteId(site.id)}
                 className={`rounded-lg border bg-white p-5 text-left shadow-sm transition hover:border-[#10b9c4] ${
                   selectedSiteId === site.id ? "border-[#10b9c4] ring-2 ring-[#10b9c4]/15" : "border-slate-200"

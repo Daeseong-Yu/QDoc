@@ -12,6 +12,7 @@
     "start:api": "pnpm --filter @qdoc/api start",
     "start:worker": "pnpm --filter @qdoc/worker start",
     "e2e": "dotenv -e .env -- playwright test",
+    "e2e:portfolio": "playwright test -c playwright.portfolio.config.ts",
     "e2e:install": "playwright install chromium",
     "verify:outbox": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:outbox",
     "verify:ops": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:ops",

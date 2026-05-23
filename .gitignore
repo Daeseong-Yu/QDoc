@@ -5,6 +5,7 @@ node_modules
 dist
 coverage
 playwright-report
+playwright-report-portfolio
 test-results
 .playwright
 backups/

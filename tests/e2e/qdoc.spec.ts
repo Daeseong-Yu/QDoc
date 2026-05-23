@@ -46,6 +46,12 @@ function getE2eEmail(testInfo: TestInfo) {
   return `e2e.${slug}@example.com`;
 }
 
+function getE2eMemberEmail(email = e2eEmail) {
+  const token = createHash("sha256").update(email).digest("hex").slice(0, 12);
+
+  return `e2e.member.${token}@example.com`;
+}
+
 function getE2eRequesterIp(testInfo: TestInfo, offset = 0) {
   const source = `${testInfo.project.name}-${testInfo.title}-${offset}`;
   const hash = [...source].reduce((value, character) => (value * 31 + character.charCodeAt(0)) % 200, 0);
@@ -171,7 +177,9 @@ async function resetE2eData() {
   await prisma.mapProviderConfigAudit.deleteMany({
     where: { provider: "mapbox" },
   });
-  await prisma.otpChallenge.deleteMany({ where: { email: e2eEmail } });
+  await prisma.otpChallenge.deleteMany({
+    where: { email: { in: [e2eEmail, getE2eMemberEmail()] } },
+  });
   await prisma.membership.deleteMany({ where: { siteId: e2eSiteId } });
   await prisma.queue.deleteMany({ where: { siteId: e2eSiteId } });
   await prisma.site.deleteMany({ where: { id: e2eSiteId } });
@@ -267,25 +275,28 @@ function patientTicket(page: Page) {
   return page.locator("article").filter({ hasText: e2eSiteName }).first();
 }
 
-async function signIn(page: Page, emailPlaceholder: string) {
-  await page.getByPlaceholder(emailPlaceholder).fill(e2eEmail);
+async function signIn(page: Page, emailPlaceholder: string, email = e2eEmail) {
+  const emailInput = page.getByPlaceholder(emailPlaceholder);
+
+  await emailInput.fill(email);
+  await expect(emailInput).toHaveValue(email);
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(
     page.getByText("Enter the verification code sent to your email."),
   ).toBeVisible();
   await prisma.otpChallenge.updateMany({
     where: {
-      email: e2eEmail,
+      email,
       verifiedAt: null,
     },
     data: {
-      codeHash: hashOtpForTest(e2eEmail, e2eOtpCode),
+      codeHash: hashOtpForTest(email, e2eOtpCode),
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     },
   });
   await page.getByPlaceholder("6-digit code").fill(e2eOtpCode);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByText(e2eEmail, { exact: true })).toBeVisible();
+  await expect(page.getByText(email, { exact: true })).toBeVisible();
 }
 
 async function selectE2eSite(page: Page) {
@@ -588,6 +599,62 @@ test("explains staff access when the signed-in email is not on a staff roster", 
   await expect(page.getByText("A site admin must add this exact email before the queue board is available.")).toBeVisible();
   await expect(page.getByText("No staff roster match.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Queue board", exact: true })).toHaveCount(0);
+});
+
+test("lets an admin add a staff tester through membership management", async ({
+  page,
+}, testInfo) => {
+  const testerEmail = getE2eMemberEmail();
+
+  await page.goto("/staff");
+  await signIn(page, "Staff email");
+  await expect(
+    page.getByRole("heading", { name: "Staff queue board" }),
+  ).toBeVisible();
+  await selectE2eSite(page);
+
+  const membershipSection = page.getByRole("heading", { name: "Staff membership" }).locator("../..");
+
+  await expect(membershipSection).toBeVisible();
+  await membershipSection.getByPlaceholder("Staff email").fill(testerEmail);
+  await membershipSection.getByRole("combobox").selectOption("staff");
+  await membershipSection.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByText("Staff membership saved.")).toBeVisible();
+  await expect(membershipSection).toContainText(testerEmail);
+  await expect(membershipSection).toContainText("staff");
+
+  await expect
+    .poll(async () => {
+      const membership = await prisma.membership.findFirst({
+        where: {
+          siteId: e2eSiteId,
+          user: { email: testerEmail },
+        },
+        select: { role: true },
+      });
+
+      return membership?.role ?? null;
+    })
+    .toBe("staff");
+
+  await page.getByLabel("Sign out").click();
+  const staffSession = page.getByRole("heading", { name: "Staff session" }).locator("../../..");
+
+  await expect(staffSession.getByText("Sign in with email OTP.")).toBeVisible();
+  await expect(staffSession.getByPlaceholder("Staff email")).toBeVisible();
+
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": getE2eRequesterIp(testInfo, 1),
+  });
+  await signIn(page, "Staff email", testerEmail);
+  await expect(
+    page.getByRole("heading", { name: "Staff queue board" }),
+  ).toBeVisible();
+  await selectE2eSite(page);
+  await expect(page.getByText("0 active tickets")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Staff membership" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Map budget" })).toHaveCount(0);
 });
 
 test("covers patient check-in and staff queue transitions", async ({

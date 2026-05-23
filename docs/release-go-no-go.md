@@ -103,6 +103,8 @@ QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true \
 pnpm e2e:portfolio
 ```
 
+This public browser smoke checks the patient page, map controls, Refresh/site-selection behavior, and `/staff` sign-in surface without database writes or OTP requests. It does not replace first-time inbox delivery, staff authorization, queue operation, worker/outbox, backup, or rollback evidence.
+
 ## Local Required Checks
 
 Run these from the repository root before staging promotion.

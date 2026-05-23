@@ -172,7 +172,7 @@ Outcome: a visitor can test the patient path and an authorized tester can test t
 Implementation state:
 
 - Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, and core queue operations.
-- Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, map fallback/provider surface expectations, and absence of raw internal errors in the public UI.
+- Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, map fallback/provider surface expectations, `/staff` sign-in surface reachability, and absence of raw internal errors in the public UI. It does not request OTPs or prove staff authorization.
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`.
 
 Remaining evidence:

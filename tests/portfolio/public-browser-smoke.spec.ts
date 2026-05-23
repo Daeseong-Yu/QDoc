@@ -21,6 +21,18 @@ function sameOriginApiResponse(url: string) {
   return responseUrl.origin === base.origin && responseUrl.pathname.startsWith("/api/");
 }
 
+function collectFailingApiResponses(page: Page) {
+  const failingApiResponses: string[] = [];
+
+  page.on("response", (response) => {
+    if (sameOriginApiResponse(response.url()) && response.status() >= 500) {
+      failingApiResponses.push(`${response.status()} ${new URL(response.url()).pathname}`);
+    }
+  });
+
+  return failingApiResponses;
+}
+
 async function expectNoInternalCopy(page: Page) {
   const bodyText = (await page.locator("body").innerText()).toLowerCase();
 
@@ -44,13 +56,7 @@ async function selectLastClinicCard(page: Page) {
 
 test.describe("portfolio public browser smoke", () => {
   test("loads the patient map and keeps public controls usable", async ({ page }) => {
-    const failingApiResponses: string[] = [];
-
-    page.on("response", (response) => {
-      if (sameOriginApiResponse(response.url()) && response.status() >= 500) {
-        failingApiResponses.push(`${response.status()} ${new URL(response.url()).pathname}`);
-      }
-    });
+    const failingApiResponses = collectFailingApiResponses(page);
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Nearby clinics" })).toBeVisible();
@@ -86,6 +92,21 @@ test.describe("portfolio public browser smoke", () => {
       await markerButtons.first().click();
       await expect(page.getByTestId("clinic-map-selected-label")).not.toHaveText("");
     }
+
+    expect.soft(failingApiResponses, "same-origin API calls should not return 5xx responses").toEqual([]);
+  });
+
+  test("loads the staff sign-in surface without exposing internal errors", async ({ page }) => {
+    const failingApiResponses = collectFailingApiResponses(page);
+
+    await page.goto("/staff", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Staff queue board" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Staff session" })).toBeVisible();
+    await expect(page.getByText("Sign in with email OTP.")).toBeVisible();
+    await expect(page.getByPlaceholder("Staff email")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send code" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Refresh" })).toBeDisabled();
+    await expectNoInternalCopy(page);
 
     expect.soft(failingApiResponses, "same-origin API calls should not return 5xx responses").toEqual([]);
   });

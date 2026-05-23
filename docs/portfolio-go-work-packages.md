@@ -32,6 +32,18 @@ The default execution order is P5-A, P5-B, P5-C, P5-D, then P5-E. If staging/man
 
 Do not mark a package complete for `GO` from local tests alone when the package depends on real email delivery, public-browser provider behavior, deployed host settings, backup restore-checks, or rollback artifacts.
 
+## Active Completion Rules
+
+These rules capture the newly defined product-completion expectations for future work:
+
+- P5-A remains open until a real OTP-receivable staff/admin and tester path is proven without direct database edits. Signing in with an unrostered personal email should fail authorization; the fix is to roster that exact tester email through bootstrap or membership management.
+- P5-B remains open until the public map is proven as an interactive provider-backed experience. Seeded QDoc clinics are the check-in source of truth, but they are not enough for nearby healthcare discovery by themselves.
+- P5-C remains open until first-time staging OTP delivery, readable delivery/rate-limit/invalid/expired states, and refresh/revisit session behavior are proven against the deployed environment.
+- P5-D remains open until the patient and staff demo paths can be exercised from the UI and checklist alone, including queue operations, notification/outbox behavior, membership management, and audit-log review.
+- P5-E remains open until staging verifier, rehearsal, backup restore-check, rollback target, and safe GO/NO-GO evidence are recorded.
+
+Do not downgrade one of these requirements to an accepted risk unless the user explicitly decides that the behavior is outside the public portfolio demo.
+
 ## Work Packages
 
 Completion standard: a work package is not done only because the code path exists. It is done when the intended visitor or tester can execute the documented workflow in staging without developer explanation, direct database edits, placeholder-only accounts, or raw implementation errors. If evidence collection finds a gap, return to implementation in that package and update the status here.

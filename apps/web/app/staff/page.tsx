@@ -887,7 +887,7 @@ export default function StaffPage() {
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="staff@example.com"
+                    placeholder="Staff email"
                     className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
                   />
                   {authStep === "code" ? (
@@ -1228,7 +1228,7 @@ export default function StaffPage() {
                             type="email"
                             value={membershipEmail}
                             onChange={(event) => setMembershipEmail(event.target.value)}
-                            placeholder="staff@example.com"
+                            placeholder="Staff email"
                             className="h-10 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-[#10b9c4]"
                           />
                           <select

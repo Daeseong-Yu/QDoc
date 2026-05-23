@@ -27,7 +27,7 @@
     "db:generate": "dotenv -e .env -- pnpm --filter @qdoc/db db:generate",
     "db:migrate": "dotenv -e .env -- pnpm --filter @qdoc/db db:migrate",
     "db:migrate:deploy": "pnpm --filter @qdoc/db db:migrate:deploy",
-    "db:seed:staging": "pnpm --filter @qdoc/db db:seed",
+    "db:seed:staging": "env APP_ENV=staging NODE_ENV=production pnpm --filter @qdoc/db db:seed",
     "db:seed": "dotenv -e .env -- pnpm --filter @qdoc/db db:seed"
   },
   "devDependencies": {

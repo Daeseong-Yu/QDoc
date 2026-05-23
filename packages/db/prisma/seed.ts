@@ -49,6 +49,7 @@ const clinics = [
 
 const legacySiteIds = ["site-downtown", "site-northside"];
 const defaultStaffAdminEmail = "staff@example.com";
+const productionLikeAppEnvs = new Set(["staging", "production"]);
 
 function parseEmailList(value: string | undefined) {
   return (value ?? "")
@@ -61,16 +62,38 @@ function isEmailLike(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function isProductionLikeSeed() {
+  return process.env.NODE_ENV === "production" || productionLikeAppEnvs.has((process.env.APP_ENV ?? "").toLowerCase());
+}
+
+function isPlaceholderStaffEmail(value: string) {
+  return value === defaultStaffAdminEmail || /@(example\.com|example\.org|example\.net)$/i.test(value);
+}
+
 function getSeedStaffAdminEmails() {
   const emails = parseEmailList(process.env.QDOC_SEED_STAFF_ADMIN_EMAILS);
-  const staffAdminEmails = emails.length > 0 ? emails : [defaultStaffAdminEmail];
+  const productionLike = isProductionLikeSeed();
+
+  if (emails.length === 0) {
+    if (productionLike) {
+      throw new Error("QDOC_SEED_STAFF_ADMIN_EMAILS is required for staging or production seed");
+    }
+
+    return [defaultStaffAdminEmail];
+  }
+
+  const staffAdminEmails = [...new Set(emails)];
   const invalidEmails = staffAdminEmails.filter((email) => !isEmailLike(email));
 
   if (invalidEmails.length > 0) {
     throw new Error("QDOC_SEED_STAFF_ADMIN_EMAILS contains invalid email entries");
   }
 
-  return [...new Set(staffAdminEmails)];
+  if (productionLike && staffAdminEmails.some(isPlaceholderStaffEmail)) {
+    throw new Error("QDOC_SEED_STAFF_ADMIN_EMAILS must use real OTP-receivable staff emails for staging or production seed");
+  }
+
+  return staffAdminEmails;
 }
 
 const samplePatientEmails = [
@@ -253,6 +276,8 @@ async function seedClinicTickets(siteId: string, queueId: string, waitingCount: 
 }
 
 async function main() {
+  const staffAdminEmails = getSeedStaffAdminEmails();
+
   const organization = await prisma.organization.upsert({
     where: { id: "qdoc-health" },
     update: {},
@@ -267,7 +292,7 @@ async function main() {
   await removeLegacySeededPatients();
 
   const staffAdmins = await Promise.all(
-    getSeedStaffAdminEmails().map((email) =>
+    staffAdminEmails.map((email) =>
       prisma.user.upsert({
         where: { email },
         update: {},

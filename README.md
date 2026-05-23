@@ -150,7 +150,7 @@ OTP delivery is console-based in local development. When signing in, read the ve
 
 Seed data:
 
-- Staff account: local defaults to `staff@example.com`. For staging, set `QDOC_SEED_STAFF_ADMIN_EMAILS` to one or more real OTP-receivable staff emails before running seed/deploy.
+- Staff account: local defaults to `staff@example.com`. For staging, set `QDOC_SEED_STAFF_ADMIN_EMAILS` to one or more real OTP-receivable staff emails before running seed/deploy; staging seed fails closed when this is missing or uses example-domain addresses.
 - Waterloo Clinic: `site-waterloo`, `queue-waterloo-walkin`, 19 waiting tickets
 - Kitchener Clinic: `site-kitchener`, `queue-kitchener-walkin`, 5 waiting tickets
 - Dental Clinic: `site-university`, `queue-university-walkin`, 0 waiting tickets
@@ -233,7 +233,7 @@ Staging environment variables:
 | `POSTGRES_DB`, `POSTGRES_USER`, `QDOC_DB_SECRET` | yes | PostgreSQL bootstrap settings. |
 | `REDIS_URL` | yes | Internal Redis URL used for OTP rate-limit counters. |
 | `SESSION_SECRET` | yes | Long random secret; never commit the value. |
-| `QDOC_SEED_STAFF_ADMIN_EMAILS` | staging bootstrap | Comma-separated real staff/admin emails to create or upsert during approved seed/bootstrap. Local defaults to `staff@example.com`; staging should use real OTP-receivable addresses. |
+| `QDOC_SEED_STAFF_ADMIN_EMAILS` | staging bootstrap | Comma-separated real staff/admin emails to create or upsert during approved seed/bootstrap. Local defaults to `staff@example.com`; staging requires real OTP-receivable addresses and rejects example-domain placeholders. |
 | `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` | no | Comma-separated clinic site IDs that `pnpm verify:admin-data` must find. Defaults are not required locally, but staging should set the launch clinic IDs. |
 | `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` | no | Comma-separated staff/admin emails that `pnpm verify:admin-data` must find as site admins. The verifier prints counts and site IDs only, not the addresses. |
 | `EMAIL_PROVIDER` | yes | Use `smtp` for staging unless console delivery is explicitly allowed. |
@@ -403,7 +403,7 @@ Rollback:
 Admin data operations:
 
 1. Classify the operation before changing data:
-   - Seed-only: `pnpm db:seed` and `pnpm db:seed:staging` create the demo organization, clinic sites, queues, configured staff admin accounts, sample tickets, and disabled map provider guardrail rows. Use these for local or approved staging bootstrap only, not production onboarding. Set `QDOC_SEED_STAFF_ADMIN_EMAILS` to real OTP-receivable staff emails for staging.
+   - Seed-only: `pnpm db:seed` and `pnpm db:seed:staging` create the demo organization, clinic sites, queues, configured staff admin accounts, sample tickets, and disabled map provider guardrail rows. Use these for local or approved staging bootstrap only, not production onboarding. Set `QDOC_SEED_STAFF_ADMIN_EMAILS` to real OTP-receivable staff emails for staging; staging seed fails closed when this is missing or uses example-domain placeholders.
    - Application-supported: staff admins can manage site settings, notification threshold, queue open/closed state, site memberships, audit-log review, and notification health from `/staff`. Operators listed in `MAP_SETTINGS_ADMIN_EMAILS` can manage global map provider enablement, monthly map-load limits, monthly place-search limits, and hard-stop settings from the staff UI.
    - Database-admin-only: new production organization/site/queue creation, destructive record cleanup, direct restore, and emergency data correction require an approved DB-admin procedure or a reviewed script. Do not bypass staff authorization boundaries from the public API.
 2. After migrations and approved seed/bootstrap data are applied, sign in as a site admin, verify every launch clinic has the expected address or coordinates, set `notificationAheadCount`, confirm at least one queue exists, and confirm at least one real OTP-receivable admin membership per site.

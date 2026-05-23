@@ -63,6 +63,35 @@ For final GO evidence, set `QDOC_EVIDENCE_STRICT=true` and mark each required pa
 
 Set `QDOC_EVIDENCE_PRIVATE_OUTPUT=true` only for local/private release notes that will not be committed. Public or repository evidence should keep S3 bucket names, SSM command IDs, backup paths, operator identity, and free-form risk details redacted.
 
+Before setting the P5-A through P5-D status variables, use the portfolio smoke helper to roll up the manual browser/inbox checks into package statuses. The helper is read-only and does not call AWS, Docker, SMTP, map providers, or the public site. It validates the status values you provide and prints export lines for `deploy/release-evidence.sh`.
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_SMOKE_STAFF_ADMIN_SIGNIN=passed \
+QDOC_SMOKE_STAFF_TESTER_AUTH=passed \
+QDOC_SMOKE_UNROSTERED_STAFF_DENIAL=passed \
+QDOC_SMOKE_PROVIDER_RESTRICTIONS=passed \
+QDOC_SMOKE_MAP_GEO_CENTER=passed \
+QDOC_SMOKE_MAP_PAN_ZOOM=passed \
+QDOC_SMOKE_MAP_RECENTER=passed \
+QDOC_SMOKE_MARKER_CARD_SYNC=passed \
+QDOC_SMOKE_QDOC_PROVIDER_DISTINCTION=passed \
+QDOC_SMOKE_MAP_FAIL_CLOSED=passed \
+QDOC_SMOKE_PATIENT_OTP_DELIVERY=passed \
+QDOC_SMOKE_STAFF_OTP_DELIVERY=passed \
+QDOC_SMOKE_AUTH_ERROR_COPY=passed \
+QDOC_SMOKE_SESSION_REVISIT=passed \
+QDOC_SMOKE_PATIENT_CHECKIN=passed \
+QDOC_SMOKE_STAFF_QUEUE_OPS=passed \
+QDOC_SMOKE_MEMBERSHIP_AUDIT=passed \
+QDOC_SMOKE_NOTIFICATION_OUTBOX=passed \
+QDOC_SMOKE_WORKER_DUPLICATE_GUARD=passed \
+QDOC_SMOKE_STRICT=true \
+bash deploy/portfolio-smoke-evidence.sh
+```
+
+Use `pending`, `not_run`, or `failed` for checks that are not actually proven. Do not mark a value `passed` from local tests when the check depends on real inboxes, a public browser, provider credentials, deployed worker behavior, or staging host settings.
+
 ## Local Required Checks
 
 Run these from the repository root before staging promotion.

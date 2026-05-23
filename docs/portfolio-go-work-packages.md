@@ -101,6 +101,7 @@ Outcome: a visitor can test the patient path and an authorized tester can test t
 Implementation state:
 
 - Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, and core queue operations.
+- `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`.
 
 Remaining evidence:
 
@@ -111,6 +112,7 @@ Remaining evidence:
 Verification:
 
 - `pnpm e2e`
+- `pnpm verify:portfolio-smoke`
 - staging manual patient/staff smoke
 - `pnpm verify:outbox`
 - `pnpm verify:ops`
@@ -123,6 +125,7 @@ Implementation state:
 
 - `docs/release-go-no-go.md` contains the release checklist.
 - `deploy/release-evidence.sh` and `pnpm verify:release-evidence` provide a read-only evidence preflight and redacted decision-record block.
+- `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide the manual P5-A through P5-D smoke status rollup that feeds the release evidence preflight.
 
 Remaining evidence:
 
@@ -135,6 +138,7 @@ Remaining evidence:
 
 Verification:
 
+- `deploy/portfolio-smoke-evidence.sh`
 - `deploy/verify-staging.sh`
 - `deploy/staging-rehearsal.sh`
 - backup restore-check command

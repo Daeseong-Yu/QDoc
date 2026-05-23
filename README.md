@@ -402,6 +402,35 @@ bash deploy/release-evidence.sh
 
 The evidence helper is read-only. It validates SHA, image tag, artifact URI, checksum, rollback, backup, and evidence status formats, then prints a commit-safe decision-record block for `docs/release-go-no-go.md`. Private operational identifiers are redacted by default; set `QDOC_EVIDENCE_PRIVATE_OUTPUT=true` only for local/private release notes that will not be committed. Use `QDOC_EVIDENCE_STRICT=true` for final GO evidence; strict mode fails while required package statuses or staging/manual proof remain pending.
 
+Portfolio smoke evidence rollup:
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_SMOKE_STAFF_ADMIN_SIGNIN=passed \
+QDOC_SMOKE_STAFF_TESTER_AUTH=passed \
+QDOC_SMOKE_UNROSTERED_STAFF_DENIAL=passed \
+QDOC_SMOKE_PROVIDER_RESTRICTIONS=passed \
+QDOC_SMOKE_MAP_GEO_CENTER=passed \
+QDOC_SMOKE_MAP_PAN_ZOOM=passed \
+QDOC_SMOKE_MAP_RECENTER=passed \
+QDOC_SMOKE_MARKER_CARD_SYNC=passed \
+QDOC_SMOKE_QDOC_PROVIDER_DISTINCTION=passed \
+QDOC_SMOKE_MAP_FAIL_CLOSED=passed \
+QDOC_SMOKE_PATIENT_OTP_DELIVERY=passed \
+QDOC_SMOKE_STAFF_OTP_DELIVERY=passed \
+QDOC_SMOKE_AUTH_ERROR_COPY=passed \
+QDOC_SMOKE_SESSION_REVISIT=passed \
+QDOC_SMOKE_PATIENT_CHECKIN=passed \
+QDOC_SMOKE_STAFF_QUEUE_OPS=passed \
+QDOC_SMOKE_MEMBERSHIP_AUDIT=passed \
+QDOC_SMOKE_NOTIFICATION_OUTBOX=passed \
+QDOC_SMOKE_WORKER_DUPLICATE_GUARD=passed \
+QDOC_SMOKE_STRICT=true \
+bash deploy/portfolio-smoke-evidence.sh
+```
+
+This helper is also read-only. It turns P5-A through P5-D manual smoke outcomes into the `QDOC_EVIDENCE_P5A_STATUS`, `QDOC_EVIDENCE_P5B_STATUS`, `QDOC_EVIDENCE_P5C_STATUS`, `QDOC_EVIDENCE_P5D_STATUS`, and `QDOC_EVIDENCE_MANUAL_SMOKE_STATUS` values used by the release evidence preflight. Use `pending`, `not_run`, or `failed` for anything that has not been proven in staging with real inboxes, public browser/provider behavior, and deployed worker/outbox behavior.
+
 Useful SSM and host checks:
 
 ```bash

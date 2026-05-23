@@ -16,6 +16,17 @@ function getExpectedSiteIds() {
     .filter(Boolean);
 }
 
+function getExpectedStaffAdminEmails() {
+  return [
+    ...new Set(
+      (process.env.QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS ?? "")
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+}
+
 function countTicketRows(rows: Array<{ siteId: string; status: string; _count: { _all: number } }>) {
   const counts = new Map<string, Record<string, number>>();
 
@@ -43,6 +54,7 @@ function check(name: string, ok: boolean, readyStatus: string, failedStatus: str
 
 async function main() {
   const expectedSiteIds = getExpectedSiteIds();
+  const expectedStaffAdminEmails = getExpectedStaffAdminEmails();
 
   const [organizationCount, sites, ticketRows, auditLogCount, mapConfigs] = await Promise.all([
     prisma.organization.count(),
@@ -70,6 +82,11 @@ async function main() {
         memberships: {
           select: {
             role: true,
+            user: {
+              select: {
+                email: true,
+              },
+            },
           },
         },
       },
@@ -103,6 +120,14 @@ async function main() {
   const sitesWithoutQueues = sites.filter((site) => site.queues.length === 0).map((site) => site.id);
   const sitesWithoutAdmins = sites
     .filter((site) => site.memberships.filter((membership) => membership.role === "admin").length === 0)
+    .map((site) => site.id);
+  const sitesMissingExpectedStaffAdmins = sites
+    .filter((site) =>
+      expectedStaffAdminEmails.some(
+        (email) =>
+          !site.memberships.some((membership) => membership.role === "admin" && membership.user.email.toLowerCase() === email),
+      ),
+    )
     .map((site) => site.id);
   const sitesWithInvalidNotificationThreshold = sites
     .filter((site) => !Number.isInteger(site.notificationAheadCount) || site.notificationAheadCount < 0)
@@ -154,6 +179,13 @@ async function main() {
     check("site_queues", sitesWithoutQueues.length === 0, "ready", "sites_without_queues", sitesWithoutQueues.length),
     check("site_admins", sitesWithoutAdmins.length === 0, "ready", "sites_without_admins", sitesWithoutAdmins.length),
     check(
+      "expected_staff_admins",
+      sitesMissingExpectedStaffAdmins.length === 0,
+      expectedStaffAdminEmails.length > 0 ? "ready" : "not_requested",
+      "expected_staff_admins_missing",
+      sitesMissingExpectedStaffAdmins.length,
+    ),
+    check(
       "notification_thresholds",
       sitesWithInvalidNotificationThreshold.length === 0,
       "ready",
@@ -177,6 +209,8 @@ async function main() {
     expectations: {
       siteIds: expectedSiteIds,
       missingSiteIds: missingExpectedSiteIds,
+      staffAdminEmails: expectedStaffAdminEmails.length,
+      sitesMissingExpectedStaffAdmins,
     },
     summary: {
       organizations: organizationCount,

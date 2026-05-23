@@ -46,6 +46,8 @@ The core database model includes organizations, clinic sites, queues, users, sta
 
 ### What's Next
 
+- Complete the portfolio-ready map experience: provider-backed pan/zoom, current-location recentering, marker selection, selected site highlighting, and clear distinction between QDoc check-in sites and third-party discovery places.
+- Finalize public demo readiness: real OTP-receivable staff accounts, user-friendly OTP/map errors, staging smoke evidence, backup restore-check evidence, and rollback readiness.
 - Add real distance and travel-time estimates instead of seeded distance values.
 - Add SMS/push notifications and more configurable notification thresholds.
 - Replace polling with SSE for faster live queue updates.
@@ -96,6 +98,13 @@ OTP abuse controls:
 2. When `REDIS_URL` is configured, API adds Redis TTL counters for email, client IP, and client IP plus email combinations.
 3. Redis keys use hashed identifiers instead of raw email addresses.
 
+Portfolio public demo gate:
+
+1. `GO` means the site is ready for portfolio visitors, not only deployable to staging.
+2. Patient OTP, clinic discovery, map interaction, check-in, active ticket status, and refresh/session continuity must work without developer explanation.
+3. Staff testing requires a real OTP-receivable staff/admin account prepared by bootstrap or membership management.
+4. User-facing UI must not expose raw internal error codes, OTP values, provider secrets, or implementation-only map cost labels.
+
 ## Local Setup
 
 ```bash
@@ -141,7 +150,7 @@ OTP delivery is console-based in local development. When signing in, read the ve
 
 Seed data:
 
-- Staff account: `staff@example.com`
+- Staff account: local defaults to `staff@example.com`. For staging, set `QDOC_SEED_STAFF_ADMIN_EMAILS` to one or more real OTP-receivable staff emails before running seed/deploy.
 - Waterloo Clinic: `site-waterloo`, `queue-waterloo-walkin`, 19 waiting tickets
 - Kitchener Clinic: `site-kitchener`, `queue-kitchener-walkin`, 5 waiting tickets
 - Dental Clinic: `site-university`, `queue-university-walkin`, 0 waiting tickets
@@ -166,7 +175,7 @@ pnpm e2e
 
 `pnpm verify:ops` prints safe operational JSON for outbox status counts, oldest pending job age, failed almost-ready email jobs, active ticket counts, and current map guardrail state. It exits non-zero when failed outbox jobs, stale processing jobs, failed email jobs, or enabled map guardrail misconfiguration need operator attention.
 
-`pnpm verify:admin-data` prints safe operational JSON for organization, clinic site, queue, staff membership, audit-log count, ticket-count, and map budget configuration readiness. It does not print emails, OTPs, raw database URLs, ticket IDs, audit metadata, or patient payloads. Set `QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener` to require specific launch clinic IDs; a missing expected site exits non-zero and provides a failure-path check without changing database rows.
+`pnpm verify:admin-data` prints safe operational JSON for organization, clinic site, queue, staff membership, audit-log count, ticket-count, and map budget configuration readiness. It does not print emails, OTPs, raw database URLs, ticket IDs, audit metadata, or patient payloads. Set `QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener` to require specific launch clinic IDs, and set `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS=staff@example.com` to verify that each launch site has the expected admin memberships without printing the addresses. Missing expected data exits non-zero and provides a failure-path check without changing database rows.
 
 `pnpm verify:launch` prints safe launch-readiness JSON for required database and Redis configuration, session hardening, HTTPS origin settings, loopback web binding, OTP debug flags, SMTP readiness, and map-provider cost guardrails. It treats `APP_ENV=staging`, `APP_ENV=production`, and `NODE_ENV=production` as launch-like environments and exits non-zero when fail-closed settings are not ready. Nearby healthcare search is disabled by default until a server-side provider credential and a positive monthly search limit are configured.
 
@@ -224,6 +233,8 @@ Staging environment variables:
 | `POSTGRES_DB`, `POSTGRES_USER`, `QDOC_DB_SECRET` | yes | PostgreSQL bootstrap settings. |
 | `REDIS_URL` | yes | Internal Redis URL used for OTP rate-limit counters. |
 | `SESSION_SECRET` | yes | Long random secret; never commit the value. |
+| `QDOC_SEED_STAFF_ADMIN_EMAILS` | staging bootstrap | Comma-separated real staff/admin emails to create or upsert during approved seed/bootstrap. Local defaults to `staff@example.com`; staging should use real OTP-receivable addresses. |
+| `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` | no | Comma-separated staff/admin emails that `pnpm verify:admin-data` must find as site admins. The verifier prints counts and site IDs only, not the addresses. |
 | `EMAIL_PROVIDER` | yes | Use `smtp` for staging unless console delivery is explicitly allowed. |
 | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | yes for SMTP | SMTP sender and credentials; never print or commit secrets. |
 | `ALLOW_CONSOLE_OTP`, `ALLOW_FIXED_OTP` | yes | Keep both `false` in normal staging. |
@@ -391,16 +402,17 @@ Rollback:
 Admin data operations:
 
 1. Classify the operation before changing data:
-   - Seed-only: `pnpm db:seed` and `pnpm db:seed:staging` create the demo organization, clinic sites, queues, staff account, sample tickets, and disabled map provider guardrail rows. Use these for local or approved staging bootstrap only, not production onboarding.
+   - Seed-only: `pnpm db:seed` and `pnpm db:seed:staging` create the demo organization, clinic sites, queues, configured staff admin accounts, sample tickets, and disabled map provider guardrail rows. Use these for local or approved staging bootstrap only, not production onboarding. Set `QDOC_SEED_STAFF_ADMIN_EMAILS` to real OTP-receivable staff emails for staging.
    - Application-supported: staff admins can manage site settings, notification threshold, queue open/closed state, site memberships, audit-log review, and notification health from `/staff`. Operators listed in `MAP_SETTINGS_ADMIN_EMAILS` can manage global map provider enablement, monthly map-load limits, monthly place-search limits, and hard-stop settings from the staff UI.
    - Database-admin-only: new production organization/site/queue creation, destructive record cleanup, direct restore, and emergency data correction require an approved DB-admin procedure or a reviewed script. Do not bypass staff authorization boundaries from the public API.
-2. After migrations and approved seed/bootstrap data are applied, sign in as a site admin, verify every launch clinic has the expected address or coordinates, set `notificationAheadCount`, confirm at least one queue exists, and add at least one admin membership per site.
+2. After migrations and approved seed/bootstrap data are applied, sign in as a site admin, verify every launch clinic has the expected address or coordinates, set `notificationAheadCount`, confirm at least one queue exists, and confirm at least one real OTP-receivable admin membership per site.
 3. Keep map providers disabled until provider console restrictions, browser credentials, monthly QDoc limit, and QDoc hard-stop settings are all configured. If a provider is enabled, `monthlyMapLoadLimit` must be positive and `hardStopEnabled` must stay true.
 4. Run the admin data verifier:
 
 ```bash
 pnpm verify:admin-data
 QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener pnpm verify:admin-data
+QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS=staff@example.com pnpm verify:admin-data
 ```
 
 5. Exercise the failure path without mutating data:

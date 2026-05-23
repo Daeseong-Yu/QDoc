@@ -1,6 +1,6 @@
-# QDoc Release Go/No-Go
+# QDoc Portfolio Release Go/No-Go
 
-Use this checklist for a launch-candidate decision. Record command status, short safe summaries, commit SHAs, artifact identifiers, and operator notes. Do not paste secrets, OTP codes, database dumps, private deployment logs, patient payloads, or raw connection strings into the evidence.
+Use this checklist for a portfolio-ready launch-candidate decision. `GO` means QDoc can be presented publicly as a portfolio demo where visitors can test the main workflows without developer explanation. Record command status, short safe summaries, commit SHAs, artifact identifiers, and operator notes. Do not paste secrets, OTP codes, database dumps, private deployment logs, patient payloads, or raw connection strings into the evidence.
 
 ## Release Identity
 
@@ -37,6 +37,7 @@ Go criteria:
 - `verify:launch` reports launch-like hardening ready for the target environment when staging or production env is loaded.
 - E2E runs against a local or explicitly isolated test database only.
 - No local-only config, `.env`, backup, screenshot, trace, or generated secret material is staged.
+- Automated coverage includes patient OTP/check-in, staff OTP/queue operations, delay/restore, and map guardrail behavior.
 
 No-go criteria:
 
@@ -76,13 +77,15 @@ Go criteria:
 - Compose services are healthy and only web is bound to host loopback.
 - Public Caddy route returns success for the expected domain.
 - Outbox, ops, admin-data, launch-hardening, backup restore-check, and bounded drill checks exit zero.
+- The staging staff/admin account is backed by a real OTP-receivable email through `QDOC_SEED_STAFF_ADMIN_EMAILS` or an approved membership operation.
+- The map provider is either intentionally disabled for a documented fail-closed test or fully configured with provider restrictions, QDoc monthly limits, usage reservations, and interactive map behavior.
 - The operator records SSM command ID, app artifact SHA, ops bundle SHA, candidate source SHA, backup filename, and restore-check pass/fail without copying private logs or dump files into Git.
 
 No-go criteria:
 
 - Public URL is missing or points at a different artifact/release SHA.
 - Backup restore-check has not passed for the launch database.
-- `verify:admin-data` shows missing launch clinic, queue, staff admin, or map guardrail records.
+- `verify:admin-data` shows missing launch clinic, queue, expected staff admin, or map guardrail records.
 - `verify:launch` reports console/fixed OTP enabled, missing SMTP, weak session secret, non-HTTPS app URL, public web bind, or map hard-stop misconfiguration in a launch-like environment.
 
 ## Manual Smoke Checks
@@ -91,15 +94,20 @@ Run these in staging after automated checks pass and real email delivery is appr
 
 1. Patient requests OTP, signs in, selects a launch clinic, checks in, and sees an active ticket.
 2. Patient refreshes or reopens the app and remains in the expected authenticated/ticket state.
-3. Staff signs in at `/staff` with a site-scoped account and sees only authorized clinic queues.
-4. Staff calls, starts, and completes the patient ticket; patient status updates through polling or SSE fallback behavior.
-5. Staff delays and restores another eligible ticket; restored ticket returns to the front of the waiting queue.
-6. Almost-ready notification work appears in operational checks without duplicate delivery.
-7. Map UI either loads only after a successful QDoc usage reservation or falls back cleanly when maps are disabled or exhausted.
+3. Patient grants location permission and sees the map centered near the current area; denial or browser block falls back cleanly.
+4. Map supports pan/zoom controls, current-location recentering, marker click selection, selected marker/site highlighting, and card-to-map synchronization.
+5. QDoc check-in sites are visually distinct from third-party provider discovery places.
+6. Staff signs in at `/staff` with a site-scoped account and sees only authorized clinic queues.
+7. Staff calls, starts, and completes the patient ticket; patient status updates through polling or SSE fallback behavior.
+8. Staff delays and restores another eligible ticket; restored ticket returns to the front of the waiting queue.
+9. Staff verifies queue open/close, notification threshold, membership management, and audit-log review.
+10. Almost-ready notification work appears in operational checks without duplicate delivery.
+11. User-facing OTP/map failures are readable and do not expose raw internal error codes such as `rate_limited` or `otp_delivery_unavailable`.
 
 Go criteria:
 
 - Patient and staff flows complete without invalid state transitions or authorization leaks.
+- Portfolio visitors can understand the primary flow without separate developer instructions.
 - Worker/outbox processing remains healthy after smoke checks.
 - No OTPs, provider secrets, raw patient payloads, or database URLs appear in captured evidence.
 
@@ -111,10 +119,11 @@ Confirm these account-level and host-level items before go:
 - Security group exposes only approved public ports, normally `80` and `443`.
 - Host Caddy proxies the launch domain to `127.0.0.1:${QDOC_WEB_PORT}`.
 - `/opt/qdoc/shared/.env.staging` or production env contains HTTPS `APP_URL`, long `SESSION_SECRET`, SMTP settings, Redis URL, database URL, and disabled OTP debug flags.
+- `/opt/qdoc/shared/.env.staging` contains real OTP-receivable `QDOC_SEED_STAFF_ADMIN_EMAILS` and matching verification expectations when staff smoke is required.
 - GitHub OIDC role, S3 bucket lifecycle, SSM document, EC2 instance profile, and environment secrets are configured in the operating account.
 - `/opt/qdoc/shared/deploy-bucket` contains only the trusted private deployment bucket name.
 - S3 contains both the app artifact and matching ops bundle for the candidate SHA.
-- Map provider remains disabled, or provider-side restrictions, browser credential limits, QDoc monthly hard-stop, and map usage rate limits are all configured.
+- Map provider remains disabled only for documented fail-closed testing, or provider-side restrictions, browser credential limits, server-side search credential restrictions, QDoc monthly hard-stop, and map/search usage rate limits are all configured.
 - Database backup is copied to encrypted off-host storage and a restore-check has passed.
 - Rollback app artifact, matching ops bundle, and matching backup are available before launch.
 
@@ -167,3 +176,5 @@ Decision time:
 ```
 
 Choose `GO` only when all local checks, staging evidence, manual smoke checks, environment work, and rollback readiness are complete or any remaining risk has an explicit owner and accepted launch impact. Otherwise choose `NO-GO` and record the blocking items.
+
+For a portfolio public demo, do not choose `GO` if the map is only decorative, staff access depends on `staff@example.com`, first-time OTP attempts fail, or raw implementation errors are visible to visitors.

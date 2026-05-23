@@ -48,6 +48,30 @@ const clinics = [
 ] as const;
 
 const legacySiteIds = ["site-downtown", "site-northside"];
+const defaultStaffAdminEmail = "staff@example.com";
+
+function parseEmailList(value: string | undefined) {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isEmailLike(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function getSeedStaffAdminEmails() {
+  const emails = parseEmailList(process.env.QDOC_SEED_STAFF_ADMIN_EMAILS);
+  const staffAdminEmails = emails.length > 0 ? emails : [defaultStaffAdminEmail];
+  const invalidEmails = staffAdminEmails.filter((email) => !isEmailLike(email));
+
+  if (invalidEmails.length > 0) {
+    throw new Error("QDOC_SEED_STAFF_ADMIN_EMAILS contains invalid email entries");
+  }
+
+  return [...new Set(staffAdminEmails)];
+}
 
 const samplePatientEmails = [
   "aiden.park@example.com",
@@ -242,13 +266,17 @@ async function main() {
   await resetSeededTickets();
   await removeLegacySeededPatients();
 
-  const staff = await prisma.user.upsert({
-    where: { email: "staff@example.com" },
-    update: {},
-    create: {
-      email: "staff@example.com",
-    },
-  });
+  const staffAdmins = await Promise.all(
+    getSeedStaffAdminEmails().map((email) =>
+      prisma.user.upsert({
+        where: { email },
+        update: {},
+        create: {
+          email,
+        },
+      }),
+    ),
+  );
 
   for (const clinic of clinics) {
     const site = await prisma.site.upsert({
@@ -298,15 +326,17 @@ async function main() {
       },
     });
 
-    await prisma.membership.upsert({
-      where: { userId_siteId: { userId: staff.id, siteId: site.id } },
-      update: { role: "admin" },
-      create: {
-        userId: staff.id,
-        siteId: site.id,
-        role: "admin",
-      },
-    });
+    for (const staffAdmin of staffAdmins) {
+      await prisma.membership.upsert({
+        where: { userId_siteId: { userId: staffAdmin.id, siteId: site.id } },
+        update: { role: "admin" },
+        create: {
+          userId: staffAdmin.id,
+          siteId: site.id,
+          role: "admin",
+        },
+      });
+    }
 
     await seedClinicTickets(site.id, clinic.queueId, clinic.waitingCount);
   }

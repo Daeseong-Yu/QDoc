@@ -146,6 +146,7 @@ services:
       NODE_ENV: production
       APP_ENV: ${APP_ENV:?Set APP_ENV in .env.staging}
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env.staging}
+      QDOC_SEED_STAFF_ADMIN_EMAILS: ${QDOC_SEED_STAFF_ADMIN_EMAILS:-}
     command: ["pnpm", "db:seed:staging"]
 
   postgres:

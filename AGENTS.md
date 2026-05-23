@@ -40,6 +40,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 
 - Treat `GO` as permission to present QDoc as a public portfolio demo, not merely as a minimal staging deployment.
 - `Launch` in the current task means portfolio-ready public demo. It does not mean every future roadmap item is complete, but every documented core patient, staff, map, OTP, queue, notification, and operational smoke path must be implemented, testable, and understandable without developer explanation.
+- Do not treat a successful build, deploy, or staging health check as sufficient for `GO`. The user-facing patient/staff workflows and operational recovery evidence are part of the gate.
 - Before `GO`, a visitor must be able to complete the patient flow without external explanation: location/map discovery, OTP sign-in, clinic/queue selection, check-in, refresh/session continuity, and active ticket status.
 - Before `GO`, an authorized staff tester must be able to complete staff operations: OTP sign-in, site selection, queue board review, call/start/complete, delay/restore, cancel, queue open/close, notification threshold, membership management, and audit-log review.
 - Before `GO`, the map must behave like an interactive map when a provider is enabled: browser-geolocation centering, pan/zoom controls, current-location recentering, marker click selection, selected marker/site highlighting, and clear distinction between QDoc check-in sites and provider discovery places.
@@ -50,6 +51,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - An unrostered personal email must not gain staff access. If a tester needs staff access, preparing that exact email through seed bootstrap or admin membership management is part of the active work, not an assumed manual database edit.
 - A fallback/static map is only acceptable as the disabled-provider or fail-closed path. Do not treat it as the final portfolio map experience while provider-backed public-browser interaction remains unverified.
 - The active implementation order for the current launch-candidate step is: staff demo access, provider-backed map/public-browser verification, first-time OTP delivery verification, full patient/staff smoke, notification/outbox evidence, backup restore-check, rollback target, then GO/NO-GO record.
+- Current GO blockers must stay synchronized in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md`. Update `.ai/core/PRD.md`, `.ai/core/ARCHITECTURE.md`, `.ai/core/ADR.md`, `AGENTS.md`, README, or `docs/release-go-no-go.md` when the change affects product scope, architecture, durable decisions, future-agent rules, or tester/operator procedures.
 - Future changes that redefine `GO`, public demo scope, map provider behavior, staff bootstrap, session/auth behavior, deployment flow, or secret handling must be reflected in `.ai/core`, the active `.ai/phases` step, and this file before implementation continues.
 
 ## Work Process

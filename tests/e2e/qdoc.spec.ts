@@ -104,7 +104,9 @@ async function installMapboxStub(page: Page) {
               surface.style.pointerEvents = "none";
               this._container.appendChild(surface);
             }
-            addControl() {}
+            addControl(control, position) {
+              window.__qdocMapboxEvents.push({ type: "addControl", position });
+            }
             flyTo(options) {
               window.__qdocMapboxEvents.push({ type: "flyTo", center: options.center, zoom: options.zoom });
             }
@@ -116,6 +118,9 @@ async function installMapboxStub(page: Page) {
             constructor(options = {}) {
               this._element = options.element || document.createElement("div");
               this._element.dataset.testid = this._element.dataset.testid || "mapbox-marker";
+              if (options.color) {
+                this._element.dataset.markerColor = options.color;
+              }
             }
             setLngLat(coordinates) {
               this._coordinates = coordinates;
@@ -482,16 +487,49 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
     longitude: -80.522,
   });
   await installMapboxStub(page);
+  let mapConfigRequests = 0;
+  let nearbyHealthcareRequests = 0;
+  page.on("request", (request) => {
+    const url = request.url();
+
+    if (url.includes("/api/maps/config")) {
+      mapConfigRequests += 1;
+    }
+
+    if (url.includes("/api/maps/nearby-healthcare")) {
+      nearbyHealthcareRequests += 1;
+    }
+  });
 
   await page.goto("/");
   await expect(page.getByTestId("mapbox-surface")).toBeVisible();
   await expect(page.getByText("Interactive map is unavailable. Showing available clinic locations.")).toHaveCount(0);
-  await page.getByLabel("Select Provider Urgent Care").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocMapboxEvents?: Array<{ type: string; position?: string }> })
+          .__qdocMapboxEvents ?? [];
+        return events.some((event) => event.type === "addControl" && event.position === "top-right");
+      }),
+    )
+    .toBe(true);
+  expect(nearbyHealthcareRequests).toBeGreaterThanOrEqual(1);
+  expect(mapConfigRequests).toBeGreaterThanOrEqual(1);
+
+  const providerMarker = page.getByLabel("Select Provider Urgent Care");
+  const qdocMarker = page.getByLabel("Select E2E Clinic");
+  await expect(qdocMarker).toHaveCSS("background-color", "rgb(16, 185, 196)");
+  await expect(providerMarker).toHaveCSS("background-color", "rgb(71, 85, 105)");
+
+  await providerMarker.click();
   await expect(page.getByText("Provider Urgent Care")).toBeVisible();
   await expect(page.getByText("2 Provider Way, Waterloo, ON")).toBeVisible();
+  await expect(providerMarker).toHaveCSS("background-color", "rgb(16, 185, 196)");
+  await expect(qdocMarker).toHaveCSS("background-color", "rgb(8, 120, 132)");
 
-  await page.getByLabel("Select E2E Clinic").click();
+  await qdocMarker.click();
   await expect(page.getByText("1 E2E Way, Waterloo, ON").first()).toBeVisible();
+  await expect(qdocMarker).toHaveCSS("background-color", "rgb(16, 185, 196)");
   await expect
     .poll(async () =>
       page.evaluate(() => {
@@ -502,9 +540,22 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
     )
     .toBe(true);
 
+  await page.getByRole("button", { name: "Recenter map to your location" }).click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocMapboxEvents?: Array<{ type: string; center?: [number, number] }> })
+          .__qdocMapboxEvents ?? [];
+        return events.some((event) => event.type === "flyTo" && event.center?.[0] === -80.522 && event.center?.[1] === 43.465);
+      }),
+    )
+    .toBe(true);
+
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(page.getByTestId("mapbox-surface")).toBeVisible();
   await expect(page.getByText("1 E2E Way, Waterloo, ON").first()).toBeVisible();
+  await expect.poll(() => nearbyHealthcareRequests).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => mapConfigRequests).toBeGreaterThanOrEqual(2);
 });
 
 test("lets staff close a queue and blocks patient check-ins", async ({

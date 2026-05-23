@@ -381,6 +381,27 @@ For local command validation without running staging containers:
 QDOC_ENV_FILE=.env.staging.example QDOC_REHEARSAL_DRY_RUN=true QDOC_REHEARSAL_REQUIRE_PUBLIC_URL=false bash deploy/staging-rehearsal.sh
 ```
 
+Release evidence preflight:
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_EXPECTED_RELEASE_SHA=<git-sha> \
+QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha> \
+QDOC_APP_ARTIFACT_URI=s3://<artifact-bucket>/staging/<git-sha>/qdoc-app.tar.gz \
+QDOC_OPS_BUNDLE_URI=s3://<artifact-bucket>/staging/<git-sha>/qdoc-ops.tar.gz \
+QDOC_APP_ARTIFACT_SHA256=<app-artifact-sha256> \
+QDOC_OPS_BUNDLE_SHA256=<ops-bundle-sha256> \
+QDOC_SSM_COMMAND_ID=<ssm-command-id> \
+QDOC_BACKUP_PATH=/opt/qdoc/backups/<backup-file>.dump \
+QDOC_ROLLBACK_SHA=<known-good-sha> \
+QDOC_ROLLBACK_APP_ARTIFACT_URI=s3://<artifact-bucket>/staging/<known-good-sha>/qdoc-app.tar.gz \
+QDOC_ROLLBACK_OPS_BUNDLE_URI=s3://<artifact-bucket>/staging/<known-good-sha>/qdoc-ops.tar.gz \
+QDOC_ROLLBACK_BACKUP_PATH=/opt/qdoc/backups/<known-good-backup-file>.dump \
+bash deploy/release-evidence.sh
+```
+
+The evidence helper is read-only. It validates SHA, image tag, artifact URI, checksum, rollback, backup, and evidence status formats, then prints a commit-safe decision-record block for `docs/release-go-no-go.md`. Private operational identifiers are redacted by default; set `QDOC_EVIDENCE_PRIVATE_OUTPUT=true` only for local/private release notes that will not be committed. Use `QDOC_EVIDENCE_STRICT=true` for final GO evidence; strict mode fails while required package statuses or staging/manual proof remain pending.
+
 Useful SSM and host checks:
 
 ```bash

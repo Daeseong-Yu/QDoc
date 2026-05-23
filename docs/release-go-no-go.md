@@ -38,6 +38,29 @@ Fill this table for each release candidate. Keep the notes safe: use short summa
 - Database migration range reviewed: `<from-sha>..<to-sha>`
 - Rollback target SHA and artifact confirmed: `<known-good-sha>`
 
+Before copying this section into the final decision record, run the read-only evidence preflight. It does not call AWS, Docker, SMTP, map providers, or the public site; it only checks provided identifiers and prints a commit-safe decision-record block with private operational identifiers redacted by default.
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_EXPECTED_RELEASE_SHA=<git-sha> \
+QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha> \
+QDOC_APP_ARTIFACT_URI=s3://<private-bucket>/staging/<git-sha>/qdoc-app.tar.gz \
+QDOC_OPS_BUNDLE_URI=s3://<private-bucket>/staging/<git-sha>/qdoc-ops.tar.gz \
+QDOC_APP_ARTIFACT_SHA256=<app-artifact-sha256> \
+QDOC_OPS_BUNDLE_SHA256=<ops-bundle-sha256> \
+QDOC_SSM_COMMAND_ID=<ssm-command-id> \
+QDOC_BACKUP_PATH=/opt/qdoc/backups/<backup-file>.dump \
+QDOC_ROLLBACK_SHA=<known-good-sha> \
+QDOC_ROLLBACK_APP_ARTIFACT_URI=s3://<private-bucket>/staging/<known-good-sha>/qdoc-app.tar.gz \
+QDOC_ROLLBACK_OPS_BUNDLE_URI=s3://<private-bucket>/staging/<known-good-sha>/qdoc-ops.tar.gz \
+QDOC_ROLLBACK_BACKUP_PATH=/opt/qdoc/backups/<known-good-backup-file>.dump \
+bash deploy/release-evidence.sh
+```
+
+For final GO evidence, set `QDOC_EVIDENCE_STRICT=true` and mark each required package/status as `passed` with `QDOC_EVIDENCE_P5A_STATUS`, `QDOC_EVIDENCE_P5B_STATUS`, `QDOC_EVIDENCE_P5C_STATUS`, `QDOC_EVIDENCE_P5D_STATUS`, `QDOC_EVIDENCE_P5E_STATUS`, `QDOC_EVIDENCE_LOCAL_CHECKS_STATUS`, `QDOC_EVIDENCE_STAGING_VERIFIER_STATUS`, `QDOC_EVIDENCE_STAGING_REHEARSAL_STATUS`, `QDOC_EVIDENCE_BACKUP_RESTORE_CHECK_STATUS`, and `QDOC_EVIDENCE_MANUAL_SMOKE_STATUS`. If any value remains pending, the decision should remain `NO-GO`.
+
+Set `QDOC_EVIDENCE_PRIVATE_OUTPUT=true` only for local/private release notes that will not be committed. Public or repository evidence should keep S3 bucket names, SSM command IDs, backup paths, operator identity, and free-form risk details redacted.
+
 ## Local Required Checks
 
 Run these from the repository root before staging promotion.

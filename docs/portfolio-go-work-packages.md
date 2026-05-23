@@ -87,6 +87,20 @@ This is the concrete task list that remains before `GO`. It is broader than depl
 7. Operations proof
    - Record staging verifier, staging rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and explicit GO/NO-GO decision.
 
+## Portfolio Tester Completion Matrix
+
+Use this matrix when deciding the next work item or judging whether a package can close. A visible feature is not complete just because it exists in the UI; it must work from a tester's point of view and have the required local plus staging/manual proof.
+
+| Surface | Must be true before GO | Still open when |
+| --- | --- | --- |
+| Patient auth and session | A first-time visitor can request OTP, sign in, refresh or revisit, and understand retry/failure states. | OTP delivery is unproven in staging, raw auth codes appear, or session behavior is only known locally. |
+| Patient map and discovery | Browser geolocation centers the provider-backed map when allowed; pan, zoom, recenter, marker/card sync, selected-state feedback, and QDoc-vs-provider distinction work. | The map is seeded-clinic-only, static/fallback-only, non-interactive, or provider credentials/restrictions/cost controls are unverified. |
+| Patient queue flow | A visitor can choose a QDoc clinic/queue, check in, see active status, notification preferences, and status changes after staff actions. | The path needs developer explanation, direct DB edits, or does not survive refresh/revisit. |
+| Staff access | A real OTP-receivable admin/staff account and tester membership path are prepared without direct database edits. | Only placeholder accounts exist, an unrostered email is expected to work, or staging inbox proof is missing. |
+| Staff operations | An authorized tester can call, start, complete, delay, restore, cancel, open/close queues, manage memberships where admin, and review audit logs. | Buttons are visible but not verified end to end, role boundaries are unclear, or audit/membership paths need hidden setup. |
+| Notification and worker | Almost-ready notification creation, outbox processing, failed-job visibility, and duplicate guard are proven on the deployed worker. | Evidence is local only or deployed worker/outbox state is not checked after manual smoke. |
+| Operations decision | Staging verifier, rehearsal, backup restore-check, rollback target, safe evidence, and GO/NO-GO are recorded. | Any evidence is missing, private data would need to be pasted into docs, or rollback/backup proof is absent. |
+
 ## Work Packages
 
 Completion standard: a work package is not done only because the code path exists. It is done when the intended visitor or tester can execute the documented workflow in staging without developer explanation, direct database edits, placeholder-only accounts, or raw implementation errors. If evidence collection finds a gap, return to implementation in that package and update the status here.

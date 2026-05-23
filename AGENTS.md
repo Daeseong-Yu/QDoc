@@ -11,6 +11,8 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - Phase registry: `.ai/phases/index.json`
 - Phase plans: `.ai/phases/{task}/*`
 - Current task, if present: `.ai/execution/current.md`
+- Portfolio GO work-package handoff: `docs/portfolio-go-work-packages.md`
+- Local workflow mirror for portfolio GO handoff: `.ai/docs/portfolio-go-work-packages.md`
 
 ## Stack
 
@@ -34,6 +36,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - Preserve backward compatibility unless the user explicitly approves a breaking change.
 - Update `.ai/core` docs and `.ai/phases` plans before changing public APIs, deployment flow, secret handling, or data storage structure.
 - Record newly approved portfolio-readiness blockers in `.ai/execution/current.md` and the active `.ai/phases/{task}/step*.md` before implementation, so future work does not depend on chat history.
+- Record newly approved P5-A through P5-E portfolio work-package changes in committed `docs/portfolio-go-work-packages.md` as the canonical handoff, mirror them in `.ai/docs/portfolio-go-work-packages.md`, then sync `.ai/execution/current.md` and the active Step 5 file.
 - EC2 deployment must keep build work off the low-resource host; GitHub Actions should produce the deployable artifact.
 
 ## Portfolio Public Demo Gate
@@ -55,6 +58,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - Distinguish local implementation completion from staging/manual evidence. A blocker is not closed for `GO` until the required staging/manual proof exists for behavior that depends on real email delivery, real provider credentials, public browser restrictions, deployed host config, backup restore-checks, or rollback artifacts.
 - Use `deploy/release-evidence.sh` or `pnpm verify:release-evidence` as the read-only P5-E evidence preflight before copying identifiers into `docs/release-go-no-go.md`; strict final evidence should use `QDOC_EVIDENCE_STRICT=true`, and public/repository evidence should keep the default redacted output.
 - When resuming Step 5, read the work package status snapshot in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md` before choosing the next task. The current next local target is P5-E operations evidence readiness unless staging/manual P5-D smoke reveals a product gap or the user's latest instruction changes priority.
+- Also read `docs/portfolio-go-work-packages.md` and its local `.ai/docs/portfolio-go-work-packages.md` mirror when resuming Step 5. The committed docs file is the package-level source of truth for the newly defined P5-A staff demo access, P5-B provider map public-browser verification, P5-C OTP delivery and auth error usability, P5-D public demo smoke, and P5-E operations evidence and decision work.
 - Current GO blockers must stay synchronized in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md`. Update `.ai/core/PRD.md`, `.ai/core/ARCHITECTURE.md`, `.ai/core/ADR.md`, `AGENTS.md`, README, or `docs/release-go-no-go.md` when the change affects product scope, architecture, durable decisions, future-agent rules, or tester/operator procedures.
 - Future changes that redefine `GO`, public demo scope, map provider behavior, staff bootstrap, session/auth behavior, deployment flow, or secret handling must be reflected in `.ai/core`, the active `.ai/phases` step, and this file before implementation continues.
 

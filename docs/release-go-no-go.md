@@ -12,6 +12,8 @@ Track remaining evidence by Step 5 work package:
 4. P5-D Public demo smoke
 5. P5-E Operations evidence and decision
 
+The package-level source of truth for this newly defined work is `docs/portfolio-go-work-packages.md`, with `.ai/docs/portfolio-go-work-packages.md` maintained as the local workflow mirror. Keep this checklist focused on release evidence and decision records; keep package status, implementation order, and handoff details synchronized in the handoff documents.
+
 Do not mark a package complete from local tests alone when it depends on real inboxes, real provider credentials, public browser restrictions, deployed host settings, backup restore-checks, or rollback artifacts.
 
 ## Work Package Evidence

@@ -1,0 +1,171 @@
+# Portfolio GO Work Packages
+
+This document is the committed handoff for the newly defined portfolio-readiness work. It refines Step 5 of `qdoc-launch-candidate`; it does not create a new phase. The ignored `.ai/docs/portfolio-go-work-packages.md` file should mirror this content for local workflow state.
+
+`GO` means QDoc can be presented as a public portfolio demo where a visitor can test the patient flow and an authorized tester can test staff operations without developer explanation, direct database edits, placeholder-only accounts, or visible internal implementation errors.
+
+Future roadmap items such as SMS, push, EMR/EHR integration, real travel-time estimates, multi-department operations, and a full clinic marketplace are out of scope for this gate.
+
+## Current Status
+
+Step 5 remains in progress. Local implementation and automated coverage exist for large parts of the gate, but portfolio `GO` is still blocked until staging/manual evidence is collected with real external systems.
+
+Do not close a package for `GO` from local tests alone when the behavior depends on:
+
+- real OTP-receivable inboxes
+- configured SMTP delivery
+- real map provider credentials and restrictions
+- public browser geolocation and provider SDK behavior
+- deployed host/Caddy/SSM settings
+- backup restore-checks
+- rollback artifacts
+
+## Work Packages
+
+### P5-A Staff Demo Access
+
+Outcome: staging has at least one real OTP-receivable staff/admin account and a tester authorization path that does not require direct database edits.
+
+Implementation state:
+
+- Seed/bootstrap supports expected staff/admin emails.
+- Launch/admin-data verification can assert staff/admin readiness without printing addresses.
+- Local E2E proves an admin-created staff tester membership path and role boundaries.
+
+Remaining evidence:
+
+- Configure a real staff/admin inbox through `QDOC_SEED_STAFF_ADMIN_EMAILS` or admin membership management.
+- Verify the expected staff/admin account with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS`.
+- Sign in at `/staff` using a real inbox.
+- Add or verify a tester membership through the UI.
+- Confirm an unrostered personal email is denied staff access with readable copy.
+
+Verification:
+
+- `pnpm verify:admin-data`
+- `pnpm verify:launch`
+- staff membership E2E or manual staging smoke
+- safe release evidence that does not disclose real email addresses unless explicitly approved
+
+### P5-B Provider Map Public-Browser Verification
+
+Outcome: the public patient map behaves like an interactive provider-backed map when enabled and fails closed when provider access, usage budget, credentials, or browser permission are unavailable.
+
+Implementation state:
+
+- Local provider map interaction is implemented.
+- Marker/card synchronization, selected state, current-location recentering, Refresh-triggered provider retry, and hidden internal guardrail copy are covered locally.
+- Local E2E uses a stubbed provider SDK/cache path to avoid paid provider traffic.
+
+Remaining evidence:
+
+- Configure provider-side restrictions, quotas, and billing alerts.
+- Configure QDoc monthly hard stops for `map_load` and `places_search`.
+- Verify public browser credentials and server-side search credentials where used.
+- Confirm geolocation-centered loading, pan/zoom, recentering, marker/card sync, QDoc-vs-provider visual distinction, denied-location fallback, and over-budget fallback in staging.
+
+Verification:
+
+- targeted/full Playwright E2E locally
+- staging manual public-browser smoke
+- `pnpm verify:ops`
+- `pnpm verify:admin-data`
+
+### P5-C OTP Delivery And Auth Error Usability
+
+Outcome: first-time patient and staff OTP requests work in staging, and common auth failures are understandable to visitors and staff testers.
+
+Implementation state:
+
+- Local UI renders readable delivery-unavailable, rate-limit, invalid-code, expired-code, unauthorized-staff, and retry states.
+- Local E2E verifies patient and staff error rendering without exposing raw internal codes.
+- Session continuity across refresh/revisit is covered locally.
+
+Remaining evidence:
+
+- Verify first-time OTP delivery with staging SMTP settings.
+- Verify real inbox receipt for patient and staff paths.
+- Verify delivery-unavailable behavior without leaking SMTP/provider diagnostics.
+- Verify refresh/revisit behavior on the deployed host.
+
+Verification:
+
+- local OTP/session E2E
+- staging manual smoke with real SMTP settings
+- release evidence that excludes OTP values and provider diagnostics
+
+### P5-D Public Demo Smoke
+
+Outcome: a visitor can test the patient path and an authorized tester can test the staff path without external explanation.
+
+Implementation state:
+
+- Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, and core queue operations.
+
+Remaining evidence:
+
+- Patient smoke: OTP sign-in, geolocation-centered discovery, clinic/queue selection, check-in, active ticket state, refresh/revisit continuity, notification preferences, and readable fallback states.
+- Staff smoke: OTP sign-in, authorized site selection, call/start/complete, delay/restore, cancel, queue open/close, notification threshold, membership management, audit-log review, and role boundary checks.
+- Worker smoke: almost-ready notification generation, outbox processing, failed-job visibility, and duplicate-delivery prevention on the deployed worker.
+
+Verification:
+
+- `pnpm e2e`
+- staging manual patient/staff smoke
+- `pnpm verify:outbox`
+- `pnpm verify:ops`
+
+### P5-E Operations Evidence And Decision
+
+Outcome: staging verification, full rehearsal, backup restore-check, rollback target, safe evidence, and explicit GO/NO-GO decision are recorded.
+
+Implementation state:
+
+- `docs/release-go-no-go.md` contains the release checklist.
+- `deploy/release-evidence.sh` and `pnpm verify:release-evidence` provide a read-only evidence preflight and redacted decision-record block.
+
+Remaining evidence:
+
+- Candidate SHA, app artifact, ops bundle, checksums, and SSM command status.
+- Staging verifier and full rehearsal status.
+- Backup restore-check result.
+- Rollback target SHA, app artifact, ops bundle, and backup reference.
+- P5-A through P5-D package statuses.
+- Known risks and explicit GO/NO-GO decision.
+
+Verification:
+
+- `deploy/verify-staging.sh`
+- `deploy/staging-rehearsal.sh`
+- backup restore-check command
+- `pnpm verify:release-evidence`
+- `python3 .ai/scripts/validate_workflow.py`
+- `python3 .ai/scripts/execute.py qdoc-launch-candidate --check`
+
+## Implementation Order
+
+Use this order unless the user's latest instruction changes priority:
+
+1. P5-A Staff demo access staging/manual evidence
+2. P5-B Provider map public-browser verification
+3. P5-C First-time OTP delivery and auth/session staging verification
+4. P5-D Full public demo smoke
+5. P5-E Operations evidence and GO/NO-GO decision
+
+If staging/manual evidence reveals a product gap, fix that gap as part of the relevant package before moving forward.
+
+## Documentation Sync
+
+When a work package is completed, redefined, or blocked by a new product/operational decision, update:
+
+1. `docs/portfolio-go-work-packages.md`
+2. `.ai/docs/portfolio-go-work-packages.md`
+3. `.ai/execution/current.md`
+4. `.ai/phases/qdoc-launch-candidate/step5.md`
+5. `.ai/core/PRD.md` for user-visible product scope changes
+6. `.ai/core/ARCHITECTURE.md` for API, data, provider, deployment, or operational behavior changes
+7. `.ai/core/ADR.md` for durable decisions and trade-offs
+8. `AGENTS.md` for rules future Codex sessions must follow
+9. `docs/release-go-no-go.md` or README for tester/operator procedure changes
+
+Do not record secrets, OTP values, private logs, raw patient payloads, provider credentials, database dumps, raw connection strings, or private operational identifiers in repository-safe evidence.

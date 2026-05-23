@@ -97,7 +97,7 @@ bash deploy/portfolio-smoke-evidence.sh
 
 Use `pending`, `not_run`, or `failed` for checks that are not actually proven. Do not mark a value `passed` from local tests when the check depends on real inboxes, a public browser, provider credentials, deployed worker behavior, or staging host settings.
 
-Run the read-only public browser smoke against the deployed URL before marking P5-B or P5-D browser checks complete. Use provider strict mode only when the map provider should be live for the candidate.
+Run the read-only public browser smoke against the deployed URL before marking P5-B or P5-D browser checks complete. Use provider strict mode only when the map provider should be live for the candidate. In strict provider mode, the smoke requires granted browser geolocation, a ready provider map, at least one QDoc clinic marker, and at least one provider nearby discovery place; if the chosen coordinates have no provider results, use `QDOC_PORTFOLIO_GEO_LATITUDE` and `QDOC_PORTFOLIO_GEO_LONGITUDE` for a known service area.
 
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com \

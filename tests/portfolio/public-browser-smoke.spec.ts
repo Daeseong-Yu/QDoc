@@ -54,6 +54,10 @@ async function selectLastClinicCard(page: Page) {
   await expect(page.getByTestId("clinic-map-selected-label")).toContainText(siteName);
 }
 
+async function expectPositiveMapCount(page: Page, attribute: string, message: string) {
+  await expect(page.getByTestId("clinic-map-section"), message).toHaveAttribute(attribute, /^[1-9]\d*$/);
+}
+
 test.describe("portfolio public browser smoke", () => {
   test("loads the patient map and keeps public controls usable", async ({ page }) => {
     const failingApiResponses = collectFailingApiResponses(page);
@@ -61,7 +65,8 @@ test.describe("portfolio public browser smoke", () => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Nearby clinics" })).toBeVisible();
     await expect(page.getByText("Clinic map")).toBeVisible();
-    await expect(page.getByTestId("clinic-map-section")).toBeVisible();
+    const mapSection = page.getByTestId("clinic-map-section");
+    await expect(mapSection).toBeVisible();
     await expect(page.getByTestId("patient-refresh-button")).toBeVisible();
     await expectNoInternalCopy(page);
 
@@ -76,6 +81,15 @@ test.describe("portfolio public browser smoke", () => {
     const providerSurface = page.locator(".mapboxgl-map, .mapboxgl-canvas, .gm-style").first();
 
     if (expectProviderMap) {
+      await expect(mapSection, "strict provider smoke requires browser geolocation").toHaveAttribute("data-has-user-location", "true");
+      await expect(mapSection, "nearby provider discovery should finish before strict map assertions").toHaveAttribute(
+        "data-nearby-search-settled",
+        "true",
+      );
+      await expect(mapSection, "provider-backed map should reach ready state").toHaveAttribute("data-map-state", "ready");
+      await expectPositiveMapCount(page, "data-qdoc-site-count", "strict provider smoke requires QDoc clinic markers");
+      await expectPositiveMapCount(page, "data-provider-place-count", "strict provider smoke requires nearby provider discovery places");
+      await expectPositiveMapCount(page, "data-map-display-place-count", "strict provider smoke requires rendered map places");
       await expect(fallback, "provider-backed map should not show the fallback map").toHaveCount(0);
       await expect(providerSurface, "provider-backed map surface should render in a public browser").toBeVisible();
       await page.getByTestId("clinic-map-provider-container").hover();

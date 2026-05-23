@@ -688,7 +688,16 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
   }, [displayPlaces, mapState, selectedDisplayPlaceId]);
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" data-testid="clinic-map-section">
+    <section
+      className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+      data-has-user-location={userLocation ? "true" : "false"}
+      data-map-display-place-count={displayPlaces.length}
+      data-map-state={mapState}
+      data-nearby-search-settled={isNearbySearchSettled ? "true" : "false"}
+      data-provider-place-count={providerDisplayPlaces.length}
+      data-qdoc-site-count={siteDisplayPlaces.length}
+      data-testid="clinic-map-section"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-950">Nearby clinics</h2>

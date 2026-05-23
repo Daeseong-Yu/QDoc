@@ -332,6 +332,14 @@ async function expectLatestE2eTicketStatus(status: string) {
     .toBe(status);
 }
 
+async function expectNoRawAuthErrorCodes(page: Page) {
+  const body = page.locator("body");
+
+  await expect(body).not.toContainText("otp_delivery_unavailable");
+  await expect(body).not.toContainText("rate_limited");
+  await expect(body).not.toContainText("invalid_otp");
+}
+
 test.beforeEach(async ({ page }, testInfo) => {
   e2eEmail = getE2eEmail(testInfo);
   await page.setExtraHTTPHeaders({
@@ -343,6 +351,140 @@ test.beforeEach(async ({ page }, testInfo) => {
 test.afterAll(async () => {
   await resetMapGuardrailsAfterE2e();
   await prisma.$disconnect();
+});
+
+test("renders patient-friendly OTP errors without exposing auth error codes", async ({
+  page,
+}) => {
+  await page.route(
+    "**/api/auth/otp/request",
+    async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "otp_delivery_unavailable" }),
+      });
+    },
+    { times: 1 },
+  );
+
+  await page.goto("/");
+  await page.getByPlaceholder("you@example.com").fill(e2eEmail);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByText("We could not send a code right now. Try again later or contact the clinic.")).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
+
+  await page.route(
+    "**/api/auth/otp/request",
+    async (route) => {
+      await route.fulfill({
+        status: 429,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "rate_limited", retryAfterSeconds: 65 }),
+      });
+    },
+    { times: 1 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByText("Too many attempts. Try again in 2 minutes.")).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
+
+  await page.route(
+    "**/api/auth/otp/request",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    },
+    { times: 1 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByText("Enter the verification code sent to your email.")).toBeVisible();
+
+  await page.route(
+    "**/api/auth/otp/verify",
+    async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "invalid_otp" }),
+      });
+    },
+    { times: 1 },
+  );
+  await page.getByPlaceholder("6-digit code").fill("000000");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("Enter the latest 6-digit verification code.")).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
+});
+
+test("renders staff-friendly OTP errors without exposing auth error codes", async ({
+  page,
+}) => {
+  await page.route(
+    "**/api/auth/otp/request",
+    async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "otp_delivery_unavailable" }),
+      });
+    },
+    { times: 1 },
+  );
+
+  await page.goto("/staff");
+  await page.getByPlaceholder("Staff email").fill(e2eEmail);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByText("We could not send a code right now. Try again later or contact the clinic.")).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
+
+  await page.route(
+    "**/api/auth/otp/request",
+    async (route) => {
+      await route.fulfill({
+        status: 429,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "rate_limited", retryAfterSeconds: 45 }),
+      });
+    },
+    { times: 1 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByText("Too many attempts. Try again in 45 seconds.")).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
+
+  await page.route(
+    "**/api/auth/otp/request",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      });
+    },
+    { times: 1 },
+  );
+  await page.getByRole("button", { name: "Send code" }).click();
+  await expect(page.getByText("Enter the verification code sent to your email.")).toBeVisible();
+
+  await page.route(
+    "**/api/auth/otp/verify",
+    async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "invalid_otp" }),
+      });
+    },
+    { times: 1 },
+  );
+  await page.getByPlaceholder("6-digit code").fill("000000");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByText("Enter the latest 6-digit verification code.")).toBeVisible();
+  await expectNoRawAuthErrorCodes(page);
 });
 
 test("enforces the monthly map load guard before exposing provider usage", async ({

@@ -32,7 +32,9 @@
     "db:migrate": "dotenv -e .env -- pnpm --filter @qdoc/db db:migrate",
     "db:migrate:deploy": "pnpm --filter @qdoc/db db:migrate:deploy",
     "db:seed:staging": "env APP_ENV=staging NODE_ENV=production pnpm --filter @qdoc/db db:seed",
-    "db:seed": "dotenv -e .env -- pnpm --filter @qdoc/db db:seed"
+    "db:seed": "dotenv -e .env -- pnpm --filter @qdoc/db db:seed",
+    "db:bootstrap-staff-admins": "dotenv -e .env -- pnpm --filter @qdoc/db db:bootstrap-staff-admins",
+    "db:bootstrap-staff-admins:staging": "env APP_ENV=staging NODE_ENV=production pnpm --filter @qdoc/db db:bootstrap-staff-admins"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

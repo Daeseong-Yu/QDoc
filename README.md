@@ -81,7 +81,7 @@ Patient flow:
 Staff flow:
 
 1. Open `/staff`.
-2. Sign in with the seeded staff account.
+2. Sign in with a prepared staff/admin account. Local development may use the seeded `staff@example.com`; staging and portfolio smoke must use a real OTP-receivable email prepared by seed, staff-admin bootstrap, or membership management.
 3. Select a staffed site.
 4. Move tickets through call, start service, complete, delay, restore, or cancel actions.
 5. Each ticket state change writes `ticket_event`, `audit_log`, `notification_log`, and `outbox` records.
@@ -151,6 +151,7 @@ OTP delivery is console-based in local development. When signing in, read the ve
 Seed data:
 
 - Staff account: local defaults to `staff@example.com`. For staging, set `QDOC_SEED_STAFF_ADMIN_EMAILS` to one or more real OTP-receivable staff emails before running seed/deploy; staging seed fails closed when this is missing or uses example-domain addresses.
+- Existing staging staff bootstrap: use `deploy/bootstrap-staff-admins.sh` with `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS` to add or promote real staff/admin emails without resetting demo tickets.
 - Waterloo Clinic: `site-waterloo`, `queue-waterloo-walkin`, 19 waiting tickets
 - Kitchener Clinic: `site-kitchener`, `queue-kitchener-walkin`, 5 waiting tickets
 - Dental Clinic: `site-university`, `queue-university-walkin`, 0 waiting tickets
@@ -241,6 +242,8 @@ Staging environment variables:
 | `REDIS_URL` | yes | Internal Redis URL used for OTP rate-limit counters. |
 | `SESSION_SECRET` | yes | Long random secret; never commit the value. |
 | `QDOC_SEED_STAFF_ADMIN_EMAILS` | staging bootstrap | Comma-separated real staff/admin emails to create or upsert during approved seed/bootstrap. Local defaults to `staff@example.com`; staging requires real OTP-receivable addresses and rejects example-domain placeholders. |
+| `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS` | staff bootstrap | Comma-separated real staff/admin emails to add or promote without rerunning the full seed. The bootstrap command does not print addresses. |
+| `QDOC_BOOTSTRAP_STAFF_SITE_IDS` | staff bootstrap | Optional comma-separated site IDs for staff bootstrap. Defaults to `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` when set, otherwise all sites. |
 | `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` | no | Comma-separated clinic site IDs that `pnpm verify:admin-data` must find. Defaults are not required locally, but staging should set the launch clinic IDs. |
 | `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` | no | Comma-separated staff/admin emails that `pnpm verify:admin-data` must find as site admins. The verifier prints counts and site IDs only, not the addresses. |
 | `EMAIL_PROVIDER` | yes | Use `smtp` for staging unless console delivery is explicitly allowed. |
@@ -414,6 +417,7 @@ Portfolio smoke evidence rollup:
 
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_SMOKE_STAFF_ADMIN_DATA=passed \
 QDOC_SMOKE_STAFF_ADMIN_SIGNIN=passed \
 QDOC_SMOKE_STAFF_TESTER_AUTH=passed \
 QDOC_SMOKE_UNROSTERED_STAFF_DENIAL=passed \
@@ -437,7 +441,7 @@ QDOC_SMOKE_STRICT=true \
 bash deploy/portfolio-smoke-evidence.sh
 ```
 
-This helper is also read-only. It turns P5-A through P5-D manual smoke outcomes into the `QDOC_EVIDENCE_P5A_STATUS`, `QDOC_EVIDENCE_P5B_STATUS`, `QDOC_EVIDENCE_P5C_STATUS`, `QDOC_EVIDENCE_P5D_STATUS`, and `QDOC_EVIDENCE_MANUAL_SMOKE_STATUS` values used by the release evidence preflight. Use `pending`, `not_run`, or `failed` for anything that has not been proven in staging with real inboxes, public browser/provider behavior, and deployed worker/outbox behavior.
+This helper is also read-only. It turns P5-A through P5-D manual smoke outcomes into the `QDOC_EVIDENCE_P5A_STATUS`, `QDOC_EVIDENCE_P5B_STATUS`, `QDOC_EVIDENCE_P5C_STATUS`, `QDOC_EVIDENCE_P5D_STATUS`, and `QDOC_EVIDENCE_MANUAL_SMOKE_STATUS` values used by the release evidence preflight. Set `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after staging admin-data verification passed with the real staff/admin expectation configured. Use `pending`, `not_run`, or `failed` for anything that has not been proven in staging with real inboxes, public browser/provider behavior, and deployed worker/outbox behavior.
 
 Useful SSM and host checks:
 
@@ -462,6 +466,7 @@ Admin data operations:
 
 1. Classify the operation before changing data:
    - Seed-only: `pnpm db:seed` and `pnpm db:seed:staging` create the demo organization, clinic sites, queues, configured staff admin accounts, sample tickets, and disabled map provider guardrail rows. Use these for local or approved staging bootstrap only, not production onboarding. Set `QDOC_SEED_STAFF_ADMIN_EMAILS` to real OTP-receivable staff emails for staging; staging seed fails closed when this is missing or uses example-domain placeholders.
+   - Staff-admin bootstrap: `pnpm db:bootstrap-staff-admins`, `pnpm db:bootstrap-staff-admins:staging`, or `bash deploy/bootstrap-staff-admins.sh` adds or promotes real staff/admin emails on existing sites without resetting tickets, queues, map settings, or provider guardrail rows. The command prints counts and site IDs, not email addresses.
    - Application-supported: staff admins can manage site settings, notification threshold, queue open/closed state, site memberships, audit-log review, and notification health from `/staff`. Operators listed in `MAP_SETTINGS_ADMIN_EMAILS` can manage global map provider enablement, monthly map-load limits, monthly place-search limits, and hard-stop settings from the staff UI.
    - Database-admin-only: new production organization/site/queue creation, destructive record cleanup, direct restore, and emergency data correction require an approved DB-admin procedure or a reviewed script. Do not bypass staff authorization boundaries from the public API.
 2. After migrations and approved seed/bootstrap data are applied, sign in as a site admin, verify every launch clinic has the expected address or coordinates, set `notificationAheadCount`, confirm at least one queue exists, and confirm at least one real OTP-receivable admin membership per site.
@@ -469,6 +474,9 @@ Admin data operations:
 4. Run the admin data verifier:
 
 ```bash
+QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener pnpm db:bootstrap-staff-admins
+QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener pnpm db:bootstrap-staff-admins
+bash deploy/bootstrap-staff-admins.sh
 pnpm verify:admin-data
 QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener pnpm verify:admin-data
 QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm verify:admin-data

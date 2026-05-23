@@ -13,7 +13,8 @@
     "db:generate": "prisma generate --schema prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:bootstrap-staff-admins": "tsx prisma/bootstrap-staff-admins.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.9.0"

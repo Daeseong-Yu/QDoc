@@ -24,7 +24,7 @@ Fill this table for each release candidate. Keep the notes safe: use short summa
 
 | Package | Required proof | Current status | Evidence location |
 | --- | --- | --- | --- |
-| P5-A Staff demo access | Real OTP-receivable staff/admin access, tester authorization path, unauthorized personal email denial | Pending staging/manual proof | `<link-or-note>` |
+| P5-A Staff demo access | Real OTP-receivable staff/admin access, tester authorization path, unauthorized personal email denial | Staff-admin bootstrap utility exists locally; pending staging/manual proof | `<link-or-note>` |
 | P5-B Provider map public-browser | Geolocation-centered provider map, pan/zoom, recentering, marker/card sync, QDoc-vs-provider distinction, fail-closed states | Pending staging/manual proof | `<link-or-note>` |
 | P5-C OTP delivery and auth errors | First-time SMTP delivery, readable retry/delivery/invalid/expired states, refresh/revisit session behavior | Pending staging/manual proof | `<link-or-note>` |
 | P5-D Public demo smoke | Patient/staff/queue/notification/outbox/membership/audit-log/map path tested as a visitor/tester | Local automated extension passed; staging/manual proof pending | Local: `pnpm e2e --grep "notification preferences|notification health"` and `pnpm e2e`; staging: `<link-or-note>` |
@@ -142,6 +142,18 @@ No-go criteria:
 
 Run staging checks from `/opt/qdoc/current` or an equivalent deployment operator shell after the candidate artifact is deployed.
 
+For P5-A on an existing staging database, add or promote the real staff/admin inbox without rerunning the full seed. Run dry-run first and do not copy real email addresses into repository evidence:
+
+```bash
+cd /opt/qdoc/current
+QDOC_BOOTSTRAP_STAFF_DRY_RUN=true \
+QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" \
+bash deploy/bootstrap-staff-admins.sh
+
+QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" \
+bash deploy/bootstrap-staff-admins.sh
+```
+
 ```bash
 cd /opt/qdoc/current
 QDOC_PUBLIC_URL=https://qdoc.example.com \
@@ -228,6 +240,7 @@ Confirm these account-level and host-level items before go:
 - Host Caddy proxies the launch domain to `127.0.0.1:${QDOC_WEB_PORT}`.
 - `/opt/qdoc/shared/.env.staging` or production env contains HTTPS `APP_URL`, long `SESSION_SECRET`, SMTP settings, Redis URL, database URL, and disabled OTP debug flags.
 - `/opt/qdoc/shared/.env.staging` contains real OTP-receivable `QDOC_SEED_STAFF_ADMIN_EMAILS` and matching verification expectations when staff smoke is required.
+- If the staging database already has demo tickets or reviewed map settings, prefer `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS` plus `deploy/bootstrap-staff-admins.sh` to add or promote staff/admin access without resetting that data.
 - GitHub OIDC role, S3 bucket lifecycle, SSM document, EC2 instance profile, and environment secrets are configured in the operating account.
 - `/opt/qdoc/shared/deploy-bucket` contains only the trusted private deployment bucket name.
 - S3 contains both the app artifact and matching ops bundle for the candidate SHA.

@@ -938,8 +938,8 @@ export default function StaffPage() {
               </div>
               {currentUser && !hasStaffAccess ? (
                 <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                  <p className="font-medium text-slate-800">No staff roster match.</p>
-                  <p className="mt-1">Ask a site admin to add {currentUser.email} to a staffed location.</p>
+                  <p className="font-medium text-slate-800">Staff access is not set up for this email.</p>
+                  <p className="mt-1">Ask a site admin to add this exact email to a staffed location.</p>
                 </div>
               ) : null}
               <div className="grid gap-2">

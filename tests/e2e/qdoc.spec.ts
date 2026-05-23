@@ -1005,7 +1005,8 @@ test("explains staff access when the signed-in email is not on a staff roster", 
   await expect(page.getByRole("heading", { name: "Staff access required" })).toBeVisible();
   await expect(page.getByText(`Signed in as ${e2eEmail}`)).toBeVisible();
   await expect(page.getByText("A site admin must add this exact email before the queue board is available.")).toBeVisible();
-  await expect(page.getByText("No staff roster match.")).toBeVisible();
+  await expect(page.getByText("Staff access is not set up for this email.")).toBeVisible();
+  await expect(page.getByText("Ask a site admin to add this exact email to a staffed location.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Queue board", exact: true })).toHaveCount(0);
 });
 

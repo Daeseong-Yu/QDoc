@@ -159,6 +159,22 @@ validate_status() {
   esac
 }
 
+is_passed_status() {
+  case "$1" in
+    passed | PASS | pass) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+require_go_passed() {
+  local label="$1"
+  local value="$2"
+
+  if ! is_passed_status "$value"; then
+    record_fail "GO decision requires $label to be passed; got $value"
+  fi
+}
+
 evidence_value() {
   local value="$1"
 
@@ -289,11 +305,29 @@ validate_status "Backup restore-check" "$BACKUP_RESTORE_CHECK_STATUS"
 validate_status "Manual smoke" "$MANUAL_SMOKE_STATUS"
 
 case "$DECISION" in
-  GO | NO-GO) ;;
+  GO)
+    log "Checking GO decision requirements"
+    require_go_passed "P5-A Staff demo access" "$P5A_STATUS"
+    require_go_passed "P5-B Provider map public-browser" "$P5B_STATUS"
+    require_go_passed "P5-C OTP delivery and auth errors" "$P5C_STATUS"
+    require_go_passed "P5-D Public demo smoke" "$P5D_STATUS"
+    require_go_passed "P5-E Operations evidence" "$P5E_STATUS"
+    require_go_passed "Local checks" "$LOCAL_CHECKS_STATUS"
+    require_go_passed "Staging verifier" "$STAGING_VERIFIER_STATUS"
+    require_go_passed "Staging rehearsal" "$STAGING_REHEARSAL_STATUS"
+    require_go_passed "Backup restore-check" "$BACKUP_RESTORE_CHECK_STATUS"
+    require_go_passed "Manual smoke" "$MANUAL_SMOKE_STATUS"
+    ;;
+  NO-GO) ;;
   *)
     record_fail "QDOC_GO_NO_GO_DECISION must be GO or NO-GO"
     ;;
 esac
+
+if [ "$failures" -gt 0 ]; then
+  printf 'ERROR: release evidence preflight found %s blocking issue(s) and %s warning(s); decision block was not generated\n' "$failures" "$warnings" >&2
+  exit 1
+fi
 
 log "Safe decision record block"
 if ! is_true "$PRIVATE_OUTPUT"; then
@@ -328,11 +362,6 @@ Rollback backup path: $(redacted_path "$ROLLBACK_BACKUP_PATH")
 Operator: $(redacted_value "$OPERATOR")
 Decision time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')
 EOF
-
-if [ "$failures" -gt 0 ]; then
-  printf 'ERROR: release evidence preflight found %s blocking issue(s) and %s warning(s)\n' "$failures" "$warnings" >&2
-  exit 1
-fi
 
 if [ "$warnings" -gt 0 ]; then
   printf 'Release evidence preflight completed with %s warning(s); use QDOC_EVIDENCE_STRICT=true for final GO evidence.\n' "$warnings" >&2

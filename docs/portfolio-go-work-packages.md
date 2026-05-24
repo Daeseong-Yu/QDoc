@@ -64,6 +64,8 @@ Latest documentation-fill refresh: the active P5 board is still launch-candidate
 
 Latest documentation-fill instruction: treat the "what remains before GO" list below as the complete portfolio product-completion backlog for documented QDoc flows, not as a narrow launch checklist or next-step-only plan. If a future session discovers that a visible tester-facing feature is non-responsive, placeholder-only, dependent on hidden setup, or local-only, update the owning P5 package here and in the `.ai` active state before continuing implementation or evidence collection.
 
+Current documentation-fill checkpoint: this handoff, its `.ai/docs` mirror, `.ai/execution/current.md`, `.ai/phases/qdoc-launch-candidate/step5.md`, `.ai/core`, `docs/release-go-no-go.md`, README, and `AGENTS.md` now carry the same Step 5 interpretation. Use this file for package definitions and status boundaries; use the active `.ai` files for the latest execution state; use the release checklist for evidence fields; use `AGENTS.md` only for future-session rules. Do not store real tester emails, candidate-only logs, provider identifiers, private host paths, or one-off command output here.
+
 ## Execution Boundaries
 
 Use these packages as the implementation, verification, and commit-unit boundaries for the rest of Step 5. Keep three states separate for each package:

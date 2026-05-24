@@ -227,7 +227,7 @@ Host networking:
 ```
 
 - Compose: `compose.staging.yaml` publishes only `web` to `127.0.0.1:${QDOC_WEB_PORT}`. API, PostgreSQL, Redis, worker, migrate, and seed remain on the private Docker network.
-- Environment: set `APP_DOMAIN`, `APP_URL`, `QDOC_APP_IMAGE`, `QDOC_WEB_BIND=127.0.0.1`, `QDOC_WEB_PORT`, SMTP credentials, `SESSION_SECRET`, `QDOC_DB_SECRET`, and a matching `DATABASE_URL` in `/opt/qdoc/shared/.env.staging`.
+- Environment: set `APP_DOMAIN`, `APP_URL`, `QDOC_WEB_BIND=127.0.0.1`, `QDOC_WEB_PORT`, SMTP credentials, `SESSION_SECRET`, `QDOC_DB_SECRET`, and a matching `DATABASE_URL` in `/opt/qdoc/shared/.env.staging`. `QDOC_APP_IMAGE` is required by Compose, but the shared env file may keep the safe placeholder from `.env.staging.example` when deployments and rehearsals pass the candidate image through the command environment.
 
 Staging environment variables:
 
@@ -236,7 +236,7 @@ Staging environment variables:
 | `APP_DOMAIN` | yes | Public hostname served by host Caddy. |
 | `APP_URL` | yes | Public origin, for example `https://qdoc.example.com`. |
 | `APP_ENV` | yes | Use `staging` for staging. |
-| `QDOC_APP_IMAGE` | yes | Docker image tag loaded from the S3 artifact, normally `qdoc-app:<git-sha>`. |
+| `QDOC_APP_IMAGE` | yes for Compose | Docker image tag loaded from the S3 artifact, normally `qdoc-app:<git-sha>`. `/opt/qdoc/shared/.env.staging` may keep `qdoc-app:replace-with-git-sha`; deploy and rehearsal scripts export the actual candidate image. Raw `docker compose` commands must pass `QDOC_APP_IMAGE=qdoc-app:<git-sha>` or use an env file with the real tag. |
 | `QDOC_RELEASE_SHA` | no | Exported by deploy/rehearsal scripts from the 40-character image tag so `/api/release` can prove which candidate the public URL is serving. |
 | `QDOC_WEB_BIND` | yes | Must remain `127.0.0.1`; the deploy script rejects public binds. |
 | `QDOC_WEB_PORT` | yes | Host loopback port Caddy proxies to, for example `13000`. |
@@ -390,6 +390,8 @@ QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_REHEARSAL_LOAD_DRILLS=true bash de
 ```
 
 The rehearsal validates the Compose configuration, optional release-directory SHA, optional app image tag, public route requirement, full staging verifier, outbox verification, operational checks, launch hardening checks, and safe email delivery readiness checks. When `QDOC_REHEARSAL_BACKUP=true`, it also creates a PostgreSQL custom-format backup and restores it into a temporary database through `deploy/db-restore-check.sh`; it never restores the primary database. When `QDOC_REHEARSAL_LOAD_DRILLS=true`, it also runs the bounded load/failure drill script after the main verifier.
+
+Use the 40-character candidate Git SHA in both `QDOC_EXPECTED_RELEASE_SHA` and `QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha>`. The literal `<git-sha>` placeholder is never valid. The rehearsal script exports `QDOC_APP_IMAGE` from `QDOC_EXPECTED_APP_IMAGE`, so the shared staging env file does not need to be edited for each release.
 
 For local command validation without running staging containers:
 

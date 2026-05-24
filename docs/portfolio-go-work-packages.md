@@ -58,6 +58,8 @@ Latest documentation-fill result: the newly defined work is filled into `.ai/cor
 
 Latest documentation refresh: this board is already filled into the required `.ai` and operator documents. Choose the next task from the package status snapshot below, not from chat history. Public/staging evidence remains pending until the candidate is pushed, staging deploy succeeds, and `/api/release` matches `git rev-parse HEAD`; until then, work only on local implementation or documentation that reduces the first open P5 blocker.
 
+Latest local verification note: the required documents are synchronized, but the latest full local `pnpm e2e` run is not green. It ended with one P5-B mobile failure in `tests/e2e/qdoc.spec.ts` where Refresh did not recover from a first provider SDK script-load failure to a provider map surface. Treat this as an active local P5-B verification gap before using full E2E as release evidence.
+
 ## Execution Boundaries
 
 Use these packages as the implementation, verification, and commit-unit boundaries for the rest of Step 5. Keep three states separate for each package:
@@ -179,6 +181,7 @@ Implementation state:
 - Disabled-provider fallback now supports visible marker selection, app-level pan controls, zoom controls, current-location recentering, and patient-readable copy so the fail-closed state is still usable during local or guarded verification.
 - Local E2E uses a stubbed provider SDK/cache path, including a first-load script failure retry case and app-level provider pan proof, to avoid paid provider traffic.
 - Latest P5-B implementation update: observable local pan proof now exists for both the provider-backed map path and the disabled-provider fallback path. This closes the local render/zoom/recenter-only gap, but P5-B still remains open for `GO` until staging proves public-browser provider behavior, provider restrictions, and cost controls.
+- Latest P5-B verification gap: full local E2E currently has one mobile failure in the provider SDK failed-load recovery case. Keep P5-B open for local fix/verification plus staging/public proof.
 - Public release preflight is available through `pnpm verify:public-release`. It is read-only, checks only `/api/health` and `/api/release`, and should run before `pnpm e2e:portfolio` when public evidence must prove the deployed URL is serving the expected candidate SHA.
 - Public browser Playwright smoke is available through `pnpm e2e:portfolio`. It is read-only, requires `QDOC_PUBLIC_URL` or `QDOC_PORTFOLIO_BASE_URL`, and can fail early on stale public deployments with `QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<40-character-git-sha>` by comparing the safe `/api/release` identity endpoint. It can require provider-backed map behavior with `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true`. Strict provider mode now fails unless browser geolocation is available, the provider map reaches ready state, at least one QDoc clinic marker is present, at least one provider nearby discovery place is rendered, and the app-level pan, zoom, and current-location recenter controls call the live provider map. The smoke also asserts patient OTP-entry surface visibility, clinic-card/marker selected-state feedback, and fallback pan/zoom/recenter viewport changes so a map that renders but does not respond to interaction remains a blocker.
 

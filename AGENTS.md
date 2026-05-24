@@ -85,6 +85,7 @@ Do not start a new phase for this board. Keep it in the active launch-candidate 
 - Keep operator-facing verification and GO/NO-GO evidence procedures in `docs/release-go-no-go.md`.
 - Keep README as the public developer/operator summary of the active portfolio gate, linking to the package handoff and release checklist instead of duplicating volatile evidence.
 - Keep `AGENTS.md` focused on future-session rules, not volatile release evidence or one-off command results.
+- When local or staging verification reveals a new P5 regression, update the active `.ai` status and package handoff before continuing; do not use older passing notes as evidence for the affected package.
 
 - Treat the portfolio site as a user-testable product surface for the documented QDoc flows. Before `GO`, the currently documented patient, staff, map, OTP, queue, notification/outbox, refresh/revisit, membership, audit-log, backup, rollback, and staging verification paths must work well enough for normal tester use; do not rely on "MVP only" reasoning to defer one of those documented paths.
 - When the user says the site must be complete for portfolio testing, interpret that as documented portfolio-flow completion, not future-roadmap completion. SMS, push, EMR/EHR, real travel-time estimates, multi-department operations, and a full clinic marketplace remain out of scope unless explicitly approved.

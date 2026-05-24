@@ -46,6 +46,8 @@ Do not close a package for `GO` from local tests alone when the behavior depends
 - backup restore-checks
 - rollback artifacts
 
+Latest documentation-sync rule: when the work board changes, update this file for package-level handoff, `.ai/docs/portfolio-go-work-packages.md` as its local mirror, `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md` for active status, `.ai/core` for durable product or architecture decisions, `docs/release-go-no-go.md` for operator evidence procedures, and `AGENTS.md` only for future-session rules. Do not start a new phase or move the work out of Step 5 unless the user explicitly changes that direction.
+
 ## Execution Boundaries
 
 Use these packages as the implementation, verification, and commit-unit boundaries for the rest of Step 5. Keep three states separate for each package:

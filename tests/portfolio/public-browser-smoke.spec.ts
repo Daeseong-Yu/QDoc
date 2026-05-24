@@ -217,6 +217,7 @@ test.describe("portfolio public browser smoke", () => {
     await expect(page.getByRole("heading", { name: "Staff queue board" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Staff session" })).toBeVisible();
     await expect(page.getByText("Sign in with email OTP.")).toBeVisible();
+    await expect(page.getByText("Use the staff or admin email added to a site roster.")).toBeVisible();
     await expect(page.getByPlaceholder("Staff email")).toBeVisible();
     await expect(page.getByRole("button", { name: "Send code" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Refresh" })).toBeDisabled();

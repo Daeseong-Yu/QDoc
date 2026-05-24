@@ -70,6 +70,11 @@ async function expectNoInternalCopy(page: Page) {
   }
 }
 
+async function expectPatientSignInSurface(page: Page) {
+  await expect(page.getByPlaceholder("you@example.com"), "patient email OTP input should be reachable without developer help").toBeVisible();
+  await expect(page.getByRole("button", { name: "Send code" }), "patient OTP send control should be visible but not clicked by public smoke").toBeVisible();
+}
+
 async function selectLastClinicCard(page: Page) {
   const cards = page.getByTestId("clinic-site-card");
   await expect(cards.first()).toBeVisible();
@@ -131,6 +136,7 @@ test.describe("portfolio public browser smoke", () => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Nearby clinics" })).toBeVisible();
     await expect(page.getByText("Clinic map")).toBeVisible();
+    await expectPatientSignInSurface(page);
     const mapSection = page.getByTestId("clinic-map-section");
     await expect(mapSection).toBeVisible();
     await expect(page.getByTestId("patient-refresh-button")).toBeVisible();

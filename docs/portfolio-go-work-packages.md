@@ -158,6 +158,7 @@ Implementation state:
 
 - Local provider map interaction is implemented.
 - Marker/card synchronization, accessible selected-state feedback, current-location recentering, Refresh-triggered provider retry, and hidden internal guardrail copy are covered locally.
+- Staff map-budget availability status renders human-readable labels instead of raw provider availability enum values.
 - Disabled-provider fallback now supports visible marker selection, zoom controls, current-location recentering, and patient-readable copy so the fail-closed state is still usable during local or guarded verification.
 - Local E2E uses a stubbed provider SDK/cache path to avoid paid provider traffic.
 - Public release preflight is available through `pnpm verify:public-release`. It is read-only, checks only `/api/health` and `/api/release`, and should run before `pnpm e2e:portfolio` when public evidence must prove the deployed URL is serving the expected candidate SHA.
@@ -218,7 +219,7 @@ Implementation state:
 
 - Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, core queue operations, membership role update/delete, membership audit-log visibility, and last-admin protection.
 - Read-only public release preflight catches healthy-but-stale public deployments before browser smoke, so P5-D evidence is not collected against an old artifact.
-- Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, marker selection, selected-state feedback, map fallback/provider surface expectations, `/staff` sign-in surface reachability, and absence of raw internal errors in the public UI. It does not request OTPs or prove staff authorization.
+- Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, marker selection, selected-state feedback, map fallback/provider surface expectations, `/staff` sign-in surface reachability, and absence of raw internal errors or raw provider availability enum tokens in the public UI. It does not request OTPs or prove staff authorization.
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`.
 
 Remaining evidence:

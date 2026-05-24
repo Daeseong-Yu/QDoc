@@ -146,6 +146,13 @@ const emptyStatusMessages: Record<TicketStatus, string> = {
   cancelled: "No cancelled tickets.",
 };
 
+const mapAvailabilityLabels: Record<StaffMapSettingsResponse["reason"], string> = {
+  available: "Ready to load public maps",
+  provider_disabled: "Provider disabled",
+  token_missing: "Public token missing",
+  budget_exhausted: "Monthly budget exhausted",
+};
+
 async function readApiResponse<T>(response: Response, schema: z.ZodSchema<T>) {
   const data: unknown = await response.json();
 
@@ -1386,7 +1393,7 @@ export default function StaffPage() {
                               <p className="text-sm text-slate-600">
                                 Loads {ops.mapSettings.usedMapLoads} used / {ops.mapSettings.remainingMapLoads} remaining · Searches{" "}
                                 {ops.mapSettings.usedPlacesSearches} used / {ops.mapSettings.remainingPlacesSearches} remaining ·{" "}
-                                {ops.mapSettings.reason}
+                                Status: {mapAvailabilityLabels[ops.mapSettings.reason]}
                               </p>
                             ) : null}
                             <button

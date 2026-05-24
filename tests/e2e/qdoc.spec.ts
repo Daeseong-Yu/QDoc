@@ -1072,6 +1072,28 @@ test("lets an admin add a staff tester through membership management", async ({
   await expect(page.getByRole("heading", { name: "Map budget" })).toHaveCount(0);
 });
 
+test("renders staff map budget status without exposing raw availability reasons", async ({
+  page,
+}) => {
+  e2eEmail = "e2e.staff@example.com";
+  await resetE2eData();
+
+  await page.goto("/staff");
+  await signIn(page, "Staff email");
+  await expect(
+    page.getByRole("heading", { name: "Staff queue board" }),
+  ).toBeVisible();
+  await selectE2eSite(page);
+
+  const mapBudgetSection = page.getByRole("heading", { name: "Map budget" }).locator("../..");
+  await expect(mapBudgetSection).toBeVisible();
+  await expect(mapBudgetSection).toContainText("Status: Ready to load public maps");
+  await expect(mapBudgetSection).not.toContainText("available");
+  await expect(mapBudgetSection).not.toContainText("provider_disabled");
+  await expect(mapBudgetSection).not.toContainText("token_missing");
+  await expect(mapBudgetSection).not.toContainText("budget_exhausted");
+});
+
 test("lets admins update memberships while preserving one site admin", async ({
   page,
 }, testInfo) => {

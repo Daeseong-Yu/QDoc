@@ -180,6 +180,7 @@ pnpm verify:ops
 pnpm verify:admin-data
 pnpm verify:launch
 pnpm verify:email
+pnpm verify:portfolio-smoke:self-test
 pnpm verify:release-evidence:self-test
 pnpm e2e
 ```
@@ -195,6 +196,8 @@ pnpm e2e
 `pnpm verify:email` prints safe email-delivery readiness JSON for OTP and worker delivery gates. It distinguishes API OTP delivery policy, worker provider policy, SMTP config shape, placeholder SMTP values, and optional SMTP transport connectivity without sending an email or printing SMTP host, username, password, sender, provider diagnostics, OTP values, or recipient addresses. Set `QDOC_VERIFY_SMTP_CONNECTIVITY=true` only when the environment is allowed to make a live SMTP `verify()` connection; this checks connectivity/authentication but still does not prove inbox receipt, so P5-C staging smoke must include a real first-time OTP request.
 
 `pnpm verify:portfolio-smoke` rolls manually observed P5-A through P5-D staging smoke outcomes into safe release-evidence status exports. For P5-A, set `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after `pnpm verify:admin-data` or `QDOC_VERIFY_ADMIN_DATA=true bash deploy/verify-staging.sh` passes with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` configured for the real staff/admin inbox. The helper does not print the email address and does not contact staging by itself.
+
+`pnpm verify:portfolio-smoke:self-test` exercises the smoke rollup with fake public URLs and status values only. It proves that pending evidence remains pending, strict mode blocks skipped checks, older coarse P5-A status sets cannot pass, invalid status values fail, and fully passed P5-A through P5-D inputs produce passed release-evidence exports without revealing the public URL by default.
 
 `pnpm verify:release-evidence:self-test` exercises the release evidence guard with fake identifiers only. It proves that a `GO` decision cannot be generated with pending P5 or evidence statuses, that a `NO-GO` record can still be produced with warnings, and that private S3 bucket names and backup paths stay redacted in the generated block.
 

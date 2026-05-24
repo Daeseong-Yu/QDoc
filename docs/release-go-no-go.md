@@ -75,6 +75,12 @@ When changing the release evidence guard, run the local self-test before relying
 pnpm verify:release-evidence:self-test
 ```
 
+When changing the portfolio smoke rollup, run its local self-test before relying on package status exports. It uses fake status values and does not call AWS, Docker, SMTP, map providers, the public site, or the database.
+
+```bash
+pnpm verify:portfolio-smoke:self-test
+```
+
 Before setting the P5-A through P5-D status variables, use the portfolio smoke helper to roll up the manual browser/inbox checks into package statuses. The helper is read-only and does not call AWS, Docker, SMTP, map providers, or the public site. It validates the status values you provide and prints export lines for `deploy/release-evidence.sh`.
 
 ```bash
@@ -144,6 +150,7 @@ pnpm verify:outbox
 pnpm verify:ops
 pnpm verify:launch
 pnpm verify:email
+pnpm verify:portfolio-smoke:self-test
 pnpm verify:release-evidence:self-test
 pnpm e2e
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_RELEASE_SHA=<git-sha> pnpm verify:public-release

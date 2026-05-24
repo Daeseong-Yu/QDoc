@@ -201,6 +201,7 @@ pnpm verify:admin-data
 pnpm verify:launch
 pnpm verify:email
 pnpm verify:portfolio-smoke
+pnpm verify:portfolio-smoke:self-test
 pnpm verify:release-evidence
 pnpm verify:release-evidence:self-test
 QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm db:bootstrap-staff-admins

@@ -75,38 +75,64 @@ async function expectPatientSignInSurface(page: Page) {
   await expect(page.getByRole("button", { name: "Send code" }), "patient OTP send control should be visible but not clicked by public smoke").toBeVisible();
 }
 
-async function selectLastClinicCard(page: Page) {
+async function selectClinicCardByIndex(page: Page, index: number) {
   const cards = page.getByTestId("clinic-site-card");
   await expect(cards.first()).toBeVisible();
 
   const count = await cards.count();
-  const target = cards.nth(Math.max(0, count - 1));
+  const targetIndex = index < 0 ? Math.max(0, count + index) : Math.min(index, count - 1);
+  const target = cards.nth(targetIndex);
   const heading = target.locator("h2").first();
   const siteName = (await heading.innerText()).trim();
 
   await target.click();
   await expect(target).toHaveAttribute("data-selected", "true");
   await expect(page.getByTestId("clinic-map-selected-label")).toContainText(siteName);
+
+  return { count, siteName };
 }
 
-async function selectVisibleMapMarker(page: Page) {
-  const markerButtons = page.locator('[data-testid="qdoc-map-marker"], [data-testid="provider-map-marker"]');
-  const count = await markerButtons.count();
+async function selectQdocMapMarker(page: Page) {
+  const markers = page.getByTestId("qdoc-map-marker");
+  const target = markers.first();
+
+  await expect(target, "public smoke requires a clickable QDoc clinic marker").toBeVisible();
+
+  const markerLabel = (await target.getAttribute("aria-label"))?.replace(/^Select\s+/, "").trim();
+  expect(markerLabel, "QDoc clinic marker should expose a selectable place label").toBeTruthy();
+
+  await target.click();
+  await expect(target).toHaveAttribute("data-selected", "true");
+  await expect(page.getByTestId("clinic-map-selected-label")).toContainText(markerLabel);
+  await expect(page.locator('[data-testid="clinic-site-card"][data-selected="true"] h2')).toContainText(markerLabel);
+
+  return markerLabel;
+}
+
+async function selectProviderMapMarker(page: Page, required = false) {
+  const markers = page.getByTestId("provider-map-marker");
+  const count = await markers.count();
 
   if (count === 0) {
-    return;
+    if (required) {
+      await expect(markers.first(), "strict provider smoke requires a clickable provider discovery marker").toBeVisible();
+    }
+    return null;
   }
 
-  const target = markerButtons.nth(count - 1);
+  const target = markers.first();
   const markerLabel = (await target.getAttribute("aria-label"))?.replace(/^Select\s+/, "").trim();
 
   await target.click();
+  await expect(target).toHaveAttribute("data-selected", "true");
 
-  if (markerLabel) {
-    await expect(page.getByTestId("clinic-map-selected-label")).toContainText(markerLabel);
+  if (!markerLabel) {
+    expect(required, "provider marker should expose a selectable place label in strict provider smoke").toBe(false);
+    return null;
   }
 
-  await expect(target).toHaveAttribute("data-selected", "true");
+  await expect(page.getByTestId("clinic-map-selected-label")).toContainText(markerLabel);
+  return markerLabel;
 }
 
 async function expectPositiveMapCount(page: Page, attribute: string, message: string) {
@@ -146,7 +172,7 @@ test.describe("portfolio public browser smoke", () => {
     await expect(page.getByRole("heading", { name: "Nearby clinics" })).toBeVisible();
     await expectNoInternalCopy(page);
 
-    await selectLastClinicCard(page);
+    await selectClinicCardByIndex(page, -1);
     await expectNoInternalCopy(page);
 
     const fallback = page.getByTestId("clinic-map-fallback");
@@ -164,6 +190,8 @@ test.describe("portfolio public browser smoke", () => {
       await expectPositiveMapCount(page, "data-map-display-place-count", "strict provider smoke requires rendered map places");
       await expect(fallback, "provider-backed map should not show the fallback map").toHaveCount(0);
       await expect(providerSurface, "provider-backed map surface should render in a public browser").toBeVisible();
+      await expect(page.getByTestId("qdoc-map-marker").first(), "strict provider smoke requires a clickable QDoc clinic marker").toBeVisible();
+      await expect(page.getByTestId("provider-map-marker").first(), "strict provider smoke requires a clickable provider discovery marker").toBeVisible();
       await page.getByTestId("clinic-map-provider-container").hover();
       await page.mouse.wheel(0, -300);
       await expect(page.getByTestId("clinic-map-provider-pan-right")).toBeVisible();
@@ -235,7 +263,13 @@ test.describe("portfolio public browser smoke", () => {
       }
     }
 
-    await selectVisibleMapMarker(page);
+    await selectQdocMapMarker(page);
+    const providerMarkerLabel = await selectProviderMapMarker(page, expectProviderMap);
+    if (providerMarkerLabel) {
+      const clinicSelection = await selectClinicCardByIndex(page, 0);
+      await expect(page.getByTestId("clinic-map-selected-label")).toContainText(clinicSelection.siteName);
+      await expect(page.locator('[data-testid="provider-map-marker"][data-selected="true"]')).toHaveCount(0);
+    }
 
     expect.soft(failingApiResponses, "same-origin API calls should not return 5xx responses").toEqual([]);
   });

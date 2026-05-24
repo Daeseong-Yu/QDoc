@@ -137,7 +137,7 @@ QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true \
 pnpm e2e:portfolio
 ```
 
-This public browser smoke first compares the expected 40-character candidate SHA with `/api/release`, then checks the patient page, patient OTP-entry surface, map controls including pan/zoom/recenter, Refresh/site-selection behavior, marker selected-state feedback, `/staff` sign-in surface plus roster guidance, and absence of raw internal API/error tokens without database writes or OTP requests. It does not replace first-time inbox delivery, staff authorization, queue operation, worker/outbox, backup, or rollback evidence.
+This public browser smoke first compares the expected 40-character candidate SHA with `/api/release`, then checks the patient page, patient OTP-entry surface, map controls including pan/zoom/recenter, Refresh/site-selection behavior, marker selected-state feedback, QDoc marker-to-card synchronization, provider marker selection and clinic reselection recovery, `/staff` sign-in surface plus roster guidance, and absence of raw internal API/error tokens without database writes or OTP requests. It does not replace first-time inbox delivery, staff authorization, queue operation, worker/outbox, backup, or rollback evidence.
 
 ## Local Required Checks
 

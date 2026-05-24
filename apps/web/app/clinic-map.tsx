@@ -144,17 +144,26 @@ function loadScript(id: string, src: string) {
   const promise = new Promise<void>((resolve, reject) => {
     const currentScript = document.getElementById(id) as HTMLScriptElement | null;
 
-    if (currentScript) {
+    if (currentScript?.dataset.qdocLoaded === "true") {
       resolve();
       return;
     }
+
+    currentScript?.remove();
 
     const script = document.createElement("script");
     script.id = id;
     script.src = src;
     script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("map_script_load_failed"));
+    script.onload = () => {
+      script.dataset.qdocLoaded = "true";
+      resolve();
+    };
+    script.onerror = () => {
+      scriptLoads.delete(id);
+      script.remove();
+      reject(new Error("map_script_load_failed"));
+    };
     document.head.appendChild(script);
   });
 

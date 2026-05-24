@@ -87,14 +87,21 @@ function getMapSearchQueryKey(provider: "mapbox", latitude: number, longitude: n
     .digest("hex");
 }
 
-async function installMapboxStub(page: Page) {
+async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: boolean } = {}) {
   await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css", async (route) => {
     await route.fulfill({
       contentType: "text/css",
       body: ".mapboxgl-map{position:absolute;inset:0}",
     });
   });
+  let shouldFailScriptLoad = options.failFirstScriptLoad ?? false;
   await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js", async (route) => {
+    if (shouldFailScriptLoad) {
+      shouldFailScriptLoad = false;
+      await route.abort("failed");
+      return;
+    }
+
     await route.fulfill({
       contentType: "application/javascript",
       body: `
@@ -919,6 +926,80 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
   await expect(page.getByText("1 E2E Way, Waterloo, ON").first()).toBeVisible();
   await expect.poll(() => nearbyHealthcareRequests).toBeGreaterThanOrEqual(2);
   await expect.poll(() => mapConfigRequests).toBeGreaterThanOrEqual(2);
+});
+
+test("retries provider map SDK loading after a failed script request", async ({
+  page,
+  context,
+}) => {
+  await prisma.mapProviderConfig.update({
+    where: { provider: "mapbox" },
+    data: {
+      isEnabled: true,
+      monthlyMapLoadLimit: 5,
+      monthlyPlacesSearchLimit: 0,
+      hardStopEnabled: true,
+    },
+  });
+  await prisma.mapSearchCache.upsert({
+    where: {
+      provider_queryKey: {
+        provider: "mapbox",
+        queryKey: getMapSearchQueryKey("mapbox", 43.465, -80.522, 5000),
+      },
+    },
+    update: {
+      responseJson: [
+        {
+          id: "mapbox:e2e-provider-care",
+          providerPlaceId: "e2e-provider-care",
+          name: "Provider Urgent Care",
+          address: "2 Provider Way, Waterloo, ON",
+          latitude: 43.466,
+          longitude: -80.523,
+          qdocSiteId: null,
+        },
+      ],
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    },
+    create: {
+      provider: "mapbox",
+      queryKey: getMapSearchQueryKey("mapbox", 43.465, -80.522, 5000),
+      responseJson: [
+        {
+          id: "mapbox:e2e-provider-care",
+          providerPlaceId: "e2e-provider-care",
+          name: "Provider Urgent Care",
+          address: "2 Provider Way, Waterloo, ON",
+          latitude: 43.466,
+          longitude: -80.523,
+          qdocSiteId: null,
+        },
+      ],
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    },
+  });
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({
+    latitude: 43.465,
+    longitude: -80.522,
+  });
+  await installMapboxStub(page, { failFirstScriptLoad: true });
+
+  let scriptRequests = 0;
+  page.on("request", (request) => {
+    if (request.url() === "https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js") {
+      scriptRequests += 1;
+    }
+  });
+
+  await page.goto("/");
+  await expect(page.getByTestId("clinic-map-fallback")).toBeVisible();
+  await expect(page.getByTestId("mapbox-surface")).toHaveCount(0);
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.getByTestId("mapbox-surface")).toBeVisible();
+  await expect(page.getByLabel("Select Provider Urgent Care")).toBeVisible();
+  await expect.poll(() => scriptRequests).toBeGreaterThanOrEqual(2);
 });
 
 test("lets staff close a queue and blocks patient check-ins", async ({

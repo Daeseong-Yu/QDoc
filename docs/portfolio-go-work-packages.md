@@ -159,10 +159,10 @@ Outcome: the public patient map behaves like an interactive provider-backed map 
 Implementation state:
 
 - Local provider map interaction is implemented.
-- Marker/card synchronization, accessible selected-state feedback, current-location recentering, Refresh-triggered provider retry, and hidden internal guardrail copy are covered locally.
+- Marker/card synchronization, accessible selected-state feedback, current-location recentering, Refresh-triggered provider retry, failed provider SDK load recovery, and hidden internal guardrail copy are covered locally.
 - Staff map-budget availability status renders human-readable labels instead of raw provider availability enum values.
 - Disabled-provider fallback now supports visible marker selection, zoom controls, current-location recentering, and patient-readable copy so the fail-closed state is still usable during local or guarded verification.
-- Local E2E uses a stubbed provider SDK/cache path to avoid paid provider traffic.
+- Local E2E uses a stubbed provider SDK/cache path, including a first-load script failure retry case, to avoid paid provider traffic.
 - Public release preflight is available through `pnpm verify:public-release`. It is read-only, checks only `/api/health` and `/api/release`, and should run before `pnpm e2e:portfolio` when public evidence must prove the deployed URL is serving the expected candidate SHA.
 - Public browser Playwright smoke is available through `pnpm e2e:portfolio`. It is read-only, requires `QDOC_PUBLIC_URL` or `QDOC_PORTFOLIO_BASE_URL`, and can fail early on stale public deployments with `QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<40-character-git-sha>` by comparing the safe `/api/release` identity endpoint. It can require provider-backed map behavior with `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true`. Strict provider mode now fails unless browser geolocation is available, the provider map reaches ready state, at least one QDoc clinic marker is present, at least one provider nearby discovery place is rendered, and the app-level current-location recenter control calls the live provider map. The smoke also asserts clinic-card/marker selected-state feedback and fallback zoom/recenter viewport changes so a map that renders but does not respond to interaction remains a blocker.
 

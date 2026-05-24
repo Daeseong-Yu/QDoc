@@ -29,7 +29,7 @@ Fill this table for each release candidate. Keep the notes safe: use short summa
 | P5-A Staff demo access | Real OTP-receivable staff/admin access, tester authorization path, unauthorized personal email denial | Staff-admin bootstrap utility exists locally; pending staging/manual proof | `<link-or-note>` |
 | P5-B Provider map public-browser | Geolocation-centered provider map, pan/zoom, recentering, marker/card sync, QDoc-vs-provider distinction, fail-closed states | Pending staging/manual proof | `<link-or-note>` |
 | P5-C OTP delivery and auth errors | First-time SMTP delivery, readable retry/delivery/invalid/expired states, refresh/revisit session behavior | Pending staging/manual proof | `<link-or-note>` |
-| P5-D Public demo smoke | Patient/staff/queue/notification/outbox/membership/audit-log/map path tested as a visitor/tester | Local automated extension passed; staging/manual proof pending | Local: `pnpm e2e --grep "notification preferences|notification health"` and `pnpm e2e`; staging: `<link-or-note>` |
+| P5-D Public demo smoke | Patient/staff/queue/notification/outbox/membership/audit-log/map path tested as a visitor/tester | Local automated coverage and smoke-evidence rollup helper exist; staging/manual proof pending | Local: `pnpm e2e`, `pnpm e2e:portfolio`, and `pnpm verify:portfolio-smoke`; staging: `<link-or-note>` |
 | P5-E Operations evidence | Staging verifier, full rehearsal, backup restore-check, rollback target, GO/NO-GO decision | Pending staging/manual proof | `<link-or-note>` |
 
 ## Release Identity

@@ -27,6 +27,7 @@
     "verify:release-evidence": "bash deploy/release-evidence.sh",
     "verify:release-evidence:self-test": "bash deploy/release-evidence.self-test.sh",
     "portfolio:evidence-commands": "bash deploy/portfolio-evidence-commands.sh",
+    "portfolio:evidence-commands:self-test": "bash deploy/portfolio-evidence-commands.self-test.sh",
     "verify:staging": "bash deploy/verify-staging.sh",
     "verify:staging:rehearsal": "bash deploy/staging-rehearsal.sh",
     "build": "turbo run build",

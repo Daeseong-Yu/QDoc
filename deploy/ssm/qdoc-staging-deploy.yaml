@@ -95,8 +95,11 @@ mainSteps:
                 deploy/db-restore.sh | \
                 deploy/deploy-from-s3.sh | \
                 deploy/load-failure-drills.sh | \
+                deploy/portfolio-evidence-commands.self-test.sh | \
                 deploy/portfolio-evidence-commands.sh | \
+                deploy/portfolio-smoke-evidence.self-test.sh | \
                 deploy/portfolio-smoke-evidence.sh | \
+                deploy/release-evidence.self-test.sh | \
                 deploy/release-evidence.sh | \
                 deploy/staging-rehearsal.sh | \
                 deploy/verify-public-release.mjs | \

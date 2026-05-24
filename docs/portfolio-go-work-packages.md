@@ -133,7 +133,7 @@ This snapshot separates local implementation from the staging/manual evidence st
 | P5-B Provider map public-browser verification | Provider and fallback map interaction paths are implemented and locally green for provider SDK retry, app-level pan/zoom/recenter, marker/card sync, active QDoc site layering, selected-state feedback, hidden guardrail copy, and disabled-provider fallback coverage. | Verify real provider credentials/restrictions, QDoc cost limits, browser geolocation, provider discovery, public-browser pan/drag behavior, and fail-closed states. | No |
 | P5-C OTP delivery and auth error usability | Readable delivery/rate-limit/invalid/expired/unauthorized states, configurable OTP limits, email-readiness verifier, and session refresh/revisit coverage exist locally. | First-time staging OTP delivery for patient and staff, deployed email verifier, real inbox receipt, and deployed refresh/revisit proof. | No |
 | P5-D Public demo smoke | Local Playwright covers patient/staff core paths, queue operations, membership, audit logs, notification preference, outbox creation/failure visibility, duplicate prevention, and a tester-facing smoke guide now exists. | Full visitor-style patient smoke, authorized staff smoke, deployed worker/outbox proof, and public smoke against the current deployed SHA. | No |
-| P5-E Operations evidence and decision | Release checklist, smoke rollup, release evidence preflight, public release preflight, and self-tests exist locally. | Staging verifier, full rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and explicit GO/NO-GO decision. | No |
+| P5-E Operations evidence and decision | Release checklist, smoke rollup, release evidence preflight, public release preflight, command-plan helper, and self-tests exist locally. | Staging verifier, full rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and explicit GO/NO-GO decision. | No |
 
 ## Portfolio Tester Completion Matrix
 
@@ -294,6 +294,8 @@ Implementation state:
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide the manual P5-A through P5-D smoke status rollup that feeds the release evidence preflight.
 - `deploy/portfolio-smoke-evidence.self-test.sh` and `pnpm verify:portfolio-smoke:self-test` cover the smoke rollup locally without AWS, Docker, SMTP, map provider, public URL, or database access. The self-test proves that pending evidence remains pending, strict mode blocks skipped checks, older coarse P5-A status sets cannot pass, invalid values fail, and fully passed P5-A through P5-D inputs produce passed release-evidence exports.
 - `deploy/portfolio-evidence-commands.sh` and `pnpm portfolio:evidence-commands` print the ordered public release preflight, public browser smoke, staging verifier, staff bootstrap, staff/admin expectation verifier, rehearsal, smoke rollup, and release evidence commands for the current candidate without contacting AWS, Docker, SMTP, map providers, the public URL, or the database. The helper fills the current Git SHA when available, carries the configured/default launch site IDs into staging admin-data verification and staff bootstrap examples, and warns when the local branch is still ahead of its upstream, reducing placeholder-SHA, image-tag, stale-clinic-data, and P5-A staff/admin expectation mistakes before evidence collection.
+- `deploy/portfolio-evidence-commands.self-test.sh` and `pnpm portfolio:evidence-commands:self-test` cover the command plan locally without AWS, Docker, SMTP, map provider, public URL, or database access. The self-test proves candidate SHA/image rendering, default and custom launch site IDs, staff email placeholder safety, and provider-map expectation propagation.
+- The SSM ops-bundle allow list includes deploy-time helpers and local self-tests shipped in the `deploy/` directory, so adding repository-local helper tests does not make staging ops-bundle validation reject the bundle.
 - Staging rehearsal and release evidence use `QDOC_EXPECTED_APP_IMAGE=qdoc-app:<40-character-git-sha>` as the candidate image, so the shared staging env file can retain its deploy-time `QDOC_APP_IMAGE` placeholder.
 
 Remaining evidence:
@@ -309,6 +311,7 @@ Verification:
 
 - `deploy/portfolio-smoke-evidence.sh`
 - `pnpm portfolio:evidence-commands`
+- `pnpm portfolio:evidence-commands:self-test`
 - `pnpm verify:portfolio-smoke:self-test`
 - `pnpm verify:public-release`
 - `deploy/verify-staging.sh`

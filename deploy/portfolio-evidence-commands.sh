@@ -103,7 +103,17 @@ sudo env \\
   QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="\$REAL_STAFF_EMAIL" \\
   bash deploy/bootstrap-staff-admins.sh
 
-6. Staging rehearsal from the deployed host
+6. Staff/admin expectation verifier from the deployed host
+
+# Run after bootstrap apply, before marking QDOC_SMOKE_STAFF_ADMIN_DATA=passed.
+cd /opt/qdoc/current
+sudo env \\
+  QDOC_PUBLIC_URL=$(quote "$PUBLIC_URL") \\
+  QDOC_VERIFY_ADMIN_DATA=true \\
+  QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="\$REAL_STAFF_EMAIL" \\
+  bash deploy/verify-staging.sh
+
+7. Staging rehearsal from the deployed host
 
 cd /opt/qdoc/current
 sudo env \\
@@ -115,7 +125,7 @@ sudo env \\
   QDOC_BACKUP_DIR=$(quote "$BACKUP_DIR") \\
   bash deploy/staging-rehearsal.sh
 
-7. Portfolio smoke evidence rollup after manual browser/inbox checks
+8. Portfolio smoke evidence rollup after manual browser/inbox checks
 
 QDOC_PUBLIC_URL=$(quote "$PUBLIC_URL") \\
 QDOC_SMOKE_PUBLIC_RELEASE_PREFLIGHT=passed \\
@@ -148,7 +158,7 @@ QDOC_SMOKE_WORKER_DUPLICATE_GUARD=passed \\
 QDOC_SMOKE_STRICT=true \\
 pnpm verify:portfolio-smoke
 
-8. Release evidence preflight
+9. Release evidence preflight
 
 # Fill artifact/checksum/SSM/backup/rollback values from the successful deploy and rehearsal.
 QDOC_PUBLIC_URL=$(quote "$PUBLIC_URL") \\

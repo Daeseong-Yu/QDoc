@@ -416,7 +416,7 @@ To print the exact evidence commands for the current candidate without contactin
 QDOC_PUBLIC_URL=https://qdoc.example.com pnpm portfolio:evidence-commands
 ```
 
-The command plan fills the candidate SHA from `git rev-parse HEAD` when available, warns when the local branch is still ahead of its upstream, and prints the ordered public release preflight, browser smoke, staging verifier, staff bootstrap, rehearsal, smoke rollup, and release evidence preflight commands. It is read-only; it does not replace pushing the candidate, waiting for the staging deploy, or proving `/api/release` matches the same SHA.
+The command plan fills the candidate SHA from `git rev-parse HEAD` when available, warns when the local branch is still ahead of its upstream, and prints the ordered public release preflight, browser smoke, staging verifier, staff bootstrap, staff/admin expectation verifier, rehearsal, smoke rollup, and release evidence preflight commands. It is read-only; it does not replace pushing the candidate, waiting for the staging deploy, or proving `/api/release` matches the same SHA.
 
 For local command validation without running staging containers:
 
@@ -480,7 +480,7 @@ QDOC_SMOKE_STRICT=true \
 bash deploy/portfolio-smoke-evidence.sh
 ```
 
-This helper is also read-only. It turns P5-A through P5-D manual smoke outcomes into the `QDOC_EVIDENCE_P5A_STATUS`, `QDOC_EVIDENCE_P5B_STATUS`, `QDOC_EVIDENCE_P5C_STATUS`, `QDOC_EVIDENCE_P5D_STATUS`, and `QDOC_EVIDENCE_MANUAL_SMOKE_STATUS` values used by the release evidence preflight. Set `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after staging admin-data verification passed with the real staff/admin expectation configured. Set the tester membership, role-boundary, queue-control, patient status revisit, and audit-log values only after those exact UI paths were exercised with the deployed public URL. Use `pending`, `not_run`, or `failed` for anything that has not been proven in staging with real inboxes, public browser/provider behavior, and deployed worker/outbox behavior.
+This helper is also read-only. It turns P5-A through P5-D manual smoke outcomes into the `QDOC_EVIDENCE_P5A_STATUS`, `QDOC_EVIDENCE_P5B_STATUS`, `QDOC_EVIDENCE_P5C_STATUS`, `QDOC_EVIDENCE_P5D_STATUS`, and `QDOC_EVIDENCE_MANUAL_SMOKE_STATUS` values used by the release evidence preflight. Set `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after staging admin-data verification passed with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL"` configured for the real staff/admin inbox. Set the tester membership, role-boundary, queue-control, patient status revisit, and audit-log values only after those exact UI paths were exercised with the deployed public URL. Use `pending`, `not_run`, or `failed` for anything that has not been proven in staging with real inboxes, public browser/provider behavior, and deployed worker/outbox behavior.
 
 Useful SSM and host checks:
 

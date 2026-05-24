@@ -203,6 +203,16 @@ QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" \
 bash deploy/bootstrap-staff-admins.sh
 ```
 
+After the apply succeeds, verify the real staff/admin expectation before recording `QDOC_SMOKE_STAFF_ADMIN_DATA=passed`:
+
+```bash
+cd /opt/qdoc/current
+QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_VERIFY_ADMIN_DATA=true \
+QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" \
+bash deploy/verify-staging.sh
+```
+
 ```bash
 cd /opt/qdoc/current
 QDOC_PUBLIC_URL=https://qdoc.example.com \

@@ -178,6 +178,7 @@ Implementation state:
 - Staff map-budget availability status renders human-readable labels instead of raw provider availability enum values.
 - Disabled-provider fallback now supports visible marker selection, zoom controls, current-location recentering, and patient-readable copy so the fail-closed state is still usable during local or guarded verification.
 - Local E2E uses a stubbed provider SDK/cache path, including a first-load script failure retry case, to avoid paid provider traffic.
+- Latest P5-B documentation clarification: map completion requires observable pan or native drag response. Current local proof should not be treated as complete if it only verifies render, marker selection, zoom, and recentering; add or verify pan coverage before closing local P5-B readiness.
 - Public release preflight is available through `pnpm verify:public-release`. It is read-only, checks only `/api/health` and `/api/release`, and should run before `pnpm e2e:portfolio` when public evidence must prove the deployed URL is serving the expected candidate SHA.
 - Public browser Playwright smoke is available through `pnpm e2e:portfolio`. It is read-only, requires `QDOC_PUBLIC_URL` or `QDOC_PORTFOLIO_BASE_URL`, and can fail early on stale public deployments with `QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<40-character-git-sha>` by comparing the safe `/api/release` identity endpoint. It can require provider-backed map behavior with `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true`. Strict provider mode now fails unless browser geolocation is available, the provider map reaches ready state, at least one QDoc clinic marker is present, at least one provider nearby discovery place is rendered, and the app-level zoom plus current-location recenter controls call the live provider map. The smoke also asserts patient OTP-entry surface visibility, clinic-card/marker selected-state feedback, and fallback zoom/recenter viewport changes so a map that renders but does not respond to interaction remains a blocker.
 
@@ -186,12 +187,12 @@ Remaining evidence:
 - Configure provider-side restrictions, quotas, and billing alerts.
 - Configure QDoc monthly hard stops for `map_load` and `places_search`.
 - Verify public browser credentials and server-side search credentials where used.
-- Confirm geolocation-centered loading, pan/zoom, recentering, marker/card sync, QDoc-vs-provider visual distinction, denied-location fallback, and over-budget fallback in staging.
+- Confirm geolocation-centered loading, pan or native drag, zoom, recentering, marker/card sync, QDoc-vs-provider visual distinction, denied-location fallback, and over-budget fallback in staging.
 
 Verification:
 
 - targeted/full Playwright E2E locally
-- fallback map E2E for disabled-provider zoom, recenter, and selection behavior
+- fallback map E2E for disabled-provider pan or drag surrogate, zoom, recenter, and selection behavior
 - `QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_RELEASE_SHA=<git-sha> pnpm verify:public-release`
 - `QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<git-sha> QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true pnpm e2e:portfolio`
 - staging manual public-browser smoke

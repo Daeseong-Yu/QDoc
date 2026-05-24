@@ -66,6 +66,7 @@ Use this board as the active pre-GO task set until the user explicitly changes s
    - Prove unauthorized personal emails remain blocked with readable staff-access copy.
 2. P5-B Provider map public-browser verification
    - Prove browser-geolocation-centered provider discovery, pan/zoom, current-location recentering, marker/card synchronization, selected-state feedback, QDoc-vs-provider discovery distinction, and fail-closed states with QDoc/provider cost controls active.
+   - Do not close P5-B from render, zoom, or recenter proof alone. Public-browser or automated evidence must show pan or native drag response as well.
 3. P5-C OTP delivery and auth error usability
    - Prove first-time staging OTP delivery for patient and staff flows, readable rate-limit/delivery/invalid/expired/unauthorized states, and refresh/revisit session behavior on the deployed host.
 4. P5-D Public demo smoke

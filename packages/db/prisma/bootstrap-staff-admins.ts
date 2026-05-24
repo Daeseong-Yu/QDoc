@@ -1,80 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 
+import { BootstrapInputError, resolveStaffAdminBootstrapConfig } from "./bootstrap-staff-admins-core.js";
+
 const prisma = new PrismaClient();
 
-const defaultStaffAdminEmail = "staff@example.com";
-const productionLikeAppEnvs = new Set(["staging", "production"]);
-
-class BootstrapInputError extends Error {
-  constructor(public readonly status: string) {
-    super(status);
-  }
-}
-
-function parseList(value: string | undefined) {
-  return [
-    ...new Set(
-      (value ?? "")
-        .split(",")
-        .map((item) => item.trim().toLowerCase())
-        .filter(Boolean),
-    ),
-  ];
-}
-
-function isEmailLike(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function isProductionLikeBootstrap() {
-  return process.env.NODE_ENV === "production" || productionLikeAppEnvs.has((process.env.APP_ENV ?? "").toLowerCase());
-}
-
-function isPlaceholderStaffEmail(value: string) {
-  return value === defaultStaffAdminEmail || /@(example\.com|example\.org|example\.net)$/i.test(value);
-}
-
-function getStaffAdminEmails() {
-  const emails = parseList(process.env.QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS ?? process.env.QDOC_SEED_STAFF_ADMIN_EMAILS);
-
-  if (emails.length === 0) {
-    throw new BootstrapInputError("staff_admin_emails_required");
-  }
-
-  if (emails.some((email) => !isEmailLike(email))) {
-    throw new BootstrapInputError("invalid_staff_admin_email_entries");
-  }
-
-  if (isProductionLikeBootstrap() && emails.some(isPlaceholderStaffEmail)) {
-    throw new BootstrapInputError("placeholder_staff_admin_emails_forbidden");
-  }
-
-  return emails;
-}
-
-function getRequestedSiteIds() {
-  return parseList(process.env.QDOC_BOOTSTRAP_STAFF_SITE_IDS ?? process.env.QDOC_ADMIN_DATA_EXPECT_SITE_IDS);
-}
-
-function isDryRun() {
-  return process.env.QDOC_BOOTSTRAP_STAFF_DRY_RUN === "true";
-}
-
-function assertApplyConfirmed(dryRun: boolean) {
-  if (dryRun || !isProductionLikeBootstrap()) {
-    return;
-  }
-
-  if (process.env.QDOC_BOOTSTRAP_STAFF_CONFIRM !== "apply") {
-    throw new BootstrapInputError("staff_admin_bootstrap_apply_confirmation_required");
-  }
-}
-
 async function main() {
-  const emails = getStaffAdminEmails();
-  const requestedSiteIds = getRequestedSiteIds();
-  const dryRun = isDryRun();
-  assertApplyConfirmed(dryRun);
+  const { emails, requestedSiteIds, dryRun } = resolveStaffAdminBootstrapConfig();
 
   const sites = await prisma.site.findMany({
     where: requestedSiteIds.length > 0 ? { id: { in: requestedSiteIds } } : {},

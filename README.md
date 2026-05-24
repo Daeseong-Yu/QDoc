@@ -495,7 +495,7 @@ Admin data operations:
 
 1. Classify the operation before changing data:
    - Seed-only: `pnpm db:seed` and `pnpm db:seed:staging` create the demo organization, clinic sites, queues, configured staff admin accounts, sample tickets, and disabled map provider guardrail rows. Use these for local or approved staging bootstrap only, not production onboarding. Set `QDOC_SEED_STAFF_ADMIN_EMAILS` to real OTP-receivable staff emails for staging; staging seed fails closed when this is missing or uses example-domain placeholders.
-   - Staff-admin bootstrap: `pnpm db:bootstrap-staff-admins`, `pnpm db:bootstrap-staff-admins:staging`, or `bash deploy/bootstrap-staff-admins.sh` adds or promotes real staff/admin emails on existing sites without resetting tickets, queues, map settings, or provider guardrail rows. The command prints counts and site IDs, not email addresses.
+   - Staff-admin bootstrap: `pnpm db:bootstrap-staff-admins`, `pnpm db:bootstrap-staff-admins:staging`, or `bash deploy/bootstrap-staff-admins.sh` adds or promotes real staff/admin emails on existing sites without resetting tickets, queues, map settings, or provider guardrail rows. The command prints counts and site IDs, not email addresses. `pnpm verify:staff-bootstrap` checks the bootstrap input policy without connecting to the database.
    - Application-supported: staff admins can manage site settings, notification threshold, queue open/closed state, site memberships, audit-log review, and notification health from `/staff`. Operators listed in `MAP_SETTINGS_ADMIN_EMAILS` can manage global map provider enablement, monthly map-load limits, monthly place-search limits, and hard-stop settings from the staff UI.
    - Database-admin-only: new production organization/site/queue creation, destructive record cleanup, direct restore, and emergency data correction require an approved DB-admin procedure or a reviewed script. Do not bypass staff authorization boundaries from the public API.
 2. After migrations and approved seed/bootstrap data are applied, sign in as a site admin, verify every launch clinic has the expected address and coordinates, set `notificationAheadCount`, confirm at least one queue exists, and confirm at least one real OTP-receivable admin membership per site.
@@ -507,6 +507,7 @@ QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF
 QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener,site-university pnpm db:bootstrap-staff-admins
 QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener,site-university bash deploy/bootstrap-staff-admins.sh
 QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener,site-university bash deploy/bootstrap-staff-admins.sh
+pnpm verify:staff-bootstrap
 pnpm verify:admin-data
 QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener,site-university pnpm verify:admin-data
 QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener,site-university QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm verify:admin-data

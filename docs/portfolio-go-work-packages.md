@@ -126,7 +126,7 @@ This snapshot separates local implementation from the staging/manual evidence st
 
 | Package | Local implementation / automated coverage | Staging or manual evidence still required | GO-ready |
 | --- | --- | --- | --- |
-| P5-A Staff demo access | Bootstrap paths, staff/admin expectation checks, membership management, role-boundary E2E, audit-log E2E, readable unrostered staff guidance, and patient check-in fallback navigation exist locally. | Real OTP-receivable staff/admin inbox, tester membership, unrostered denial, and staging admin-data proof. | No |
+| P5-A Staff demo access | Bootstrap paths, DB-free staff bootstrap policy self-test, staff/admin expectation checks, membership management, role-boundary E2E, audit-log E2E, readable unrostered staff guidance, and patient check-in fallback navigation exist locally. | Real OTP-receivable staff/admin inbox, tester membership, unrostered denial, and staging admin-data proof. | No |
 | P5-B Provider map public-browser verification | Provider and fallback map interaction paths are implemented and locally green for provider SDK retry, app-level pan/zoom/recenter, marker/card sync, active QDoc site layering, selected-state feedback, hidden guardrail copy, and disabled-provider fallback coverage. | Verify real provider credentials/restrictions, QDoc cost limits, browser geolocation, provider discovery, public-browser pan/drag behavior, and fail-closed states. | No |
 | P5-C OTP delivery and auth error usability | Readable delivery/rate-limit/invalid/expired/unauthorized states, configurable OTP limits, email-readiness verifier, and session refresh/revisit coverage exist locally. | First-time staging OTP delivery for patient and staff, deployed email verifier, real inbox receipt, and deployed refresh/revisit proof. | No |
 | P5-D Public demo smoke | Local Playwright covers patient/staff core paths, queue operations, membership, audit logs, notification preference, outbox creation/failure visibility, and duplicate prevention. | Full visitor-style patient smoke, authorized staff smoke, deployed worker/outbox proof, and public smoke against the current deployed SHA. | No |
@@ -158,6 +158,7 @@ Implementation state:
 
 - Seed/bootstrap supports expected staff/admin emails.
 - Existing staging databases can add or promote real staff/admin emails with `deploy/bootstrap-staff-admins.sh` or `pnpm db:bootstrap-staff-admins:staging` without rerunning the full seed, resetting tickets, changing queues, or changing map guardrail rows.
+- `pnpm verify:staff-bootstrap` runs a DB-free staff bootstrap policy self-test for required email input, invalid email rejection, staging/production placeholder rejection, production-like apply confirmation, dry-run behavior, and site-ID fallback/override parsing.
 - Launch/admin-data verification can assert staff/admin readiness without printing addresses.
 - Launch/admin-data verification now treats expected clinic IDs as map-ready only when each expected site has address and coordinate data; this prevents stale staging data from passing while the patient map cannot show meaningful QDoc clinics.
 - Local E2E proves admin-created staff tester membership, staff-only role boundaries, admin role update/delete flows, membership audit-log visibility, and last-admin protection.
@@ -177,6 +178,7 @@ Remaining evidence:
 
 Verification:
 
+- `pnpm verify:staff-bootstrap`
 - `pnpm verify:admin-data`
 - `pnpm verify:launch`
 - `QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm db:bootstrap-staff-admins`

@@ -19,6 +19,7 @@
     "verify:admin-data": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:admin-data",
     "verify:launch": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:launch",
     "verify:email": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:email",
+    "verify:staff-bootstrap": "pnpm --filter @qdoc/db verify:staff-bootstrap",
     "verify:drills": "bash deploy/load-failure-drills.sh",
     "verify:portfolio-smoke": "bash deploy/portfolio-smoke-evidence.sh",
     "verify:portfolio-smoke:self-test": "bash deploy/portfolio-smoke-evidence.self-test.sh",

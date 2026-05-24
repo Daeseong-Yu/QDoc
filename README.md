@@ -416,7 +416,7 @@ To print the exact evidence commands for the current candidate without contactin
 QDOC_PUBLIC_URL=https://qdoc.example.com pnpm portfolio:evidence-commands
 ```
 
-The command plan fills the candidate SHA from `git rev-parse HEAD` when available, warns when the local branch is still ahead of its upstream, and prints the ordered public release preflight, browser smoke, staging verifier, staff bootstrap, staff/admin expectation verifier, rehearsal, smoke rollup, and release evidence preflight commands. It is read-only; it does not replace pushing the candidate, waiting for the staging deploy, or proving `/api/release` matches the same SHA.
+The command plan fills the candidate SHA from `git rev-parse HEAD` when available, carries `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` into the staging verifier and staff bootstrap examples, warns when the local branch is still ahead of its upstream, and prints the ordered public release preflight, browser smoke, staging verifier, staff bootstrap, staff/admin expectation verifier, rehearsal, smoke rollup, and release evidence preflight commands. It is read-only; it does not replace pushing the candidate, waiting for the staging deploy, or proving `/api/release` matches the same SHA.
 
 For local command validation without running staging containers:
 

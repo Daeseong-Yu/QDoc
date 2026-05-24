@@ -6,6 +6,7 @@ CANDIDATE_SHA="${QDOC_RELEASE_SHA:-${QDOC_EXPECTED_RELEASE_SHA:-}}"
 IMAGE_NAME="${QDOC_IMAGE_NAME:-qdoc-app}"
 BACKUP_DIR="${QDOC_BACKUP_DIR:-/opt/qdoc/backups}"
 REQUIRE_PROVIDER_MAP="${QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP:-true}"
+LAUNCH_SITE_IDS="${QDOC_ADMIN_DATA_EXPECT_SITE_IDS:-site-waterloo,site-kitchener,site-university}"
 
 warnings=0
 
@@ -57,6 +58,7 @@ Release identity:
   Candidate SHA: $CANDIDATE_SHA
   Expected app image: ${IMAGE_NAME}:$CANDIDATE_SHA
   Public URL: $PUBLIC_URL
+  Launch site IDs: $LAUNCH_SITE_IDS
 
 Prerequisite:
   Push the candidate, wait for the staging workflow to deploy it, then confirm /api/release matches the same SHA.
@@ -82,6 +84,7 @@ sudo env \\
   QDOC_VERIFY_OUTBOX=true \\
   QDOC_VERIFY_OPS=true \\
   QDOC_VERIFY_ADMIN_DATA=true \\
+  QDOC_ADMIN_DATA_EXPECT_SITE_IDS=$(quote "$LAUNCH_SITE_IDS") \\
   QDOC_VERIFY_LAUNCH=true \\
   QDOC_VERIFY_EMAIL=true \\
   bash deploy/verify-staging.sh
@@ -92,6 +95,7 @@ sudo env \\
 cd /opt/qdoc/current
 sudo env \\
   QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="\$REAL_STAFF_EMAIL" \\
+  QDOC_BOOTSTRAP_STAFF_SITE_IDS=$(quote "$LAUNCH_SITE_IDS") \\
   bash deploy/bootstrap-staff-admins.sh
 
 5. Existing-database staff/admin bootstrap apply from the deployed host
@@ -101,6 +105,7 @@ cd /opt/qdoc/current
 sudo env \\
   QDOC_BOOTSTRAP_STAFF_CONFIRM=apply \\
   QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="\$REAL_STAFF_EMAIL" \\
+  QDOC_BOOTSTRAP_STAFF_SITE_IDS=$(quote "$LAUNCH_SITE_IDS") \\
   bash deploy/bootstrap-staff-admins.sh
 
 6. Staff/admin expectation verifier from the deployed host
@@ -110,6 +115,7 @@ cd /opt/qdoc/current
 sudo env \\
   QDOC_PUBLIC_URL=$(quote "$PUBLIC_URL") \\
   QDOC_VERIFY_ADMIN_DATA=true \\
+  QDOC_ADMIN_DATA_EXPECT_SITE_IDS=$(quote "$LAUNCH_SITE_IDS") \\
   QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="\$REAL_STAFF_EMAIL" \\
   bash deploy/verify-staging.sh
 

@@ -198,7 +198,7 @@ Implementation state:
 - Session continuity across refresh/revisit is covered locally.
 - `pnpm verify:email` safely checks API OTP delivery policy, worker provider policy, SMTP config shape, placeholder SMTP values, and optional SMTP connectivity/auth without sending email or printing provider diagnostics.
 - `deploy/verify-staging.sh` can run the same check from the staging worker image with `QDOC_VERIFY_EMAIL=true`; `QDOC_VERIFY_SMTP_CONNECTIVITY=true` adds an approved live SMTP `verify()` connection.
-- OTP request/verify rate limits are environment-configurable with conservative defaults matching the original policy. The API still reserves counters before SMTP delivery so repeated failed delivery attempts cannot hammer the email provider; this means a delivery-unavailable attempt can be followed by a short `rate_limited` response until the configured window clears.
+- OTP request/verify rate limits are environment-configurable with conservative defaults matching the original policy. SMTP delivery failures now clear the normal request cooldown and enter a short delivery-unavailable backoff with retry timing, so repeated provider failures do not hammer email delivery and first-time visitors are not shown a misleading `rate_limited` response immediately after a failed delivery attempt.
 
 Remaining evidence:
 

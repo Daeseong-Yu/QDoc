@@ -203,7 +203,9 @@ function getMessage(error: unknown) {
   }
 
   if (error.error === "otp_delivery_unavailable") {
-    return "We could not send a code right now. Try again later or contact the clinic.";
+    return error.retryAfterSeconds
+      ? `We could not send a code right now. Try again in ${formatRetryAfter(error.retryAfterSeconds)}.`
+      : "We could not send a code right now. Try again later or contact the clinic.";
   }
 
   if (error.error === "invalid_otp") {

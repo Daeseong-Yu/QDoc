@@ -13,10 +13,12 @@ import { clearSessionCookie, createSessionCookie, createSessionToken, readSessio
 
 const otpTtlMs = 10 * 60 * 1000;
 const otpRequestCooldownMs = 60 * 1000;
+const otpDeliveryFailureCooldownMs = otpRequestCooldownMs;
 const otpVerifyCooldownMs = 30 * 1000;
 const maxPendingChallenges = 5;
 
 const otpRequestCooldowns = new Map<string, number>();
+const otpDeliveryFailureCooldowns = new Map<string, number>();
 const otpVerifyCooldowns = new Map<string, number>();
 const otpRequestEmailsInFlight = new Set<string>();
 
@@ -70,19 +72,35 @@ function maskEmail(email: string) {
   return `${visiblePrefix}${maskedPart}@${domain}`;
 }
 
-function reserveCooldown(map: Map<string, number>, key: string, ttlMs: number) {
+function getCooldownRetryAfter(map: Map<string, number>, key: string) {
   pruneExpiredEntries(map);
 
   const existingExpiry = map.get(key) ?? 0;
+  const now = Date.now();
 
-  if (existingExpiry > Date.now()) {
+  if (existingExpiry <= now) {
+    return null;
+  }
+
+  return Math.max(1, Math.ceil((existingExpiry - now) / 1000));
+}
+
+function setCooldown(map: Map<string, number>, key: string, ttlMs: number) {
+  map.set(key, Date.now() + ttlMs);
+  return Math.max(1, Math.ceil(ttlMs / 1000));
+}
+
+function reserveCooldown(map: Map<string, number>, key: string, ttlMs: number) {
+  const retryAfterSeconds = getCooldownRetryAfter(map, key);
+
+  if (retryAfterSeconds) {
     return {
       reserved: false as const,
-      retryAfterSeconds: Math.max(1, Math.ceil((existingExpiry - Date.now()) / 1000)),
+      retryAfterSeconds,
     };
   }
 
-  map.set(key, Date.now() + ttlMs);
+  setCooldown(map, key, ttlMs);
   return { reserved: true as const };
 }
 
@@ -139,6 +157,18 @@ function sendRateLimited(response: ServerResponse, retryAfterSeconds: number) {
     { error: "rate_limited", retryAfterSeconds },
     { "retry-after": String(retryAfterSeconds) },
   );
+}
+
+function sendOtpDeliveryUnavailable(response: ServerResponse, retryAfterSeconds?: number) {
+  const body: { error: "otp_delivery_unavailable"; retryAfterSeconds?: number } = {
+    error: "otp_delivery_unavailable",
+  };
+
+  if (retryAfterSeconds) {
+    body.retryAfterSeconds = retryAfterSeconds;
+  }
+
+  sendJson(response, 503, body, retryAfterSeconds ? { "retry-after": String(retryAfterSeconds) } : undefined);
 }
 
 function generateOtpCode() {
@@ -254,12 +284,19 @@ export async function handleOtpRequest(request: IncomingMessage, response: Serve
     return;
   }
 
+  const requestCooldownKey = getOtpRequestCooldownKey(request, input.data.email);
+
   if (!canDeliverOtp()) {
-    sendJson(response, 503, { error: "otp_delivery_unavailable" });
+    sendOtpDeliveryUnavailable(response);
     return;
   }
 
-  const requestCooldownKey = getOtpRequestCooldownKey(request, input.data.email);
+  const deliveryFailureRetryAfter = getCooldownRetryAfter(otpDeliveryFailureCooldowns, requestCooldownKey);
+
+  if (deliveryFailureRetryAfter) {
+    sendOtpDeliveryUnavailable(response, deliveryFailureRetryAfter);
+    return;
+  }
 
   const requestCooldown = reserveCooldown(otpRequestCooldowns, requestCooldownKey, otpRequestCooldownMs);
 
@@ -305,14 +342,21 @@ export async function handleOtpRequest(request: IncomingMessage, response: Serve
     challengeId = challenge.id;
 
     await deliverOtp(input.data.email, code);
+    clearCooldown(otpDeliveryFailureCooldowns, requestCooldownKey);
   } catch (error) {
     if (challengeId) {
       await prisma.otpChallenge.delete({ where: { id: challengeId } }).catch(() => undefined);
     }
 
     if (error instanceof OtpDeliveryError) {
+      clearCooldown(otpRequestCooldowns, requestCooldownKey);
+      const retryAfterSeconds = setCooldown(
+        otpDeliveryFailureCooldowns,
+        requestCooldownKey,
+        otpDeliveryFailureCooldownMs,
+      );
       console.error("OTP delivery failed", { provider: process.env.EMAIL_PROVIDER ?? "console" });
-      sendJson(response, 503, { error: "otp_delivery_unavailable" });
+      sendOtpDeliveryUnavailable(response, retryAfterSeconds);
       return;
     }
 

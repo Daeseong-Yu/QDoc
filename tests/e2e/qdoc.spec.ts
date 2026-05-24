@@ -448,7 +448,7 @@ test("renders patient-friendly OTP errors without exposing auth error codes", as
       await route.fulfill({
         status: 503,
         contentType: "application/json",
-        body: JSON.stringify({ error: "otp_delivery_unavailable" }),
+        body: JSON.stringify({ error: "otp_delivery_unavailable", retryAfterSeconds: 60 }),
       });
     },
     { times: 1 },
@@ -457,7 +457,7 @@ test("renders patient-friendly OTP errors without exposing auth error codes", as
   await page.goto("/");
   await page.getByPlaceholder("you@example.com").fill(e2eEmail);
   await page.getByRole("button", { name: "Send code" }).click();
-  await expect(page.getByText("We could not send a code right now. Try again later or contact the clinic.")).toBeVisible();
+  await expect(page.getByText("We could not send a code right now. Try again in 1 minute.")).toBeVisible();
   await expectNoRawAuthErrorCodes(page);
 
   await page.route(
@@ -531,7 +531,7 @@ test("renders staff-friendly OTP errors without exposing auth error codes", asyn
       await route.fulfill({
         status: 503,
         contentType: "application/json",
-        body: JSON.stringify({ error: "otp_delivery_unavailable" }),
+        body: JSON.stringify({ error: "otp_delivery_unavailable", retryAfterSeconds: 30 }),
       });
     },
     { times: 1 },
@@ -540,7 +540,7 @@ test("renders staff-friendly OTP errors without exposing auth error codes", asyn
   await page.goto("/staff");
   await page.getByPlaceholder("Staff email").fill(e2eEmail);
   await page.getByRole("button", { name: "Send code" }).click();
-  await expect(page.getByText("We could not send a code right now. Try again later or contact the clinic.")).toBeVisible();
+  await expect(page.getByText("We could not send a code right now. Try again in 30 seconds.")).toBeVisible();
   await expectNoRawAuthErrorCodes(page);
 
   await page.route(

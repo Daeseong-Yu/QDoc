@@ -139,6 +139,7 @@ Implementation state:
 - Existing staging databases can add or promote real staff/admin emails with `deploy/bootstrap-staff-admins.sh` or `pnpm db:bootstrap-staff-admins:staging` without rerunning the full seed, resetting tickets, changing queues, or changing map guardrail rows.
 - Launch/admin-data verification can assert staff/admin readiness without printing addresses.
 - Local E2E proves admin-created staff tester membership, staff-only role boundaries, admin role update/delete flows, membership audit-log visibility, and last-admin protection.
+- The staff sign-in surface now tells testers before OTP that staff tools require a staff/admin email added to a site roster, while personal emails remain limited to patient check-in until an admin adds them.
 
 Remaining evidence:
 

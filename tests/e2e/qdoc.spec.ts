@@ -1137,6 +1137,9 @@ test("lets an admin add a staff tester through membership management", async ({
   const staffSession = page.getByRole("heading", { name: "Staff session" }).locator("../../..");
 
   await expect(staffSession.getByText("Sign in with email OTP.")).toBeVisible();
+  await expect(
+    staffSession.getByText("Use the staff or admin email added to a site roster."),
+  ).toBeVisible();
   await expect(staffSession.getByPlaceholder("Staff email")).toBeVisible();
 
   await page.setExtraHTTPHeaders({

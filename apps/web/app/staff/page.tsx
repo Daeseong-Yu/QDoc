@@ -905,6 +905,9 @@ export default function StaffPage() {
 
               {!currentUser ? (
                 <div className="grid gap-3">
+                  <p className="text-sm leading-6 text-slate-600">
+                    Use the staff or admin email added to a site roster. Personal emails can use patient check-in, but they will not open staff tools until an admin adds them.
+                  </p>
                   <input
                     type="email"
                     value={email}

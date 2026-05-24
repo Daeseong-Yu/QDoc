@@ -53,6 +53,25 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - `Launch` in the current task means portfolio-ready public demo. It does not mean every future roadmap item is complete, but every documented core patient, staff, map, OTP, queue, notification, and operational smoke path must be implemented, testable, and understandable without developer explanation.
 - Do not treat a successful build, deploy, or staging health check as sufficient for `GO`. The user-facing patient/staff workflows and operational recovery evidence are part of the gate.
 - Newly defined Step 5 work is product-completion work plus evidence collection. Do not treat P5-A through P5-E as optional roadmap, documentation-only work, or deployment-only validation.
+
+### Current Step 5 Work Board
+
+Use this board as the active pre-GO task set until the user explicitly changes scope or excludes a path from the public portfolio demo:
+
+1. P5-A Staff demo access
+   - Prepare real OTP-receivable staff/admin and tester access through seed bootstrap, existing-database staff-admin bootstrap, or admin membership management.
+   - Prove unauthorized personal emails remain blocked with readable staff-access copy.
+2. P5-B Provider map public-browser verification
+   - Prove browser-geolocation-centered provider discovery, pan/zoom, current-location recentering, marker/card synchronization, selected-state feedback, QDoc-vs-provider discovery distinction, and fail-closed states with QDoc/provider cost controls active.
+3. P5-C OTP delivery and auth error usability
+   - Prove first-time staging OTP delivery for patient and staff flows, readable rate-limit/delivery/invalid/expired/unauthorized states, and refresh/revisit session behavior on the deployed host.
+4. P5-D Public demo smoke
+   - Exercise patient, staff, queue, notification/outbox, refresh/revisit, membership, audit-log, and map flows as a visitor or invited tester would use them.
+5. P5-E Operations evidence and decision
+   - Record staging verifier, full rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and an explicit GO/NO-GO decision.
+
+Do not start a new phase for this board. Keep it in the active launch-candidate Step 5 documents unless the user explicitly approves a phase change.
+
 - Treat the portfolio site as a user-testable product surface for the documented QDoc flows. Before `GO`, the currently documented patient, staff, map, OTP, queue, notification/outbox, refresh/revisit, membership, audit-log, backup, rollback, and staging verification paths must work well enough for normal tester use; do not rely on "MVP only" reasoning to defer one of those documented paths.
 - When the user says the site must be complete for portfolio testing, interpret that as documented portfolio-flow completion, not future-roadmap completion. SMS, push, EMR/EHR, real travel-time estimates, multi-department operations, and a full clinic marketplace remain out of scope unless explicitly approved.
 - Treat the current pre-GO backlog as a functional completion list, not a launch checklist only. The remaining work must leave QDoc usable as a portfolio product surface for real visitor testing, with only explicitly approved future-roadmap items excluded.

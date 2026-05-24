@@ -69,6 +69,12 @@ Set `QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha>` explicitly for release evidence
 
 Set `QDOC_EVIDENCE_PRIVATE_OUTPUT=true` only for local/private release notes that will not be committed. Public or repository evidence should keep S3 bucket names, SSM command IDs, backup paths, operator identity, and free-form risk details redacted.
 
+When changing the release evidence guard, run the local self-test before relying on the decision block. It does not call AWS, Docker, SMTP, map providers, the public site, or the database.
+
+```bash
+pnpm verify:release-evidence:self-test
+```
+
 Before setting the P5-A through P5-D status variables, use the portfolio smoke helper to roll up the manual browser/inbox checks into package statuses. The helper is read-only and does not call AWS, Docker, SMTP, map providers, or the public site. It validates the status values you provide and prints export lines for `deploy/release-evidence.sh`.
 
 ```bash
@@ -138,6 +144,7 @@ pnpm verify:outbox
 pnpm verify:ops
 pnpm verify:launch
 pnpm verify:email
+pnpm verify:release-evidence:self-test
 pnpm e2e
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_RELEASE_SHA=<git-sha> pnpm verify:public-release
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<git-sha> QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true pnpm e2e:portfolio

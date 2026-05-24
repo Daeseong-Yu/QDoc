@@ -23,6 +23,7 @@
     "verify:portfolio-smoke": "bash deploy/portfolio-smoke-evidence.sh",
     "verify:public-release": "node deploy/verify-public-release.mjs",
     "verify:release-evidence": "bash deploy/release-evidence.sh",
+    "verify:release-evidence:self-test": "bash deploy/release-evidence.self-test.sh",
     "verify:staging": "bash deploy/verify-staging.sh",
     "verify:staging:rehearsal": "bash deploy/staging-rehearsal.sh",
     "build": "turbo run build",

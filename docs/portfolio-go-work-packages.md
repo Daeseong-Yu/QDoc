@@ -260,6 +260,7 @@ Implementation state:
 
 - `docs/release-go-no-go.md` contains the release checklist.
 - `deploy/release-evidence.sh` and `pnpm verify:release-evidence` provide a read-only evidence preflight and redacted decision-record block after blocking validation passes. A `GO` decision is rejected unless every P5 package status and required evidence status is `passed`.
+- `deploy/release-evidence.self-test.sh` and `pnpm verify:release-evidence:self-test` cover the release evidence decision guard locally without AWS, Docker, SMTP, map provider, public URL, or database access. The self-test proves that `GO` with pending statuses fails without printing a decision block, `NO-GO` with pending statuses remains recordable with warnings, and `GO` with every required status passed prints only redacted private operational identifiers.
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide the manual P5-A through P5-D smoke status rollup that feeds the release evidence preflight.
 - Staging rehearsal and release evidence use `QDOC_EXPECTED_APP_IMAGE=qdoc-app:<40-character-git-sha>` as the candidate image, so the shared staging env file can retain its deploy-time `QDOC_APP_IMAGE` placeholder.
 
@@ -280,6 +281,7 @@ Verification:
 - `deploy/staging-rehearsal.sh`
 - backup restore-check command
 - `pnpm verify:release-evidence`
+- `pnpm verify:release-evidence:self-test`
 - `python3 .ai/scripts/validate_workflow.py`
 - `python3 .ai/scripts/execute.py qdoc-launch-candidate --check`
 

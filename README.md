@@ -216,7 +216,7 @@ pnpm e2e:install
 Manual core-flow staging checklist:
 
 1. Patient requests an email OTP, signs in, selects a clinic queue, checks in, and sees an active ticket.
-2. Staff signs in at `/staff` with a seeded staff account and can see the same site queue.
+2. Staff signs in at `/staff` with a prepared real OTP-receivable staff/admin account and can see the same site queue. Do not use local seeded placeholder accounts for staging or portfolio evidence.
 3. Staff calls the patient ticket, starts service, and completes it; the patient status panel reflects each state change after polling.
 4. Staff delays a waiting ticket and restores it; the restored ticket returns to the front of the waiting queue.
 5. Worker logs show outbox jobs being processed, or `QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh` passes against staging.

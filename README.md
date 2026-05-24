@@ -50,7 +50,7 @@ The core database model includes organizations, clinic sites, queues, users, sta
 - Finalize public demo readiness: real OTP-receivable staff accounts, user-friendly OTP/map errors, staging smoke evidence, backup restore-check evidence, and rollback readiness.
 - Add real distance and travel-time estimates instead of seeded distance values.
 - Add SMS/push notifications and more configurable notification thresholds.
-- Replace polling with SSE for faster live queue updates.
+- Harden realtime behavior further with SSE observability and fallback coverage before considering WebSocket.
 - Add richer staff roles, queue closing controls, and multi-department clinic support.
 - Expand Playwright coverage for edge cases such as closed queues, duplicate check-ins, and cancelled tickets.
 - Add observability dashboards for queue wait times, notification failures, and staff actions.
@@ -75,7 +75,7 @@ Patient flow:
 2. Select a clinic and queue.
 3. Sign in with email OTP.
 4. Check in.
-5. Watch the active ticket panel update by polling.
+5. Watch the active ticket panel update through SSE snapshots with polling fallback.
 6. Receive in-app and email notifications when the ticket is close to being called.
 
 Staff flow:
@@ -220,7 +220,7 @@ Manual core-flow staging checklist:
 
 1. Patient requests an email OTP, signs in, selects a clinic queue, checks in, and sees an active ticket.
 2. Staff signs in at `/staff` with a prepared real OTP-receivable staff/admin account and can see the same site queue. Do not use local seeded placeholder accounts for staging or portfolio evidence.
-3. Staff calls the patient ticket, starts service, and completes it; the patient status panel reflects each state change after polling.
+3. Staff calls the patient ticket, starts service, and completes it; the patient status panel reflects each state change through SSE snapshots or polling fallback.
 4. Staff delays a waiting ticket and restores it; the restored ticket returns to the front of the waiting queue.
 5. Worker logs show outbox jobs being processed, or `QDOC_VERIFY_OUTBOX=true bash deploy/verify-staging.sh` passes against staging.
 

@@ -117,6 +117,7 @@ type ProviderInteractionState = {
 };
 
 const scriptLoads = new Map<string, Promise<void>>();
+const scriptLoadAttempts = new Map<string, number>();
 const fallbackMinZoom = 1;
 const fallbackMaxZoom = 4;
 
@@ -151,10 +152,13 @@ function loadScript(id: string, src: string) {
     return existing;
   }
 
+  const loadAttempt = scriptLoadAttempts.get(id) ?? 0;
+  const scriptSrc = loadAttempt > 0 ? `${src}${src.includes("?") ? "&" : "?"}qdoc_retry=${loadAttempt}` : src;
   const promise = new Promise<void>((resolve, reject) => {
     const currentScript = document.getElementById(id) as HTMLScriptElement | null;
 
     if (currentScript?.dataset.qdocLoaded === "true") {
+      scriptLoadAttempts.delete(id);
       resolve();
       return;
     }
@@ -163,14 +167,16 @@ function loadScript(id: string, src: string) {
 
     const script = document.createElement("script");
     script.id = id;
-    script.src = src;
+    script.src = scriptSrc;
     script.async = true;
     script.onload = () => {
       script.dataset.qdocLoaded = "true";
+      scriptLoadAttempts.delete(id);
       resolve();
     };
     script.onerror = () => {
       scriptLoads.delete(id);
+      scriptLoadAttempts.set(id, loadAttempt + 1);
       script.remove();
       reject(new Error("map_script_load_failed"));
     };
@@ -332,9 +338,6 @@ async function initializeProviderMap(
     return null;
   }
 
-  const reservation = await reserveMapLoad();
-  const publicToken = reservation.publicToken;
-
   if (config.provider === "mapbox") {
     loadMapboxCss();
     await loadScript("qdoc-mapbox-gl", "https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js");
@@ -344,6 +347,9 @@ async function initializeProviderMap(
     if (!mapboxgl) {
       throw new Error("mapbox_unavailable");
     }
+
+    const reservation = await reserveMapLoad();
+    const publicToken = reservation.publicToken;
 
     mapboxgl.accessToken = publicToken;
     const map = new mapboxgl.Map({
@@ -393,6 +399,9 @@ async function initializeProviderMap(
       },
     };
   }
+
+  const reservation = await reserveMapLoad();
+  const publicToken = reservation.publicToken;
 
   await loadScript(
     "qdoc-google-maps",

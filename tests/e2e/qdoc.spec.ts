@@ -91,11 +91,12 @@ async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: bo
   await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css", async (route) => {
     await route.fulfill({
       contentType: "text/css",
+      headers: { "cache-control": "no-store" },
       body: ".mapboxgl-map{position:absolute;inset:0}",
     });
   });
   let shouldFailScriptLoad = options.failFirstScriptLoad ?? false;
-  await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js", async (route) => {
+  await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js*", async (route) => {
     if (shouldFailScriptLoad) {
       shouldFailScriptLoad = false;
       await route.abort("failed");
@@ -104,6 +105,7 @@ async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: bo
 
     await route.fulfill({
       contentType: "application/javascript",
+      headers: { "cache-control": "no-store" },
       body: `
         window.__qdocMapboxEvents = [];
         window.mapboxgl = {
@@ -1041,7 +1043,7 @@ test("retries provider map SDK loading after a failed script request", async ({
 
   let scriptRequests = 0;
   page.on("request", (request) => {
-    if (request.url() === "https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js") {
+    if (request.url().startsWith("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js")) {
       scriptRequests += 1;
     }
   });

@@ -19,6 +19,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - Current task, if present: `.ai/execution/current.md`
 - Portfolio GO work-package handoff: `docs/portfolio-go-work-packages.md`
 - Local workflow mirror for portfolio GO handoff: `.ai/docs/portfolio-go-work-packages.md`
+- Portfolio tester smoke guide: `docs/portfolio-tester-guide.md`
 - Portfolio release evidence checklist: `docs/release-go-no-go.md`
 
 ## Stack
@@ -83,6 +84,7 @@ Current package status rule: every P5 package is still `GO-ready: No` unless the
 - Treat the newly defined P5-A through P5-E work as accepted Step 5 scope. Future sessions should not reconstruct it from chat history.
 - Keep the active task snapshot in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md`.
 - Keep the package-level handoff in `docs/portfolio-go-work-packages.md` and mirror it in `.ai/docs/portfolio-go-work-packages.md`.
+- Keep tester-facing smoke walkthroughs in `docs/portfolio-tester-guide.md`.
 - Keep durable product, architecture, and trade-off decisions in `.ai/core/PRD.md`, `.ai/core/ARCHITECTURE.md`, and `.ai/core/ADR.md`; update these only when product scope, architecture behavior, public API, deployment, cost-control, data, auth/session, or operational decisions change.
 - Keep operator-facing verification and GO/NO-GO evidence procedures in `docs/release-go-no-go.md`.
 - Keep README as the public developer/operator summary of the active portfolio gate, linking to the package handoff and release checklist instead of duplicating volatile evidence.

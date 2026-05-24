@@ -113,7 +113,7 @@ Current pre-GO work packages:
 4. P5-D Public demo smoke: exercise patient, staff, queue, notification/outbox, refresh/revisit, membership, audit-log, and map paths as a visitor or invited tester would use them.
 5. P5-E Operations evidence and decision: record staging verifier, rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and an explicit GO/NO-GO decision.
 
-The package handoff is tracked in [docs/portfolio-go-work-packages.md](docs/portfolio-go-work-packages.md). The active workflow state is mirrored under `.ai/`, and future Codex sessions should use `AGENTS.md` plus the active Step 5 files before choosing the next task.
+The package handoff is tracked in [docs/portfolio-go-work-packages.md](docs/portfolio-go-work-packages.md). Tester-facing smoke steps are in [docs/portfolio-tester-guide.md](docs/portfolio-tester-guide.md), while operator release evidence is tracked in [docs/release-go-no-go.md](docs/release-go-no-go.md). The active workflow state is mirrored under `.ai/`, and future Codex sessions should use `AGENTS.md` plus the active Step 5 files before choosing the next task.
 
 ## Local Setup
 

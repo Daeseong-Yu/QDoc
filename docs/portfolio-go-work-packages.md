@@ -24,6 +24,7 @@ Documentation coverage for this newly defined work:
 - `.ai/phases/index.json` and `.ai/phases/qdoc-launch-candidate/index.json` keep the launch-candidate task and P5-A through P5-E package list discoverable.
 - `.ai/execution/current.md` keeps the active status snapshot and next-action guidance.
 - `.ai/phases/qdoc-launch-candidate/step5.md` keeps the active acceptance criteria, implementation order, and verification expectations.
+- `docs/portfolio-tester-guide.md` keeps the tester-facing patient, staff, map, OTP, and error-copy smoke path.
 - `docs/release-go-no-go.md` keeps the operator-facing evidence checklist and safe decision-record fields.
 - `AGENTS.md` keeps the future-session rules so Step 5 work does not depend on chat history.
 - `README.md` summarizes the active portfolio gate for developers/operators and links back to this package handoff and the release checklist.
@@ -131,7 +132,7 @@ This snapshot separates local implementation from the staging/manual evidence st
 | P5-A Staff demo access | Bootstrap paths, DB-free staff bootstrap policy self-test, staff/admin expectation checks, membership management, role-boundary E2E, audit-log E2E, readable unrostered staff guidance, and patient check-in fallback navigation exist locally. | Real OTP-receivable staff/admin inbox, tester membership, unrostered denial, and staging admin-data proof. | No |
 | P5-B Provider map public-browser verification | Provider and fallback map interaction paths are implemented and locally green for provider SDK retry, app-level pan/zoom/recenter, marker/card sync, active QDoc site layering, selected-state feedback, hidden guardrail copy, and disabled-provider fallback coverage. | Verify real provider credentials/restrictions, QDoc cost limits, browser geolocation, provider discovery, public-browser pan/drag behavior, and fail-closed states. | No |
 | P5-C OTP delivery and auth error usability | Readable delivery/rate-limit/invalid/expired/unauthorized states, configurable OTP limits, email-readiness verifier, and session refresh/revisit coverage exist locally. | First-time staging OTP delivery for patient and staff, deployed email verifier, real inbox receipt, and deployed refresh/revisit proof. | No |
-| P5-D Public demo smoke | Local Playwright covers patient/staff core paths, queue operations, membership, audit logs, notification preference, outbox creation/failure visibility, and duplicate prevention. | Full visitor-style patient smoke, authorized staff smoke, deployed worker/outbox proof, and public smoke against the current deployed SHA. | No |
+| P5-D Public demo smoke | Local Playwright covers patient/staff core paths, queue operations, membership, audit logs, notification preference, outbox creation/failure visibility, duplicate prevention, and a tester-facing smoke guide now exists. | Full visitor-style patient smoke, authorized staff smoke, deployed worker/outbox proof, and public smoke against the current deployed SHA. | No |
 | P5-E Operations evidence and decision | Release checklist, smoke rollup, release evidence preflight, public release preflight, and self-tests exist locally. | Staging verifier, full rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and explicit GO/NO-GO decision. | No |
 
 ## Portfolio Tester Completion Matrix

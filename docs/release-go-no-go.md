@@ -272,6 +272,7 @@ No-go criteria:
 ## Manual Smoke Checks
 
 Run these in staging after automated checks pass and real email delivery is approved.
+Use `docs/portfolio-tester-guide.md` as the tester-facing walkthrough for P5-A through P5-D, then record the safe evidence and final decision in this document.
 
 1. Patient requests OTP, signs in, selects a launch clinic, checks in, and sees an active ticket.
 2. Patient refreshes or reopens the app and remains in the expected authenticated/ticket state.

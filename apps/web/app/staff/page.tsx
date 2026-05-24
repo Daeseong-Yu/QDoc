@@ -904,38 +904,40 @@ export default function StaffPage() {
               </div>
 
               {!currentUser ? (
-                <div className="grid gap-3">
+                <div className="grid gap-3" data-testid="staff-auth-controls" data-auth-step={authStep}>
                   <p className="text-sm leading-6 text-slate-600">
                     Use the staff or admin email added to a site roster. Personal emails can use patient check-in, but they will not open staff tools until an admin adds them.
                   </p>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="Staff email"
-                    className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
-                  />
-                  {authStep === "code" ? (
+                  <div className="flex flex-wrap items-center gap-2">
                     <input
-                      type="text"
-                      inputMode="numeric"
-                      value={code}
-                      onChange={(event) => setCode(event.target.value)}
-                      placeholder="6-digit code"
-                      className="h-11 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="Staff email"
+                      className="h-11 min-w-0 flex-[1_1_11rem] rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
                     />
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void (authStep === "email" ? requestOtp() : verifyOtp());
-                    }}
-                    disabled={authState === "loading"}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
-                  >
-                    {authState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
-                    {authStep === "email" ? "Send code" : "Sign in"}
-                  </button>
+                    {authStep === "code" ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={code}
+                        onChange={(event) => setCode(event.target.value)}
+                        placeholder="6-digit code"
+                        className="h-11 w-32 shrink-0 rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#10b9c4]"
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void (authStep === "email" ? requestOtp() : verifyOtp());
+                      }}
+                      disabled={authState === "loading"}
+                      className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#10b9c4] px-4 text-sm font-semibold text-white hover:bg-[#0ea5b2] disabled:cursor-not-allowed disabled:bg-slate-400"
+                    >
+                      {authState === "loading" ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
+                      {authStep === "email" ? "Send code" : "Sign in"}
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </section>

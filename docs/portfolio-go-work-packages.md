@@ -143,6 +143,7 @@ Implementation state:
 - Launch/admin-data verification can assert staff/admin readiness without printing addresses.
 - Local E2E proves admin-created staff tester membership, staff-only role boundaries, admin role update/delete flows, membership audit-log visibility, and last-admin protection.
 - The staff sign-in surface now tells testers before OTP that staff tools require a staff/admin email added to a site roster, while personal emails remain limited to patient check-in until an admin adds them.
+- The staff sign-in OTP controls now keep the email, 6-digit code, and submit action in a compact responsive control group, with E2E coverage preventing the staff OTP input from expanding into a full-width row.
 
 Remaining evidence:
 
@@ -235,7 +236,7 @@ Implementation state:
 
 - Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, core queue operations, membership role update/delete, membership audit-log visibility, and last-admin protection.
 - Read-only public release preflight catches healthy-but-stale public deployments before browser smoke, so P5-D evidence is not collected against an old artifact.
-- Read-only public browser smoke covers patient page load, patient OTP-entry surface visibility, Refresh usability, clinic selection, marker selection, selected-state feedback, map fallback/provider surface expectations, `/staff` sign-in surface plus roster-guidance reachability, and absence of raw internal API/error tokens in the public UI, including auth, queue, map-provider, and provider-availability codes. It does not request OTPs or prove staff authorization.
+- Read-only public browser smoke covers patient page load, patient OTP-entry surface visibility, Refresh usability, clinic selection, marker selection, selected-state feedback, map fallback/provider surface expectations, `/staff` sign-in surface plus roster-guidance and initial auth-control reachability, and absence of raw internal API/error tokens in the public UI, including auth, queue, map-provider, and provider-availability codes. It does not request OTPs or prove staff authorization.
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`. The helper requires explicit public release preflight and public browser smoke statuses before P5-B or P5-D can pass. It also requires separate statuses for tester membership, role boundaries, patient refresh/revisit, queue controls/notification threshold, membership management, audit-log review, notification/outbox behavior, and duplicate-delivery prevention so the GO evidence cannot hide a skipped workflow inside a coarse package status.
 
 Remaining evidence:

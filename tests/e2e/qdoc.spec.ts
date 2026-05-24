@@ -580,6 +580,10 @@ test("renders staff-friendly OTP errors without exposing auth error codes", asyn
   );
   await page.getByRole("button", { name: "Send code" }).click();
   await expect(page.getByText("Enter the verification code sent to your email.")).toBeVisible();
+  await expect(page.getByTestId("staff-auth-controls")).toHaveAttribute("data-auth-step", "code");
+  await expect(page.getByPlaceholder("Staff email")).toBeVisible();
+  const staffOtpInputWidth = await page.getByPlaceholder("6-digit code").evaluate((element) => element.getBoundingClientRect().width);
+  expect(staffOtpInputWidth).toBeLessThanOrEqual(180);
 
   await page.route(
     "**/api/auth/otp/verify",

@@ -126,7 +126,7 @@ This snapshot separates local implementation from the staging/manual evidence st
 
 | Package | Local implementation / automated coverage | Staging or manual evidence still required | GO-ready |
 | --- | --- | --- | --- |
-| P5-A Staff demo access | Bootstrap paths, staff/admin expectation checks, membership management, role-boundary E2E, audit-log E2E, and readable unrostered staff guidance exist locally. | Real OTP-receivable staff/admin inbox, tester membership, unrostered denial, and staging admin-data proof. | No |
+| P5-A Staff demo access | Bootstrap paths, staff/admin expectation checks, membership management, role-boundary E2E, audit-log E2E, readable unrostered staff guidance, and patient check-in fallback navigation exist locally. | Real OTP-receivable staff/admin inbox, tester membership, unrostered denial, and staging admin-data proof. | No |
 | P5-B Provider map public-browser verification | Provider and fallback map interaction paths are implemented and locally green for provider SDK retry, app-level pan/zoom/recenter, marker/card sync, active QDoc site layering, selected-state feedback, hidden guardrail copy, and disabled-provider fallback coverage. | Verify real provider credentials/restrictions, QDoc cost limits, browser geolocation, provider discovery, public-browser pan/drag behavior, and fail-closed states. | No |
 | P5-C OTP delivery and auth error usability | Readable delivery/rate-limit/invalid/expired/unauthorized states, configurable OTP limits, email-readiness verifier, and session refresh/revisit coverage exist locally. | First-time staging OTP delivery for patient and staff, deployed email verifier, real inbox receipt, and deployed refresh/revisit proof. | No |
 | P5-D Public demo smoke | Local Playwright covers patient/staff core paths, queue operations, membership, audit logs, notification preference, outbox creation/failure visibility, and duplicate prevention. | Full visitor-style patient smoke, authorized staff smoke, deployed worker/outbox proof, and public smoke against the current deployed SHA. | No |
@@ -163,6 +163,7 @@ Implementation state:
 - Local E2E proves admin-created staff tester membership, staff-only role boundaries, admin role update/delete flows, membership audit-log visibility, and last-admin protection.
 - The staff sign-in surface now tells testers before OTP that staff tools require a staff/admin email added to a site roster, while personal emails remain limited to patient check-in until an admin adds them.
 - The staff sign-in OTP controls now keep the email, 6-digit code, and submit action in a compact responsive control group, with E2E coverage preventing the staff OTP input from expanding into a full-width row.
+- Unrostered staff sign-in now keeps the queue board blocked, shows readable access guidance, and provides a direct patient check-in fallback link so a tester with a personal email can continue the public patient flow without developer explanation.
 
 Remaining evidence:
 
@@ -172,7 +173,7 @@ Remaining evidence:
 - Sign in at `/staff` using a real inbox.
 - Add or verify a tester membership through the UI, then record `QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP=passed`.
 - Verify staff-only role boundaries through the UI, then record `QDOC_SMOKE_STAFF_ROLE_BOUNDARY=passed`.
-- Confirm an unrostered personal email is denied staff access with readable copy.
+- Confirm an unrostered personal email is denied staff access with readable copy and the patient check-in fallback remains available.
 
 Verification:
 

@@ -31,6 +31,7 @@ import {
   Bell,
   Check,
   ClipboardList,
+  Home,
   Loader2,
   LogOut,
   Mail,
@@ -44,6 +45,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
@@ -1003,6 +1005,13 @@ export default function StaffPage() {
                       <p className="mt-3 max-w-2xl text-sm text-slate-600">
                         This email can use patient check-in, but it is not attached to a staff location. A site admin must add this exact email before the queue board is available.
                       </p>
+                      <Link
+                        href="/"
+                        className="mt-4 inline-flex h-10 items-center gap-2 rounded-md bg-[#10b9c4] px-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0ea5b2]"
+                      >
+                        <Home size={16} aria-hidden="true" />
+                        Open patient check-in
+                      </Link>
                     </div>
                   </div>
                   <button

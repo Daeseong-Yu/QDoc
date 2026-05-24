@@ -88,13 +88,17 @@ mainSteps:
                 .env.staging.example | \
                 compose.staging.yaml | \
                 deploy/ | \
+                deploy/bootstrap-staff-admins.sh | \
                 deploy/Caddyfile | \
                 deploy/db-backup.sh | \
                 deploy/db-restore-check.sh | \
                 deploy/db-restore.sh | \
                 deploy/deploy-from-s3.sh | \
                 deploy/load-failure-drills.sh | \
+                deploy/portfolio-smoke-evidence.sh | \
+                deploy/release-evidence.sh | \
                 deploy/staging-rehearsal.sh | \
+                deploy/verify-public-release.mjs | \
                 deploy/verify-staging.sh | \
                 deploy/ssm/ | \
                 deploy/ssm/qdoc-staging-deploy.yaml)

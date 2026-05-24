@@ -326,7 +326,7 @@ aws ssm send-command \
   --parameters '{"appArtifactUri":["s3://<artifact-bucket>/staging/<git-sha>/qdoc-app.tar.gz"],"opsBundleUri":["s3://<artifact-bucket>/staging/<git-sha>/qdoc-ops.tar.gz"],"imageTag":["<git-sha>"],"expectedAppSha256":["<app-artifact-sha256>"],"expectedOpsSha256":["<ops-bundle-sha256>"]}'
 ```
 
-The SSM command runs as root, requires app and ops artifacts to come from the trusted bucket recorded in `/opt/qdoc/shared/deploy-bucket`, downloads and verifies `qdoc-ops.tar.gz` from the same S3 prefix, extracts it to `/opt/qdoc/releases/<git-sha>`, then runs the bundled `deploy/deploy-from-s3.sh`. The deploy script serializes deployments with a host lock, downloads `qdoc-app.tar.gz.sha256`, verifies the image artifact against the workflow-provided digest before loading it into Docker, forces the web bind to loopback, waits for Compose services to become healthy, and updates `/opt/qdoc/current` after success.
+The SSM command runs as root, requires app and ops artifacts to come from the trusted bucket recorded in `/opt/qdoc/shared/deploy-bucket`, downloads and verifies `qdoc-ops.tar.gz` from the same S3 prefix, validates the ops bundle against an explicit allowlist, extracts it to `/opt/qdoc/releases/<git-sha>`, then runs the bundled `deploy/deploy-from-s3.sh`. The deploy script serializes deployments with a host lock, downloads `qdoc-app.tar.gz.sha256`, verifies the image artifact against the workflow-provided digest before loading it into Docker, forces the web bind to loopback, waits for Compose services to become healthy, and updates `/opt/qdoc/current` after success. Update `deploy/ssm/qdoc-staging-deploy.yaml` whenever a new file is added to the staged ops bundle.
 
 Verify the path before testing in a browser:
 

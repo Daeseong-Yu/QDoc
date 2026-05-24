@@ -60,6 +60,8 @@ Latest documentation refresh: this board is already filled into the required `.a
 
 Latest local verification note: local P5-B recovery is complete in the current working tree. Targeted provider-map E2E passed 4 tests, full local Playwright E2E passed 34 tests, and `pnpm typecheck`, `pnpm lint`, workflow validation, and `git diff --check` passed. The fixed local gaps were Mapbox/Google SDK readiness retry and overlapping marker hit testing/selection layering. Staging/public-browser provider evidence is still required with real provider credentials/restrictions, QDoc cost limits, browser geolocation, provider discovery, pan/zoom/recenter/selection behavior, and fail-closed states.
 
+Latest documentation-fill refresh: the active P5 board is still launch-candidate Step 5. Evidence commands should read the current candidate with `git rev-parse HEAD` immediately before use instead of copying a SHA from chat history or stale status notes. P5-C no longer treats the delivery-failure backoff as an implementation follow-up; the remaining blocker is staging proof with deployed email verification, real first-time inbox receipt, and deployed refresh/revisit behavior.
+
 Latest documentation-fill instruction: treat the "what remains before GO" list below as the complete portfolio product-completion backlog for documented QDoc flows, not as a narrow launch checklist or next-step-only plan. If a future session discovers that a visible tester-facing feature is non-responsive, placeholder-only, dependent on hidden setup, or local-only, update the owning P5 package here and in the `.ai` active state before continuing implementation or evidence collection.
 
 ## Execution Boundaries

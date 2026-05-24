@@ -121,7 +121,7 @@ QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true \
 pnpm e2e:portfolio
 ```
 
-This public browser smoke first compares the expected 40-character candidate SHA with `/api/release`, then checks the patient page, map controls, Refresh/site-selection behavior, marker selected-state feedback, and `/staff` sign-in surface without database writes or OTP requests. It does not replace first-time inbox delivery, staff authorization, queue operation, worker/outbox, backup, or rollback evidence.
+This public browser smoke first compares the expected 40-character candidate SHA with `/api/release`, then checks the patient page, map controls, Refresh/site-selection behavior, marker selected-state feedback, `/staff` sign-in surface, and absence of raw internal API/error tokens without database writes or OTP requests. It does not replace first-time inbox delivery, staff authorization, queue operation, worker/outbox, backup, or rollback evidence.
 
 ## Local Required Checks
 
@@ -248,7 +248,7 @@ Run these in staging after automated checks pass and real email delivery is appr
 8. Staff delays and restores another eligible ticket; restored ticket returns to the front of the waiting queue.
 9. Staff verifies queue open/close, notification threshold, membership management, and audit-log review.
 10. Almost-ready notification work appears in operational checks without duplicate delivery.
-11. User-facing OTP/map failures are readable and do not expose raw internal error codes such as `rate_limited`, `otp_delivery_unavailable`, `invalid_otp`, or `expired_otp`.
+11. User-facing OTP/map/staff failures are readable and do not expose raw internal error codes such as `rate_limited`, `otp_delivery_unavailable`, `invalid_otp`, `expired_otp`, `map_provider_disabled`, `map_budget_exhausted`, `queue_closed`, `invalid_request`, `invalid_transition`, `internal_error`, `not_found`, or raw JSON auth tokens such as `"unauthorized"` or `"forbidden"`.
 
 Go criteria:
 

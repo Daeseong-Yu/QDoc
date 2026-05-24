@@ -60,6 +60,8 @@ Latest documentation refresh: this board is already filled into the required `.a
 
 Latest local verification note: the previous P5-B provider SDK script-load recovery gap has been fixed locally. The targeted desktop sequence, full mobile suite, and full local Playwright suite now pass; staging/public-browser proof is still pending before `GO`.
 
+Latest documentation-fill instruction: treat the "what remains before GO" list below as the complete portfolio product-completion backlog for documented QDoc flows, not as a narrow launch checklist or next-step-only plan. If a future session discovers that a visible tester-facing feature is non-responsive, placeholder-only, dependent on hidden setup, or local-only, update the owning P5 package here and in the `.ai` active state before continuing implementation or evidence collection.
+
 ## Execution Boundaries
 
 Use these packages as the implementation, verification, and commit-unit boundaries for the rest of Step 5. Keep three states separate for each package:

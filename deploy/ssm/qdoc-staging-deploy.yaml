@@ -88,6 +88,7 @@ mainSteps:
                 .env.staging.example | \
                 compose.staging.yaml | \
                 deploy/ | \
+                deploy/bootstrap-staff-admins.self-test.sh | \
                 deploy/bootstrap-staff-admins.sh | \
                 deploy/Caddyfile | \
                 deploy/db-backup.sh | \

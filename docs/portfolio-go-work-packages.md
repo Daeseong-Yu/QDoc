@@ -56,6 +56,8 @@ Current documentation ownership: this document owns the P5-A through P5-E packag
 
 Latest documentation-fill result: the newly defined work is filled into `.ai/core`, `.ai/phases`, `.ai/execution/current.md`, this committed handoff, the `.ai/docs` mirror, `docs/release-go-no-go.md`, `AGENTS.md`, and the README portfolio gate summary. Continue updating by ownership instead of copying every implementation detail into every document. This document remains the package-level source of truth; active candidate SHA, one-off staging results, and private operational details belong in active execution state or external safe release notes.
 
+Latest documentation refresh: this board is already filled into the required `.ai` and operator documents. Choose the next task from the package status snapshot below, not from chat history. Public/staging evidence remains pending until the candidate is pushed, staging deploy succeeds, and `/api/release` matches `git rev-parse HEAD`; until then, work only on local implementation or documentation that reduces the first open P5 blocker.
+
 ## Execution Boundaries
 
 Use these packages as the implementation, verification, and commit-unit boundaries for the rest of Step 5. Keep three states separate for each package:

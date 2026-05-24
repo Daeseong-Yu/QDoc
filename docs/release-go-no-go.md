@@ -18,6 +18,8 @@ The package-level source of truth for this newly defined work is `docs/portfolio
 
 Do not mark a package complete from local tests alone when it depends on real inboxes, real provider credentials, public browser restrictions, deployed host settings, backup restore-checks, or rollback artifacts.
 
+Before using this checklist for final evidence, confirm the release candidate is the one being served publicly: read the SHA with `git rev-parse HEAD`, ensure that commit has been pushed and deployed, and require `/api/release` to match it. If that prerequisite is missing, leave the relevant package evidence as `pending` and do not replace it with local-only proof.
+
 If any evidence step shows that a visitor or invited tester cannot complete a documented workflow from the UI and checklist alone, stop treating the release as evidence-only work. Return to the relevant P5 package, fix the implementation or documentation gap, and rerun the affected checks before recording a GO/NO-GO decision.
 
 ## Work Package Evidence

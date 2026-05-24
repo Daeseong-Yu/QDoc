@@ -153,6 +153,25 @@ async function pollNumericMapAttribute(page: Page, attribute: string) {
   return page.getByTestId("clinic-map-section").evaluate((element, name) => Number(element.getAttribute(name)), attribute);
 }
 
+async function dragProviderMap(page: Page) {
+  const providerContainer = page.getByTestId("clinic-map-provider-container");
+  const box = await providerContainer.boundingBox();
+
+  expect(box, "provider map container should have a measurable public-browser surface").not.toBeNull();
+
+  if (!box) {
+    return;
+  }
+
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 80, startY + 20, { steps: 8 });
+  await page.mouse.up();
+}
+
 test.describe("portfolio public browser smoke", () => {
   test("loads the patient map and keeps public controls usable", async ({ page, request }) => {
     await expectCandidateRelease(request);
@@ -197,6 +216,13 @@ test.describe("portfolio public browser smoke", () => {
       await expect(page.getByTestId("clinic-map-provider-pan-right")).toBeVisible();
       await expect(page.getByTestId("clinic-map-provider-zoom-in")).toBeVisible();
       await expect(page.getByTestId("clinic-map-provider-zoom-out")).toBeVisible();
+      const providerDragGestureCount = await readNumericMapAttribute(page, "data-provider-drag-gesture-count");
+      await dragProviderMap(page);
+      await expect
+        .poll(() => pollNumericMapAttribute(page, "data-provider-drag-gesture-count"), {
+          message: "provider map should receive a direct drag gesture in the public browser",
+        })
+        .toBeGreaterThan(providerDragGestureCount);
       const providerPanCount = await readNumericMapAttribute(page, "data-provider-pan-count");
       await page.getByTestId("clinic-map-provider-pan-right").click();
       await expect

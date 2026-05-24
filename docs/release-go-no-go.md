@@ -136,7 +136,7 @@ QDOC_EXPECTED_RELEASE_SHA=<git-sha> \
 pnpm verify:public-release
 ```
 
-Run the read-only public browser smoke against the deployed URL before marking P5-B or P5-D browser checks complete. Use provider strict mode only when the map provider should be live for the candidate. In strict provider mode, the smoke requires granted browser geolocation, a ready provider map, at least one QDoc clinic marker, at least one provider nearby discovery place, and app-level provider pan/zoom/recenter responses; if the chosen coordinates have no provider results, use `QDOC_PORTFOLIO_GEO_LATITUDE` and `QDOC_PORTFOLIO_GEO_LONGITUDE` for a known service area.
+Run the read-only public browser smoke against the deployed URL before marking P5-B or P5-D browser checks complete. Use provider strict mode only when the map provider should be live for the candidate. In strict provider mode, the smoke requires granted browser geolocation, a ready provider map, at least one QDoc clinic marker, at least one provider nearby discovery place, a direct drag gesture on the ready provider map surface, and app-level provider pan/zoom/recenter responses; if the chosen coordinates have no provider results, use `QDOC_PORTFOLIO_GEO_LATITUDE` and `QDOC_PORTFOLIO_GEO_LONGITUDE` for a known service area.
 
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com \
@@ -145,7 +145,7 @@ QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true \
 pnpm e2e:portfolio
 ```
 
-This public browser smoke first compares the expected 40-character candidate SHA with `/api/release`, then checks the patient page, patient OTP-entry surface, map controls including pan/zoom/recenter, Refresh/site-selection behavior, marker selected-state feedback, QDoc marker-to-card synchronization, provider marker selection and clinic reselection recovery, `/staff` sign-in surface plus roster guidance, and absence of raw internal API/error tokens without database writes or OTP requests. It does not replace first-time inbox delivery, staff authorization, queue operation, worker/outbox, backup, or rollback evidence.
+This public browser smoke first compares the expected 40-character candidate SHA with `/api/release`, then checks the patient page, patient OTP-entry surface, map controls including direct drag, pan/zoom/recenter, Refresh/site-selection behavior, marker selected-state feedback, QDoc marker-to-card synchronization, provider marker selection and clinic reselection recovery, `/staff` sign-in surface plus roster guidance, and absence of raw internal API/error tokens without database writes or OTP requests. It does not replace first-time inbox delivery, staff authorization, queue operation, worker/outbox, backup, or rollback evidence.
 
 ## Local Required Checks
 

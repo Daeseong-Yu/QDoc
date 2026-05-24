@@ -113,6 +113,7 @@ type MarkerOffset = {
 };
 
 type ProviderInteractionState = {
+  dragGestureCount: number;
   fallbackPanCount: number;
   fallbackRecenterCount: number;
   focusCount: number;
@@ -609,6 +610,12 @@ function getFallbackPanOffset(viewport: FallbackViewport) {
 export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onSelectSite }: ClinicMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const providerMapRef = useRef<ProviderMapHandle | null>(null);
+  const providerDragRef = useRef<{
+    pointerId: number;
+    recorded: boolean;
+    x: number;
+    y: number;
+  } | null>(null);
   const locationSignature = userLocation
     ? `${userLocation.latitude.toFixed(5)}:${userLocation.longitude.toFixed(5)}`
     : "";
@@ -624,6 +631,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     zoom: 2,
   });
   const [providerInteraction, setProviderInteraction] = useState<ProviderInteractionState>({
+    dragGestureCount: 0,
     fallbackPanCount: 0,
     fallbackRecenterCount: 0,
     focusCount: 0,
@@ -743,6 +751,13 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     setProviderInteraction((current) => ({
       ...current,
       zoomCount: current.zoomCount + 1,
+    }));
+  }, []);
+
+  const recordProviderDragGesture = useCallback(() => {
+    setProviderInteraction((current) => ({
+      ...current,
+      dragGestureCount: current.dragGestureCount + 1,
     }));
   }, []);
 
@@ -872,6 +887,64 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
   }, [displaySignature, displayPlaces, isNearbySearchSettled, refreshKey, selectDisplayPlace, selectedSiteId, userLocation]);
 
   useEffect(() => {
+    const element = mapContainerRef.current;
+
+    if (!element || mapState !== "ready") {
+      providerDragRef.current = null;
+      return;
+    }
+
+    const minimumDragDistance = 12;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (event.pointerType === "mouse" && event.button !== 0) {
+        return;
+      }
+
+      providerDragRef.current = {
+        pointerId: event.pointerId,
+        recorded: false,
+        x: event.clientX,
+        y: event.clientY,
+      };
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      const drag = providerDragRef.current;
+
+      if (!drag || drag.pointerId !== event.pointerId || drag.recorded) {
+        return;
+      }
+
+      const distance = Math.hypot(event.clientX - drag.x, event.clientY - drag.y);
+
+      if (distance >= minimumDragDistance) {
+        drag.recorded = true;
+        recordProviderDragGesture();
+      }
+    }
+
+    function handlePointerEnd(event: PointerEvent) {
+      if (providerDragRef.current?.pointerId === event.pointerId) {
+        providerDragRef.current = null;
+      }
+    }
+
+    element.addEventListener("pointerdown", handlePointerDown, { capture: true });
+    element.addEventListener("pointermove", handlePointerMove, { capture: true });
+    element.addEventListener("pointerup", handlePointerEnd, { capture: true });
+    element.addEventListener("pointercancel", handlePointerEnd, { capture: true });
+
+    return () => {
+      element.removeEventListener("pointerdown", handlePointerDown, { capture: true });
+      element.removeEventListener("pointermove", handlePointerMove, { capture: true });
+      element.removeEventListener("pointerup", handlePointerEnd, { capture: true });
+      element.removeEventListener("pointercancel", handlePointerEnd, { capture: true });
+      providerDragRef.current = null;
+    };
+  }, [mapState, recordProviderDragGesture]);
+
+  useEffect(() => {
     providerMapRef.current?.selectPlace(selectedDisplayPlaceId, selectedSiteId);
 
     const place = displayPlaces.find((item) => item.id === selectedDisplayPlaceId);
@@ -896,6 +969,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
       data-map-display-place-count={displayPlaces.length}
       data-map-state={mapState}
       data-nearby-search-settled={isNearbySearchSettled ? "true" : "false"}
+      data-provider-drag-gesture-count={providerInteraction.dragGestureCount}
       data-provider-focus-count={providerInteraction.focusCount}
       data-provider-pan-count={providerInteraction.panCount}
       data-provider-place-count={providerDisplayPlaces.length}

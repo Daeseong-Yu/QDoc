@@ -912,6 +912,22 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
   await expect(page.getByTestId("clinic-map-provider-zoom-in")).toBeVisible();
   await expect(page.getByTestId("clinic-map-provider-zoom-out")).toBeVisible();
   await expect(page.getByTestId("clinic-map-provider-pan-right")).toBeVisible();
+  const dragGestureCount = Number(await page.getByTestId("clinic-map-section").getAttribute("data-provider-drag-gesture-count"));
+  const providerContainerBox = await page.getByTestId("clinic-map-provider-container").boundingBox();
+  expect(providerContainerBox).not.toBeNull();
+  if (providerContainerBox) {
+    const startX = providerContainerBox.x + providerContainerBox.width / 2;
+    const startY = providerContainerBox.y + providerContainerBox.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 80, startY + 20, { steps: 8 });
+    await page.mouse.up();
+    await expect
+      .poll(() =>
+        page.getByTestId("clinic-map-section").evaluate((element) => Number(element.getAttribute("data-provider-drag-gesture-count"))),
+      )
+      .toBeGreaterThan(dragGestureCount);
+  }
 
   const providerMarker = page.getByLabel("Select Provider Urgent Care");
   const qdocMarker = page.getByLabel("Select E2E Clinic");

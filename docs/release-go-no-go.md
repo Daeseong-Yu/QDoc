@@ -46,6 +46,14 @@ Fill this table for each release candidate. Keep the notes safe: use short summa
 - Database migration range reviewed: `<from-sha>..<to-sha>`
 - Rollback target SHA and artifact confirmed: `<known-good-sha>`
 
+To generate the ordered command plan for the current candidate without contacting staging, SMTP, AWS, Docker, or a map provider, run:
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com pnpm portfolio:evidence-commands
+```
+
+The helper fills the candidate SHA from `git rev-parse HEAD` when available and warns if the local branch is still ahead of its upstream. Use it to avoid copying the literal `<git-sha>` placeholder into rehearsal, public release preflight, or release evidence commands.
+
 Before copying this section into the final decision record, run the read-only evidence preflight. It does not call AWS, Docker, SMTP, map providers, or the public site; it only checks provided identifiers and prints a commit-safe decision-record block with private operational identifiers redacted by default after blocking validation passes.
 
 ```bash

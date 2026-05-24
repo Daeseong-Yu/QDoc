@@ -410,6 +410,14 @@ The rehearsal validates the Compose configuration, optional release-directory SH
 
 Use the 40-character candidate Git SHA in both `QDOC_EXPECTED_RELEASE_SHA` and `QDOC_EXPECTED_APP_IMAGE=qdoc-app:<git-sha>`. The literal `<git-sha>` placeholder is never valid. The rehearsal script exports `QDOC_APP_IMAGE` from `QDOC_EXPECTED_APP_IMAGE`, so the shared staging env file does not need to be edited for each release.
 
+To print the exact evidence commands for the current candidate without contacting staging, SMTP, AWS, Docker, or a map provider:
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com pnpm portfolio:evidence-commands
+```
+
+The command plan fills the candidate SHA from `git rev-parse HEAD` when available, warns when the local branch is still ahead of its upstream, and prints the ordered public release preflight, browser smoke, staging verifier, staff bootstrap, rehearsal, smoke rollup, and release evidence preflight commands. It is read-only; it does not replace pushing the candidate, waiting for the staging deploy, or proving `/api/release` matches the same SHA.
+
 For local command validation without running staging containers:
 
 ```bash

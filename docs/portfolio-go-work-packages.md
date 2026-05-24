@@ -290,6 +290,7 @@ Implementation state:
 - `deploy/release-evidence.self-test.sh` and `pnpm verify:release-evidence:self-test` cover the release evidence decision guard locally without AWS, Docker, SMTP, map provider, public URL, or database access. The self-test proves that `GO` with pending statuses fails without printing a decision block, `NO-GO` with pending statuses remains recordable with warnings, and `GO` with every required status passed prints only redacted private operational identifiers.
 - `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide the manual P5-A through P5-D smoke status rollup that feeds the release evidence preflight.
 - `deploy/portfolio-smoke-evidence.self-test.sh` and `pnpm verify:portfolio-smoke:self-test` cover the smoke rollup locally without AWS, Docker, SMTP, map provider, public URL, or database access. The self-test proves that pending evidence remains pending, strict mode blocks skipped checks, older coarse P5-A status sets cannot pass, invalid values fail, and fully passed P5-A through P5-D inputs produce passed release-evidence exports.
+- `deploy/portfolio-evidence-commands.sh` and `pnpm portfolio:evidence-commands` print the ordered public release preflight, public browser smoke, staging verifier, staff bootstrap, rehearsal, smoke rollup, and release evidence commands for the current candidate without contacting AWS, Docker, SMTP, map providers, the public URL, or the database. The helper fills the current Git SHA when available and warns when the local branch is still ahead of its upstream, reducing placeholder-SHA and image-tag mistakes before evidence collection.
 - Staging rehearsal and release evidence use `QDOC_EXPECTED_APP_IMAGE=qdoc-app:<40-character-git-sha>` as the candidate image, so the shared staging env file can retain its deploy-time `QDOC_APP_IMAGE` placeholder.
 
 Remaining evidence:
@@ -304,6 +305,7 @@ Remaining evidence:
 Verification:
 
 - `deploy/portfolio-smoke-evidence.sh`
+- `pnpm portfolio:evidence-commands`
 - `pnpm verify:portfolio-smoke:self-test`
 - `pnpm verify:public-release`
 - `deploy/verify-staging.sh`

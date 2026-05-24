@@ -167,11 +167,10 @@ No-go criteria:
 
 Run staging checks from `/opt/qdoc/current` or an equivalent deployment operator shell after the candidate artifact is deployed.
 
-For P5-A on an existing staging database, add or promote the real staff/admin inbox without rerunning the full seed. Run dry-run first and do not copy real email addresses into repository evidence:
+For P5-A on an existing staging database, add or promote the real staff/admin inbox without rerunning the full seed. The deploy helper dry-runs by default unless `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply` is set. Run dry-run first and do not copy real email addresses into repository evidence:
 
 ```bash
 cd /opt/qdoc/current
-QDOC_BOOTSTRAP_STAFF_DRY_RUN=true \
 QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" \
 bash deploy/bootstrap-staff-admins.sh
 

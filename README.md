@@ -151,7 +151,7 @@ OTP delivery is console-based in local development. When signing in, read the ve
 Seed data:
 
 - Staff account: local defaults to `staff@example.com`. For staging, set `QDOC_SEED_STAFF_ADMIN_EMAILS` to one or more real OTP-receivable staff emails before running seed/deploy; staging seed fails closed when this is missing or uses example-domain addresses.
-- Existing staging staff bootstrap: use `deploy/bootstrap-staff-admins.sh` with `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS` to add or promote real staff/admin emails without resetting demo tickets. Run dry-run first; production-like apply requires `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply`.
+- Existing staging staff bootstrap: use `deploy/bootstrap-staff-admins.sh` with `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS` to add or promote real staff/admin emails without resetting demo tickets. The deploy helper dry-runs by default; production-like apply requires `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply`.
 - Waterloo Clinic: `site-waterloo`, `queue-waterloo-walkin`, 19 waiting tickets
 - Kitchener Clinic: `site-kitchener`, `queue-kitchener-walkin`, 5 waiting tickets
 - Dental Clinic: `site-university`, `queue-university-walkin`, 0 waiting tickets
@@ -248,6 +248,7 @@ Staging environment variables:
 | `QDOC_SEED_STAFF_ADMIN_EMAILS` | staging bootstrap | Comma-separated real staff/admin emails to create or upsert during approved seed/bootstrap. Local defaults to `staff@example.com`; staging requires real OTP-receivable addresses and rejects example-domain placeholders. |
 | `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS` | staff bootstrap | Comma-separated real staff/admin emails to add or promote without rerunning the full seed. The bootstrap command does not print addresses. |
 | `QDOC_BOOTSTRAP_STAFF_SITE_IDS` | staff bootstrap | Optional comma-separated site IDs for staff bootstrap. Defaults to `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` when set, otherwise all sites. |
+| `QDOC_BOOTSTRAP_STAFF_DRY_RUN` | staff bootstrap | Optional `true` or `false`. The deploy helper defaults to `true`, unless `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply` is set; package scripts still honor the explicit value. |
 | `QDOC_BOOTSTRAP_STAFF_CONFIRM` | staff bootstrap | Set to `apply` only for the approved non-dry-run staff-admin bootstrap in staging or production-like environments. Dry-run does not require it. |
 | `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` | no | Comma-separated clinic site IDs that `pnpm verify:admin-data` must find. Defaults are not required locally, but staging should set the launch clinic IDs. |
 | `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` | no | Comma-separated staff/admin emails that `pnpm verify:admin-data` must find as site admins. The verifier prints counts and site IDs only, not the addresses. |
@@ -488,7 +489,8 @@ Admin data operations:
 ```bash
 QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener pnpm db:bootstrap-staff-admins
 QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener pnpm db:bootstrap-staff-admins
-bash deploy/bootstrap-staff-admins.sh
+QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener bash deploy/bootstrap-staff-admins.sh
+QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener bash deploy/bootstrap-staff-admins.sh
 pnpm verify:admin-data
 QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener pnpm verify:admin-data
 QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm verify:admin-data

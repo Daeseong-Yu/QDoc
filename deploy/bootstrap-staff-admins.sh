@@ -85,10 +85,33 @@ fi
 
 export QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS
 export QDOC_BOOTSTRAP_STAFF_SITE_IDS
-export QDOC_BOOTSTRAP_STAFF_DRY_RUN="${QDOC_BOOTSTRAP_STAFF_DRY_RUN:-false}"
 export QDOC_BOOTSTRAP_STAFF_CONFIRM="${QDOC_BOOTSTRAP_STAFF_CONFIRM:-}"
 
-log "Bootstrapping staff admin memberships in the staging image"
+if [ -z "${QDOC_BOOTSTRAP_STAFF_DRY_RUN:-}" ]; then
+  if [ "$QDOC_BOOTSTRAP_STAFF_CONFIRM" = "apply" ]; then
+    QDOC_BOOTSTRAP_STAFF_DRY_RUN=false
+  else
+    QDOC_BOOTSTRAP_STAFF_DRY_RUN=true
+  fi
+fi
+
+case "$QDOC_BOOTSTRAP_STAFF_DRY_RUN" in
+  true | false) ;;
+  *) fail "QDOC_BOOTSTRAP_STAFF_DRY_RUN must be true or false" ;;
+esac
+
+if [ "$QDOC_BOOTSTRAP_STAFF_DRY_RUN" = "false" ] && [ "$QDOC_BOOTSTRAP_STAFF_CONFIRM" != "apply" ]; then
+  fail "QDOC_BOOTSTRAP_STAFF_CONFIRM=apply is required for non-dry-run staff admin bootstrap"
+fi
+
+export QDOC_BOOTSTRAP_STAFF_DRY_RUN
+
+if [ "$QDOC_BOOTSTRAP_STAFF_DRY_RUN" = "true" ]; then
+  log "Planning staff admin membership bootstrap in the staging image"
+else
+  log "Applying staff admin membership bootstrap in the staging image"
+fi
+
 compose run --rm --no-deps \
   -e QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS \
   -e QDOC_BOOTSTRAP_STAFF_SITE_IDS \

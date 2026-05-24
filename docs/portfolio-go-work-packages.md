@@ -140,7 +140,7 @@ Implementation state:
 Remaining evidence:
 
 - Configure a real staff/admin inbox through `QDOC_SEED_STAFF_ADMIN_EMAILS`, `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS`, or admin membership management.
-- For an already-deployed staging database, run the staff-admin bootstrap first in dry-run mode, then apply it only after confirming the target site count. Production-like apply requires `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply`. The command output must remain safe and must not print real email addresses.
+- For an already-deployed staging database, run the staff-admin bootstrap first in dry-run mode, then apply it only after confirming the target site count. The deploy helper dry-runs by default unless `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply` is set. Production-like apply requires `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply`. The command output must remain safe and must not print real email addresses.
 - Verify the expected staff/admin account with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS`, then record `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only when the staging admin-data verifier passed without printing the address.
 - Sign in at `/staff` using a real inbox.
 - Add or verify a tester membership through the UI, then record `QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP=passed`.
@@ -153,7 +153,8 @@ Verification:
 - `pnpm verify:launch`
 - `QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm db:bootstrap-staff-admins`
 - `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm db:bootstrap-staff-admins:staging`
-- `bash deploy/bootstrap-staff-admins.sh` from the deployed release when applying approved staging staff/admin access
+- `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" bash deploy/bootstrap-staff-admins.sh` from the deployed release for the default dry-run plan
+- `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" bash deploy/bootstrap-staff-admins.sh` from the deployed release when applying approved staging staff/admin access
 - staff membership E2E or manual staging smoke
 - `QDOC_SMOKE_STAFF_ADMIN_DATA=passed QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP=passed QDOC_SMOKE_STAFF_ROLE_BOUNDARY=passed bash deploy/portfolio-smoke-evidence.sh` as part of the P5-A smoke rollup after staging verification
 - safe release evidence that does not disclose real email addresses unless explicitly approved

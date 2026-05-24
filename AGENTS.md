@@ -82,6 +82,7 @@ Do not start a new phase for this board. Keep it in the active launch-candidate 
 - Keep the package-level handoff in `docs/portfolio-go-work-packages.md` and mirror it in `.ai/docs/portfolio-go-work-packages.md`.
 - Keep durable product, architecture, and trade-off decisions in `.ai/core/PRD.md`, `.ai/core/ARCHITECTURE.md`, and `.ai/core/ADR.md`; update these only when product scope, architecture behavior, public API, deployment, cost-control, data, auth/session, or operational decisions change.
 - Keep operator-facing verification and GO/NO-GO evidence procedures in `docs/release-go-no-go.md`.
+- Keep README as the public developer/operator summary of the active portfolio gate, linking to the package handoff and release checklist instead of duplicating volatile evidence.
 - Keep `AGENTS.md` focused on future-session rules, not volatile release evidence or one-off command results.
 
 - Treat the portfolio site as a user-testable product surface for the documented QDoc flows. Before `GO`, the currently documented patient, staff, map, OTP, queue, notification/outbox, refresh/revisit, membership, audit-log, backup, rollback, and staging verification paths must work well enough for normal tester use; do not rely on "MVP only" reasoning to defer one of those documented paths.

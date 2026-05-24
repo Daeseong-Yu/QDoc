@@ -105,6 +105,16 @@ Portfolio public demo gate:
 3. Staff testing requires a real OTP-receivable staff/admin account prepared by bootstrap or membership management.
 4. User-facing UI must not expose raw internal error codes, OTP values, provider secrets, or implementation-only map cost labels.
 
+Current pre-GO work packages:
+
+1. P5-A Staff demo access: prepare real OTP-receivable staff/admin and tester access, verify role boundaries, and keep unrostered emails denied with readable copy.
+2. P5-B Provider map public-browser verification: prove geolocation-centered provider discovery, pan/zoom, recentering, marker/card synchronization, QDoc-vs-provider distinction, and fail-closed cost controls.
+3. P5-C OTP delivery and auth error usability: prove first-time staging OTP delivery and readable delivery-unavailable, rate-limited, invalid-code, expired-code, and unauthorized-staff states.
+4. P5-D Public demo smoke: exercise patient, staff, queue, notification/outbox, refresh/revisit, membership, audit-log, and map paths as a visitor or invited tester would use them.
+5. P5-E Operations evidence and decision: record staging verifier, rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and an explicit GO/NO-GO decision.
+
+The package handoff is tracked in [docs/portfolio-go-work-packages.md](docs/portfolio-go-work-packages.md). The active workflow state is mirrored under `.ai/`, and future Codex sessions should use `AGENTS.md` plus the active Step 5 files before choosing the next task.
+
 ## Local Setup
 
 ```bash

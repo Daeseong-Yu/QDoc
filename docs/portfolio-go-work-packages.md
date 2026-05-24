@@ -25,6 +25,7 @@ Documentation coverage for this newly defined work:
 - `.ai/execution/current.md` keeps the active status snapshot and next-action guidance.
 - `.ai/phases/qdoc-launch-candidate/step5.md` keeps the active acceptance criteria, implementation order, and verification expectations.
 - `AGENTS.md` keeps the future-session rules so Step 5 work does not depend on chat history.
+- `README.md` summarizes the active portfolio gate for developers/operators and links back to this package handoff and the release checklist.
 
 Resume from these documents in this order when continuing the newly defined work:
 
@@ -51,6 +52,8 @@ Latest documentation-sync rule: when the work board changes, update this file fo
 Volatile candidate values such as the current release SHA belong in `.ai/execution/current.md` and the active Step 5 status block, not as durable package definitions in this committed handoff. Before public release preflight or portfolio smoke, read the current SHA with `git rev-parse HEAD` and update the active `.ai` status if it has changed.
 
 Current documentation ownership: this document owns the P5-A through P5-E package definitions, local/staging evidence boundaries, and package-level verification commands. It should not store one-off staging logs, OTP values, private host details, bucket names, provider identifiers, real tester email addresses, or volatile candidate evidence. Use `docs/release-go-no-go.md` for safe operator evidence and `.ai/execution/current.md` for the latest active status snapshot.
+
+Latest documentation-fill result: the newly defined work is filled into `.ai/core`, `.ai/phases`, `.ai/execution/current.md`, this committed handoff, the `.ai/docs` mirror, `docs/release-go-no-go.md`, `AGENTS.md`, and the README portfolio gate summary. Continue updating by ownership instead of copying every implementation detail into every document.
 
 ## Execution Boundaries
 

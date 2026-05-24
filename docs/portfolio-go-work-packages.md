@@ -161,7 +161,7 @@ Verification:
 - `QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" bash deploy/bootstrap-staff-admins.sh` from the deployed release for the default dry-run plan
 - `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" bash deploy/bootstrap-staff-admins.sh` from the deployed release when applying approved staging staff/admin access
 - staff membership E2E or manual staging smoke
-- `QDOC_SMOKE_STAFF_ADMIN_DATA=passed QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP=passed QDOC_SMOKE_STAFF_ROLE_BOUNDARY=passed bash deploy/portfolio-smoke-evidence.sh` as part of the P5-A smoke rollup after staging verification
+- `QDOC_SMOKE_STAFF_ADMIN_DATA=passed QDOC_SMOKE_STAFF_ADMIN_SIGNIN=passed QDOC_SMOKE_STAFF_TESTER_AUTH=passed QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP=passed QDOC_SMOKE_STAFF_ROLE_BOUNDARY=passed QDOC_SMOKE_UNROSTERED_STAFF_DENIAL=passed bash deploy/portfolio-smoke-evidence.sh` as part of the P5-A smoke rollup after staging verification
 - safe release evidence that does not disclose real email addresses unless explicitly approved
 
 ### P5-B Provider Map Public-Browser Verification

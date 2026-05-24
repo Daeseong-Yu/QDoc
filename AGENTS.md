@@ -200,6 +200,8 @@ pnpm verify:ops
 pnpm verify:admin-data
 pnpm verify:launch
 pnpm verify:email
+pnpm verify:portfolio-smoke
+pnpm verify:release-evidence
 pnpm verify:release-evidence:self-test
 QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm db:bootstrap-staff-admins
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_RELEASE_SHA=<git-sha> pnpm verify:public-release

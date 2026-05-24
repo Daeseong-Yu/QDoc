@@ -21,6 +21,7 @@
     "verify:email": "dotenv -e .env -- pnpm --filter @qdoc/worker verify:email",
     "verify:drills": "bash deploy/load-failure-drills.sh",
     "verify:portfolio-smoke": "bash deploy/portfolio-smoke-evidence.sh",
+    "verify:public-release": "node deploy/verify-public-release.mjs",
     "verify:release-evidence": "bash deploy/release-evidence.sh",
     "verify:staging": "bash deploy/verify-staging.sh",
     "verify:staging:rehearsal": "bash deploy/staging-rehearsal.sh",

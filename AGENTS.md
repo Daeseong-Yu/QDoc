@@ -80,6 +80,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - When a tester-facing path is missing, confusing, non-interactive, placeholder-only, or dependent on developer/operator explanation, treat that as active implementation work in the relevant P5 package before collecting final evidence.
 - Use `deploy/release-evidence.sh` or `pnpm verify:release-evidence` as the read-only P5-E evidence preflight before copying identifiers into `docs/release-go-no-go.md`; strict final evidence should use `QDOC_EVIDENCE_STRICT=true`, and public/repository evidence should keep the default redacted output.
 - Use `deploy/portfolio-smoke-evidence.sh` or `pnpm verify:portfolio-smoke` after staging manual smoke to roll P5-A through P5-D outcomes into package status exports for the release evidence preflight; strict final smoke evidence should use `QDOC_SMOKE_STRICT=true`.
+- Use `pnpm verify:public-release` before public-browser smoke when the candidate SHA matters. It checks only `/api/health` and `/api/release`, requires `QDOC_PUBLIC_URL` or `QDOC_PORTFOLIO_BASE_URL`, and should use `QDOC_EXPECTED_RELEASE_SHA=<40-character-git-sha>` or `QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<40-character-git-sha>` to fail early on stale public deployments.
 - Use `pnpm e2e:portfolio` for read-only public-browser smoke against a deployed URL. It requires `QDOC_PUBLIC_URL` or `QDOC_PORTFOLIO_BASE_URL`; add `QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true` when P5-B must prove a live provider-backed map instead of the fallback map. In strict provider mode, the smoke must prove browser geolocation, provider map ready state, at least one QDoc clinic marker, and at least one provider nearby discovery place.
 - Use `pnpm verify:email` locally and `QDOC_VERIFY_EMAIL=true bash deploy/verify-staging.sh` in staging for P5-C email readiness. Add `QDOC_VERIFY_SMTP_CONNECTIVITY=true` only when an approved live SMTP connectivity/auth check is intended. This verifier must remain safe: no SMTP secrets, provider diagnostics, OTP values, recipient addresses, or real email sends in output.
 - When resuming Step 5, read the work package status snapshot in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md` before choosing the next task. Choose work from P5-A through P5-E based on the latest blocker, and treat staging/manual product gaps as implementation work in the relevant package before returning to evidence collection.
@@ -165,6 +166,7 @@ pnpm verify:admin-data
 pnpm verify:launch
 pnpm verify:email
 QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm db:bootstrap-staff-admins
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_RELEASE_SHA=<git-sha> pnpm verify:public-release
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true pnpm e2e:portfolio
 ```
 

@@ -99,6 +99,14 @@ bash deploy/portfolio-smoke-evidence.sh
 
 Use `pending`, `not_run`, or `failed` for checks that are not actually proven. Do not mark a value `passed` from local tests when the check depends on real inboxes, a public browser, provider credentials, deployed worker behavior, or staging host settings.
 
+Run the read-only public release preflight before browser smoke. It checks only `/api/health` and `/api/release`; use it to catch stale public deployments before collecting Playwright evidence.
+
+```bash
+QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_EXPECTED_RELEASE_SHA=<git-sha> \
+pnpm verify:public-release
+```
+
 Run the read-only public browser smoke against the deployed URL before marking P5-B or P5-D browser checks complete. Use provider strict mode only when the map provider should be live for the candidate. In strict provider mode, the smoke requires granted browser geolocation, a ready provider map, at least one QDoc clinic marker, and at least one provider nearby discovery place; if the chosen coordinates have no provider results, use `QDOC_PORTFOLIO_GEO_LATITUDE` and `QDOC_PORTFOLIO_GEO_LONGITUDE` for a known service area.
 
 ```bash
@@ -124,6 +132,7 @@ pnpm verify:ops
 pnpm verify:launch
 pnpm verify:email
 pnpm e2e
+QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_RELEASE_SHA=<git-sha> pnpm verify:public-release
 QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<git-sha> QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=true pnpm e2e:portfolio
 git diff --check
 ```
@@ -137,6 +146,7 @@ Go criteria:
 - E2E runs against a local or explicitly isolated test database only.
 - No local-only config, `.env`, backup, screenshot, trace, or generated secret material is staged.
 - Automated coverage includes patient OTP/check-in, staff OTP/queue operations, invalid/expired OTP states, refresh/revisit session continuity, notification preference persistence, almost-ready notification/outbox creation, failed notification job visibility, duplicate-delivery prevention, cancel, delay/restore, audit-log visibility, and map guardrail behavior.
+- Public release preflight passes before public browser smoke, proving the URL is healthy and serving the expected candidate SHA.
 - Public browser smoke passes against the candidate URL when the public domain and provider credentials are expected to be live.
 
 No-go criteria:
@@ -144,6 +154,7 @@ No-go criteria:
 - Any required check fails without a documented, accepted non-launch-blocking reason.
 - E2E targets a shared staging or production database.
 - A required launch setting is only present in local `.env` and not in the target environment.
+- `/api/release` is missing, invalid, or does not match the expected candidate SHA when public smoke evidence is required.
 
 ## Staging Evidence
 

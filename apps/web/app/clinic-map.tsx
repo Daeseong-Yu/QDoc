@@ -97,7 +97,7 @@ type ProviderMapHandle = {
   panBy: (x: number, y: number) => void;
   recenter: (location: BrowserLocation) => void;
   remove: () => void;
-  selectPlace: (placeId: string) => void;
+  selectPlace: (placeId: string, activeQdocSiteId: string) => void;
   zoomBy: (delta: number) => void;
 };
 
@@ -105,6 +105,11 @@ type FallbackViewport = {
   latitude: number;
   longitude: number;
   zoom: number;
+};
+
+type MarkerOffset = {
+  x: number;
+  y: number;
 };
 
 type ProviderInteractionState = {
@@ -145,40 +150,62 @@ function getCoordinates(site: PatientSiteSummary) {
   return { latitude, longitude };
 }
 
-function loadScript(id: string, src: string) {
+function loadScript(id: string, src: string, isReady?: () => boolean): Promise<void> {
   const existing = scriptLoads.get(id);
 
   if (existing) {
-    return existing;
+    return existing.then(() => {
+      if (!isReady || isReady()) {
+        return;
+      }
+
+      scriptLoads.delete(id);
+      scriptLoadAttempts.set(id, (scriptLoadAttempts.get(id) ?? 0) + 1);
+      document.getElementById(id)?.remove();
+      return loadScript(id, src, isReady);
+    });
   }
 
-  const loadAttempt = scriptLoadAttempts.get(id) ?? 0;
-  const scriptSrc = loadAttempt > 0 ? `${src}${src.includes("?") ? "&" : "?"}qdoc_retry=${loadAttempt}` : src;
   const promise = new Promise<void>((resolve, reject) => {
     const currentScript = document.getElementById(id) as HTMLScriptElement | null;
 
     if (currentScript?.dataset.qdocLoaded === "true") {
-      scriptLoadAttempts.delete(id);
-      resolve();
-      return;
+      if (!isReady || isReady()) {
+        scriptLoadAttempts.delete(id);
+        resolve();
+        return;
+      }
+
+      scriptLoadAttempts.set(id, Math.max(scriptLoadAttempts.get(id) ?? 0, 1));
     }
 
     currentScript?.remove();
 
+    const loadAttempt = scriptLoadAttempts.get(id) ?? 0;
+    const scriptSrc = loadAttempt > 0 ? `${src}${src.includes("?") ? "&" : "?"}qdoc_retry=${loadAttempt}` : src;
     const script = document.createElement("script");
+    const rejectLoad = (message: string) => {
+      scriptLoads.delete(id);
+      scriptLoadAttempts.set(id, loadAttempt + 1);
+      script.remove();
+      reject(new Error(message));
+    };
+
     script.id = id;
     script.src = scriptSrc;
     script.async = true;
     script.onload = () => {
       script.dataset.qdocLoaded = "true";
+      if (isReady && !isReady()) {
+        rejectLoad("map_script_global_unavailable");
+        return;
+      }
+
       scriptLoadAttempts.delete(id);
       resolve();
     };
     script.onerror = () => {
-      scriptLoads.delete(id);
-      scriptLoadAttempts.set(id, loadAttempt + 1);
-      script.remove();
-      reject(new Error("map_script_load_failed"));
+      rejectLoad("map_script_load_failed");
     };
     document.head.appendChild(script);
   });
@@ -274,9 +301,49 @@ function getMarkerColor(place: MapDisplayPlace, isSelected: boolean) {
   return place.kind === "qdoc_site" ? "#087884" : "#475569";
 }
 
-function styleMapboxMarkerElement(element: HTMLButtonElement, place: MapDisplayPlace, isSelected: boolean) {
+function getMarkerZIndex(place: MapDisplayPlace, isSelected: boolean, activeQdocSiteId: string) {
+  if (place.kind === "qdoc_site") {
+    if (isSelected) {
+      return 50;
+    }
+
+    return place.qdocSiteId === activeQdocSiteId ? 40 : 30;
+  }
+
+  return isSelected ? 20 : 10;
+}
+
+function getApproximateDistanceKm(a: Pick<MapDisplayPlace, "latitude" | "longitude">, b: Pick<MapDisplayPlace, "latitude" | "longitude">) {
+  const kmPerLatitudeDegree = 111;
+  const kmPerLongitudeDegree = Math.max(28, 111 * Math.cos((a.latitude * Math.PI) / 180));
+  const latitudeKm = (a.latitude - b.latitude) * kmPerLatitudeDegree;
+  const longitudeKm = (a.longitude - b.longitude) * kmPerLongitudeDegree;
+
+  return Math.sqrt(latitudeKm ** 2 + longitudeKm ** 2);
+}
+
+function getMapboxMarkerOffset(place: MapDisplayPlace, places: MapDisplayPlace[]): MarkerOffset {
+  const hasNearbyMarker = places.some((candidate) => candidate.id !== place.id && getApproximateDistanceKm(place, candidate) < 0.5);
+
+  if (!hasNearbyMarker) {
+    return { x: 0, y: 0 };
+  }
+
+  return place.kind === "qdoc_site" ? { x: -18, y: 16 } : { x: 18, y: -16 };
+}
+
+function styleMapboxMarkerElement(
+  element: HTMLButtonElement,
+  place: MapDisplayPlace,
+  isSelected: boolean,
+  offset: MarkerOffset,
+  activeQdocSiteId: string,
+) {
   element.dataset.selected = isSelected ? "true" : "false";
   element.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  element.style.pointerEvents = "auto";
+  element.style.zIndex = String(getMarkerZIndex(place, isSelected, activeQdocSiteId));
+  element.style.setProperty("translate", `${offset.x}px ${offset.y}px`);
   element.style.width = isSelected ? "34px" : "28px";
   element.style.height = isSelected ? "34px" : "28px";
   element.style.border = "2px solid white";
@@ -285,14 +352,20 @@ function styleMapboxMarkerElement(element: HTMLButtonElement, place: MapDisplayP
   element.style.background = getMarkerColor(place, isSelected);
 }
 
-function createMapboxMarkerElement(place: MapDisplayPlace, isSelected: boolean, onSelectPlace: (place: MapDisplayPlace) => void) {
+function createMapboxMarkerElement(
+  place: MapDisplayPlace,
+  isSelected: boolean,
+  offset: MarkerOffset,
+  activeQdocSiteId: string,
+  onSelectPlace: (place: MapDisplayPlace) => void,
+) {
   const element = document.createElement("button");
   element.type = "button";
   element.dataset.testid = place.kind === "qdoc_site" ? "qdoc-map-marker" : "provider-map-marker";
   element.dataset.mapKind = place.kind;
   element.setAttribute("aria-label", `Select ${place.name}`);
   element.title = place.name;
-  styleMapboxMarkerElement(element, place, isSelected);
+  styleMapboxMarkerElement(element, place, isSelected, offset, activeQdocSiteId);
   element.style.cursor = "pointer";
   element.style.transition = "transform 150ms ease, box-shadow 150ms ease";
   element.onclick = (event) => {
@@ -318,6 +391,7 @@ async function initializeProviderMap(
   places: MapDisplayPlace[],
   userLocation: BrowserLocation | null,
   selectedPlaceId: string,
+  activeQdocSiteId: string,
   onSelectPlace: (place: MapDisplayPlace) => void,
 ) {
   if (!config.provider) {
@@ -340,7 +414,9 @@ async function initializeProviderMap(
 
   if (config.provider === "mapbox") {
     loadMapboxCss();
-    await loadScript("qdoc-mapbox-gl", "https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js");
+    await loadScript("qdoc-mapbox-gl", "https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js", () =>
+      Boolean(getWindowMaps().mapboxgl),
+    );
 
     const mapboxgl = getWindowMaps().mapboxgl;
 
@@ -365,11 +441,12 @@ async function initializeProviderMap(
       new mapboxgl.Marker({ color: "#087884" }).setLngLat([userLocation.longitude, userLocation.latitude]).addTo(map);
     }
 
-    const markerElements = new Map<string, { element: HTMLButtonElement; place: MapDisplayPlace }>();
+    const markerElements = new Map<string, { element: HTMLButtonElement; offset: MarkerOffset; place: MapDisplayPlace }>();
 
     for (const place of places) {
-      const element = createMapboxMarkerElement(place, place.id === selectedPlaceId, onSelectPlace);
-      markerElements.set(place.id, { element, place });
+      const offset = getMapboxMarkerOffset(place, places);
+      const element = createMapboxMarkerElement(place, place.id === selectedPlaceId, offset, activeQdocSiteId, onSelectPlace);
+      markerElements.set(place.id, { element, offset, place });
       new mapboxgl.Marker({ element })
         .setLngLat([place.longitude, place.latitude])
         .setPopup(new mapboxgl.Popup({ offset: 16 }).setText(place.name))
@@ -389,9 +466,9 @@ async function initializeProviderMap(
       remove: () => {
         map.remove();
       },
-      selectPlace: (placeId: string) => {
+      selectPlace: (placeId: string, activeQdocSiteId: string) => {
         for (const [id, marker] of markerElements) {
-          styleMapboxMarkerElement(marker.element, marker.place, id === placeId);
+          styleMapboxMarkerElement(marker.element, marker.place, id === placeId, marker.offset, activeQdocSiteId);
         }
       },
       zoomBy: (delta: number) => {
@@ -406,6 +483,7 @@ async function initializeProviderMap(
   await loadScript(
     "qdoc-google-maps",
     `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(publicToken)}&loading=async`,
+    () => Boolean(getWindowMaps().google?.maps),
   );
 
   const google = getWindowMaps().google;
@@ -766,6 +844,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
           displayPlaces,
           userLocation,
           selectedDisplayPlaceIdRef.current,
+          selectedSiteId,
           selectDisplayPlace,
         );
 
@@ -790,10 +869,10 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
       providerMapRef.current?.remove();
       providerMapRef.current = null;
     };
-  }, [displaySignature, displayPlaces, isNearbySearchSettled, refreshKey, selectDisplayPlace, userLocation]);
+  }, [displaySignature, displayPlaces, isNearbySearchSettled, refreshKey, selectDisplayPlace, selectedSiteId, userLocation]);
 
   useEffect(() => {
-    providerMapRef.current?.selectPlace(selectedDisplayPlaceId);
+    providerMapRef.current?.selectPlace(selectedDisplayPlaceId, selectedSiteId);
 
     const place = displayPlaces.find((item) => item.id === selectedDisplayPlaceId);
     if (place && mapState === "ready") {
@@ -805,7 +884,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
         zoom: Math.max(current.zoom, 2),
       }));
     }
-  }, [displayPlaces, focusProviderPlace, mapState, selectedDisplayPlaceId]);
+  }, [displayPlaces, focusProviderPlace, mapState, selectedDisplayPlaceId, selectedSiteId]);
 
   return (
     <section

@@ -76,6 +76,8 @@ Use this board as the active pre-GO task set until the user explicitly changes s
 
 Do not start a new phase for this board. Keep it in the active launch-candidate Step 5 documents unless the user explicitly approves a phase change.
 
+Current package status rule: every P5 package is still `GO-ready: No` unless the active Step 5 status snapshot says otherwise. Local implementation and automated coverage are not enough for portfolio `GO` when real inboxes, public provider credentials, deployed worker behavior, backup restore-checks, or rollback artifacts are required. Choose the next task from the first package whose staging/manual evidence or tester-facing behavior is still missing.
+
 ### Documentation Ownership For Current Work
 
 - Treat the newly defined P5-A through P5-E work as accepted Step 5 scope. Future sessions should not reconstruct it from chat history.

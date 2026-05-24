@@ -118,6 +118,18 @@ This is the concrete task list that remains before `GO`. It is broader than depl
 7. Operations proof
    - Record staging verifier, staging rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and explicit GO/NO-GO decision.
 
+## Current Package Status Snapshot
+
+This snapshot separates local implementation from the staging/manual evidence still needed for portfolio `GO`. Update it when a P5 package changes state; do not use local-only proof as final public-demo evidence.
+
+| Package | Local implementation / automated coverage | Staging or manual evidence still required | GO-ready |
+| --- | --- | --- | --- |
+| P5-A Staff demo access | Bootstrap paths, staff/admin expectation checks, membership management, role-boundary E2E, audit-log E2E, and readable unrostered staff guidance exist locally. | Real OTP-receivable staff/admin inbox, tester membership, unrostered denial, and staging admin-data proof. | No |
+| P5-B Provider map public-browser verification | Provider and fallback map interaction, pan/zoom/recenter, selection sync, refresh retry, SDK-load retry, and raw-token leak checks are covered locally. | Public-browser provider proof with real credentials/restrictions, QDoc cost limits, browser geolocation, provider discovery, and fail-closed states. | No |
+| P5-C OTP delivery and auth error usability | Readable delivery/rate-limit/invalid/expired/unauthorized states, configurable OTP limits, email-readiness verifier, and session refresh/revisit coverage exist locally. | First-time staging OTP delivery for patient and staff, deployed email verifier, real inbox receipt, and deployed refresh/revisit proof. | No |
+| P5-D Public demo smoke | Local Playwright covers patient/staff core paths, queue operations, membership, audit logs, notification preference, outbox creation/failure visibility, and duplicate prevention. | Full visitor-style patient smoke, authorized staff smoke, deployed worker/outbox proof, and public smoke against the current deployed SHA. | No |
+| P5-E Operations evidence and decision | Release checklist, smoke rollup, release evidence preflight, public release preflight, and self-tests exist locally. | Staging verifier, full rehearsal, backup restore-check, rollback target, safe evidence identifiers, known risks, and explicit GO/NO-GO decision. | No |
+
 ## Portfolio Tester Completion Matrix
 
 Use this matrix when deciding the next work item or judging whether a package can close. A visible feature is not complete just because it exists in the UI; it must work from a tester's point of view and have the required local plus staging/manual proof.

@@ -50,6 +50,8 @@ Latest documentation-sync rule: when the work board changes, update this file fo
 
 Volatile candidate values such as the current release SHA belong in `.ai/execution/current.md` and the active Step 5 status block, not as durable package definitions in this committed handoff. Before public release preflight or portfolio smoke, read the current SHA with `git rev-parse HEAD` and update the active `.ai` status if it has changed.
 
+Current documentation ownership: this document owns the P5-A through P5-E package definitions, local/staging evidence boundaries, and package-level verification commands. It should not store one-off staging logs, OTP values, private host details, bucket names, provider identifiers, real tester email addresses, or volatile candidate evidence. Use `docs/release-go-no-go.md` for safe operator evidence and `.ai/execution/current.md` for the latest active status snapshot.
+
 ## Execution Boundaries
 
 Use these packages as the implementation, verification, and commit-unit boundaries for the rest of Step 5. Keep three states separate for each package:

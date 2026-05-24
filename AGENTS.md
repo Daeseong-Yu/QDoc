@@ -75,6 +75,15 @@ Use this board as the active pre-GO task set until the user explicitly changes s
 
 Do not start a new phase for this board. Keep it in the active launch-candidate Step 5 documents unless the user explicitly approves a phase change.
 
+### Documentation Ownership For Current Work
+
+- Treat the newly defined P5-A through P5-E work as accepted Step 5 scope. Future sessions should not reconstruct it from chat history.
+- Keep the active task snapshot in `.ai/execution/current.md` and `.ai/phases/qdoc-launch-candidate/step5.md`.
+- Keep the package-level handoff in `docs/portfolio-go-work-packages.md` and mirror it in `.ai/docs/portfolio-go-work-packages.md`.
+- Keep durable product, architecture, and trade-off decisions in `.ai/core/PRD.md`, `.ai/core/ARCHITECTURE.md`, and `.ai/core/ADR.md`; update these only when product scope, architecture behavior, public API, deployment, cost-control, data, auth/session, or operational decisions change.
+- Keep operator-facing verification and GO/NO-GO evidence procedures in `docs/release-go-no-go.md`.
+- Keep `AGENTS.md` focused on future-session rules, not volatile release evidence or one-off command results.
+
 - Treat the portfolio site as a user-testable product surface for the documented QDoc flows. Before `GO`, the currently documented patient, staff, map, OTP, queue, notification/outbox, refresh/revisit, membership, audit-log, backup, rollback, and staging verification paths must work well enough for normal tester use; do not rely on "MVP only" reasoning to defer one of those documented paths.
 - When the user says the site must be complete for portfolio testing, interpret that as documented portfolio-flow completion, not future-roadmap completion. SMS, push, EMR/EHR, real travel-time estimates, multi-department operations, and a full clinic marketplace remain out of scope unless explicitly approved.
 - Treat the current pre-GO backlog as a functional completion list, not a launch checklist only. The remaining work must leave QDoc usable as a portfolio product surface for real visitor testing, with only explicitly approved future-roadmap items excluded.

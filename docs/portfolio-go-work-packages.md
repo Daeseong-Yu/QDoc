@@ -24,6 +24,7 @@ Documentation coverage for this newly defined work:
 - `.ai/phases/index.json` and `.ai/phases/qdoc-launch-candidate/index.json` keep the launch-candidate task and P5-A through P5-E package list discoverable.
 - `.ai/execution/current.md` keeps the active status snapshot and next-action guidance.
 - `.ai/phases/qdoc-launch-candidate/step5.md` keeps the active acceptance criteria, implementation order, and verification expectations.
+- `docs/release-go-no-go.md` keeps the operator-facing evidence checklist and safe decision-record fields.
 - `AGENTS.md` keeps the future-session rules so Step 5 work does not depend on chat history.
 - `README.md` summarizes the active portfolio gate for developers/operators and links back to this package handoff and the release checklist.
 
@@ -53,7 +54,7 @@ Volatile candidate values such as the current release SHA belong in `.ai/executi
 
 Current documentation ownership: this document owns the P5-A through P5-E package definitions, local/staging evidence boundaries, and package-level verification commands. It should not store one-off staging logs, OTP values, private host details, bucket names, provider identifiers, real tester email addresses, or volatile candidate evidence. Use `docs/release-go-no-go.md` for safe operator evidence and `.ai/execution/current.md` for the latest active status snapshot.
 
-Latest documentation-fill result: the newly defined work is filled into `.ai/core`, `.ai/phases`, `.ai/execution/current.md`, this committed handoff, the `.ai/docs` mirror, `docs/release-go-no-go.md`, `AGENTS.md`, and the README portfolio gate summary. Continue updating by ownership instead of copying every implementation detail into every document.
+Latest documentation-fill result: the newly defined work is filled into `.ai/core`, `.ai/phases`, `.ai/execution/current.md`, this committed handoff, the `.ai/docs` mirror, `docs/release-go-no-go.md`, `AGENTS.md`, and the README portfolio gate summary. Continue updating by ownership instead of copying every implementation detail into every document. This document remains the package-level source of truth; active candidate SHA, one-off staging results, and private operational details belong in active execution state or external safe release notes.
 
 ## Execution Boundaries
 

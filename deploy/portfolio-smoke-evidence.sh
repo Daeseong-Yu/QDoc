@@ -133,6 +133,8 @@ validate_public_url() {
 P5A_STAFF_ADMIN_DATA="$(status_value QDOC_SMOKE_STAFF_ADMIN_DATA)"
 P5A_STAFF_ADMIN_SIGNIN="$(status_value QDOC_SMOKE_STAFF_ADMIN_SIGNIN)"
 P5A_STAFF_TESTER_AUTH="$(status_value QDOC_SMOKE_STAFF_TESTER_AUTH)"
+P5A_STAFF_TESTER_MEMBERSHIP="$(status_value QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP)"
+P5A_STAFF_ROLE_BOUNDARY="$(status_value QDOC_SMOKE_STAFF_ROLE_BOUNDARY)"
 P5A_UNROSTERED_DENIAL="$(status_value QDOC_SMOKE_UNROSTERED_STAFF_DENIAL)"
 
 P5B_PROVIDER_RESTRICTIONS="$(status_value QDOC_SMOKE_PROVIDER_RESTRICTIONS)"
@@ -149,15 +151,19 @@ P5C_AUTH_ERROR_COPY="$(status_value QDOC_SMOKE_AUTH_ERROR_COPY)"
 P5C_SESSION_REVISIT="$(status_value QDOC_SMOKE_SESSION_REVISIT)"
 
 P5D_PATIENT_CHECKIN="$(status_value QDOC_SMOKE_PATIENT_CHECKIN)"
+P5D_PATIENT_STATUS_REVISIT="$(status_value QDOC_SMOKE_PATIENT_STATUS_REVISIT)"
 P5D_STAFF_QUEUE_OPS="$(status_value QDOC_SMOKE_STAFF_QUEUE_OPS)"
+P5D_STAFF_QUEUE_CONTROLS="$(status_value QDOC_SMOKE_STAFF_QUEUE_CONTROLS)"
+P5D_STAFF_ROLE_BOUNDARY="$(status_value QDOC_SMOKE_STAFF_ROLE_BOUNDARY)"
 P5D_MEMBERSHIP_AUDIT="$(status_value QDOC_SMOKE_MEMBERSHIP_AUDIT)"
+P5D_AUDIT_LOG_REVIEW="$(status_value QDOC_SMOKE_AUDIT_LOG_REVIEW)"
 P5D_NOTIFICATION_OUTBOX="$(status_value QDOC_SMOKE_NOTIFICATION_OUTBOX)"
 P5D_WORKER_DUPLICATE_GUARD="$(status_value QDOC_SMOKE_WORKER_DUPLICATE_GUARD)"
 
-P5A_STATUS="$(package_status "$P5A_STAFF_ADMIN_DATA" "$P5A_STAFF_ADMIN_SIGNIN" "$P5A_STAFF_TESTER_AUTH" "$P5A_UNROSTERED_DENIAL")"
+P5A_STATUS="$(package_status "$P5A_STAFF_ADMIN_DATA" "$P5A_STAFF_ADMIN_SIGNIN" "$P5A_STAFF_TESTER_AUTH" "$P5A_STAFF_TESTER_MEMBERSHIP" "$P5A_STAFF_ROLE_BOUNDARY" "$P5A_UNROSTERED_DENIAL")"
 P5B_STATUS="$(package_status "$P5B_PROVIDER_RESTRICTIONS" "$P5B_MAP_GEO_CENTER" "$P5B_MAP_PAN_ZOOM" "$P5B_MAP_RECENTER" "$P5B_MARKER_SYNC" "$P5B_MARKER_DISTINCTION" "$P5B_FAIL_CLOSED")"
 P5C_STATUS="$(package_status "$P5C_PATIENT_OTP_DELIVERY" "$P5C_STAFF_OTP_DELIVERY" "$P5C_AUTH_ERROR_COPY" "$P5C_SESSION_REVISIT")"
-P5D_STATUS="$(package_status "$P5D_PATIENT_CHECKIN" "$P5D_STAFF_QUEUE_OPS" "$P5D_MEMBERSHIP_AUDIT" "$P5D_NOTIFICATION_OUTBOX" "$P5D_WORKER_DUPLICATE_GUARD")"
+P5D_STATUS="$(package_status "$P5D_PATIENT_CHECKIN" "$P5D_PATIENT_STATUS_REVISIT" "$P5D_STAFF_QUEUE_OPS" "$P5D_STAFF_QUEUE_CONTROLS" "$P5D_STAFF_ROLE_BOUNDARY" "$P5D_MEMBERSHIP_AUDIT" "$P5D_AUDIT_LOG_REVIEW" "$P5D_NOTIFICATION_OUTBOX" "$P5D_WORKER_DUPLICATE_GUARD")"
 MANUAL_SMOKE_STATUS="$(package_status "$P5A_STATUS" "$P5B_STATUS" "$P5C_STATUS" "$P5D_STATUS")"
 
 log "Checking portfolio smoke evidence inputs"
@@ -167,6 +173,8 @@ log "Checking P5-A staff demo access"
 validate_status "P5-A expected staff/admin admin-data verifier" "$P5A_STAFF_ADMIN_DATA"
 validate_status "P5-A staff/admin OTP sign-in" "$P5A_STAFF_ADMIN_SIGNIN"
 validate_status "P5-A authorized staff tester access" "$P5A_STAFF_TESTER_AUTH"
+validate_status "P5-A admin-created tester membership" "$P5A_STAFF_TESTER_MEMBERSHIP"
+validate_status "P5-A staff role boundary" "$P5A_STAFF_ROLE_BOUNDARY"
 validate_status "P5-A unrostered staff denial" "$P5A_UNROSTERED_DENIAL"
 
 log "Checking P5-B provider map public-browser evidence"
@@ -186,8 +194,12 @@ validate_status "P5-C refresh/revisit session continuity" "$P5C_SESSION_REVISIT"
 
 log "Checking P5-D public demo smoke evidence"
 validate_status "P5-D patient check-in flow" "$P5D_PATIENT_CHECKIN"
+validate_status "P5-D patient status refresh/revisit" "$P5D_PATIENT_STATUS_REVISIT"
 validate_status "P5-D staff queue operations" "$P5D_STAFF_QUEUE_OPS"
-validate_status "P5-D membership and audit-log review" "$P5D_MEMBERSHIP_AUDIT"
+validate_status "P5-D staff queue controls and notification threshold" "$P5D_STAFF_QUEUE_CONTROLS"
+validate_status "P5-D staff role boundary" "$P5D_STAFF_ROLE_BOUNDARY"
+validate_status "P5-D membership management" "$P5D_MEMBERSHIP_AUDIT"
+validate_status "P5-D audit-log review" "$P5D_AUDIT_LOG_REVIEW"
 validate_status "P5-D almost-ready notification/outbox behavior" "$P5D_NOTIFICATION_OUTBOX"
 validate_status "P5-D duplicate delivery prevention" "$P5D_WORKER_DUPLICATE_GUARD"
 
@@ -202,6 +214,8 @@ P5-A Staff demo access: $P5A_STATUS
   Expected staff/admin admin-data verifier: $P5A_STAFF_ADMIN_DATA
   Staff/admin OTP sign-in: $P5A_STAFF_ADMIN_SIGNIN
   Authorized tester access: $P5A_STAFF_TESTER_AUTH
+  Admin-created tester membership: $P5A_STAFF_TESTER_MEMBERSHIP
+  Staff role boundary: $P5A_STAFF_ROLE_BOUNDARY
   Unrostered staff denial: $P5A_UNROSTERED_DENIAL
 P5-B Provider map public-browser: $P5B_STATUS
   Provider restrictions and QDoc budgets: $P5B_PROVIDER_RESTRICTIONS
@@ -218,8 +232,12 @@ P5-C OTP delivery and auth errors: $P5C_STATUS
   Refresh/revisit session continuity: $P5C_SESSION_REVISIT
 P5-D Public demo smoke: $P5D_STATUS
   Patient check-in flow: $P5D_PATIENT_CHECKIN
+  Patient status refresh/revisit: $P5D_PATIENT_STATUS_REVISIT
   Staff queue operations: $P5D_STAFF_QUEUE_OPS
-  Membership and audit-log review: $P5D_MEMBERSHIP_AUDIT
+  Staff queue controls and notification threshold: $P5D_STAFF_QUEUE_CONTROLS
+  Staff role boundary: $P5D_STAFF_ROLE_BOUNDARY
+  Membership management: $P5D_MEMBERSHIP_AUDIT
+  Audit-log review: $P5D_AUDIT_LOG_REVIEW
   Almost-ready notification/outbox behavior: $P5D_NOTIFICATION_OUTBOX
   Duplicate delivery prevention: $P5D_WORKER_DUPLICATE_GUARD
 Manual smoke: $MANUAL_SMOKE_STATUS

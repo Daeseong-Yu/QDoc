@@ -76,6 +76,8 @@ QDOC_PUBLIC_URL=https://qdoc.example.com \
 QDOC_SMOKE_STAFF_ADMIN_DATA=passed \
 QDOC_SMOKE_STAFF_ADMIN_SIGNIN=passed \
 QDOC_SMOKE_STAFF_TESTER_AUTH=passed \
+QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP=passed \
+QDOC_SMOKE_STAFF_ROLE_BOUNDARY=passed \
 QDOC_SMOKE_UNROSTERED_STAFF_DENIAL=passed \
 QDOC_SMOKE_PROVIDER_RESTRICTIONS=passed \
 QDOC_SMOKE_MAP_GEO_CENTER=passed \
@@ -89,15 +91,18 @@ QDOC_SMOKE_STAFF_OTP_DELIVERY=passed \
 QDOC_SMOKE_AUTH_ERROR_COPY=passed \
 QDOC_SMOKE_SESSION_REVISIT=passed \
 QDOC_SMOKE_PATIENT_CHECKIN=passed \
+QDOC_SMOKE_PATIENT_STATUS_REVISIT=passed \
 QDOC_SMOKE_STAFF_QUEUE_OPS=passed \
+QDOC_SMOKE_STAFF_QUEUE_CONTROLS=passed \
 QDOC_SMOKE_MEMBERSHIP_AUDIT=passed \
+QDOC_SMOKE_AUDIT_LOG_REVIEW=passed \
 QDOC_SMOKE_NOTIFICATION_OUTBOX=passed \
 QDOC_SMOKE_WORKER_DUPLICATE_GUARD=passed \
 QDOC_SMOKE_STRICT=true \
 bash deploy/portfolio-smoke-evidence.sh
 ```
 
-Use `pending`, `not_run`, or `failed` for checks that are not actually proven. Do not mark a value `passed` from local tests when the check depends on real inboxes, a public browser, provider credentials, deployed worker behavior, or staging host settings.
+Use `pending`, `not_run`, or `failed` for checks that are not actually proven. Do not mark a value `passed` from local tests when the check depends on real inboxes, a public browser, provider credentials, deployed worker behavior, or staging host settings. The membership, role-boundary, queue-control, patient status revisit, and audit-log values are separate because a portfolio tester must be able to prove those UI paths without relying on a developer explanation or direct database edits.
 
 Run the read-only public release preflight before browser smoke. It checks only `/api/health` and `/api/release`; use it to catch stale public deployments before collecting Playwright evidence.
 

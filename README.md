@@ -427,6 +427,8 @@ QDOC_PUBLIC_URL=https://qdoc.example.com \
 QDOC_SMOKE_STAFF_ADMIN_DATA=passed \
 QDOC_SMOKE_STAFF_ADMIN_SIGNIN=passed \
 QDOC_SMOKE_STAFF_TESTER_AUTH=passed \
+QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP=passed \
+QDOC_SMOKE_STAFF_ROLE_BOUNDARY=passed \
 QDOC_SMOKE_UNROSTERED_STAFF_DENIAL=passed \
 QDOC_SMOKE_PROVIDER_RESTRICTIONS=passed \
 QDOC_SMOKE_MAP_GEO_CENTER=passed \
@@ -440,15 +442,18 @@ QDOC_SMOKE_STAFF_OTP_DELIVERY=passed \
 QDOC_SMOKE_AUTH_ERROR_COPY=passed \
 QDOC_SMOKE_SESSION_REVISIT=passed \
 QDOC_SMOKE_PATIENT_CHECKIN=passed \
+QDOC_SMOKE_PATIENT_STATUS_REVISIT=passed \
 QDOC_SMOKE_STAFF_QUEUE_OPS=passed \
+QDOC_SMOKE_STAFF_QUEUE_CONTROLS=passed \
 QDOC_SMOKE_MEMBERSHIP_AUDIT=passed \
+QDOC_SMOKE_AUDIT_LOG_REVIEW=passed \
 QDOC_SMOKE_NOTIFICATION_OUTBOX=passed \
 QDOC_SMOKE_WORKER_DUPLICATE_GUARD=passed \
 QDOC_SMOKE_STRICT=true \
 bash deploy/portfolio-smoke-evidence.sh
 ```
 
-This helper is also read-only. It turns P5-A through P5-D manual smoke outcomes into the `QDOC_EVIDENCE_P5A_STATUS`, `QDOC_EVIDENCE_P5B_STATUS`, `QDOC_EVIDENCE_P5C_STATUS`, `QDOC_EVIDENCE_P5D_STATUS`, and `QDOC_EVIDENCE_MANUAL_SMOKE_STATUS` values used by the release evidence preflight. Set `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after staging admin-data verification passed with the real staff/admin expectation configured. Use `pending`, `not_run`, or `failed` for anything that has not been proven in staging with real inboxes, public browser/provider behavior, and deployed worker/outbox behavior.
+This helper is also read-only. It turns P5-A through P5-D manual smoke outcomes into the `QDOC_EVIDENCE_P5A_STATUS`, `QDOC_EVIDENCE_P5B_STATUS`, `QDOC_EVIDENCE_P5C_STATUS`, `QDOC_EVIDENCE_P5D_STATUS`, and `QDOC_EVIDENCE_MANUAL_SMOKE_STATUS` values used by the release evidence preflight. Set `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only after staging admin-data verification passed with the real staff/admin expectation configured. Set the tester membership, role-boundary, queue-control, patient status revisit, and audit-log values only after those exact UI paths were exercised with the deployed public URL. Use `pending`, `not_run`, or `failed` for anything that has not been proven in staging with real inboxes, public browser/provider behavior, and deployed worker/outbox behavior.
 
 Useful SSM and host checks:
 

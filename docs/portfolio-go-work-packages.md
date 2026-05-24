@@ -138,7 +138,8 @@ Remaining evidence:
 - For an already-deployed staging database, run the staff-admin bootstrap first in dry-run mode, then apply it only after confirming the target site count. Production-like apply requires `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply`. The command output must remain safe and must not print real email addresses.
 - Verify the expected staff/admin account with `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS`, then record `QDOC_SMOKE_STAFF_ADMIN_DATA=passed` only when the staging admin-data verifier passed without printing the address.
 - Sign in at `/staff` using a real inbox.
-- Add or verify a tester membership through the UI.
+- Add or verify a tester membership through the UI, then record `QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP=passed`.
+- Verify staff-only role boundaries through the UI, then record `QDOC_SMOKE_STAFF_ROLE_BOUNDARY=passed`.
 - Confirm an unrostered personal email is denied staff access with readable copy.
 
 Verification:
@@ -149,7 +150,7 @@ Verification:
 - `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm db:bootstrap-staff-admins:staging`
 - `bash deploy/bootstrap-staff-admins.sh` from the deployed release when applying approved staging staff/admin access
 - staff membership E2E or manual staging smoke
-- `QDOC_SMOKE_STAFF_ADMIN_DATA=passed bash deploy/portfolio-smoke-evidence.sh` as part of the P5-A smoke rollup after staging verification
+- `QDOC_SMOKE_STAFF_ADMIN_DATA=passed QDOC_SMOKE_STAFF_TESTER_MEMBERSHIP=passed QDOC_SMOKE_STAFF_ROLE_BOUNDARY=passed bash deploy/portfolio-smoke-evidence.sh` as part of the P5-A smoke rollup after staging verification
 - safe release evidence that does not disclose real email addresses unless explicitly approved
 
 ### P5-B Provider Map Public-Browser Verification
@@ -222,12 +223,12 @@ Implementation state:
 - Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, core queue operations, membership role update/delete, membership audit-log visibility, and last-admin protection.
 - Read-only public release preflight catches healthy-but-stale public deployments before browser smoke, so P5-D evidence is not collected against an old artifact.
 - Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, marker selection, selected-state feedback, map fallback/provider surface expectations, `/staff` sign-in surface reachability, and absence of raw internal errors or raw provider availability enum tokens in the public UI. It does not request OTPs or prove staff authorization.
-- `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`.
+- `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`. The helper requires separate statuses for tester membership, role boundaries, patient refresh/revisit, queue controls/notification threshold, membership management, audit-log review, notification/outbox behavior, and duplicate-delivery prevention so the GO evidence cannot hide a skipped workflow inside a coarse package status.
 
 Remaining evidence:
 
-- Patient smoke: OTP sign-in, geolocation-centered discovery, clinic/queue selection, check-in, active ticket state, refresh/revisit continuity, notification preferences, and readable fallback states.
-- Staff smoke: OTP sign-in, authorized site selection, call/start/complete, delay/restore, cancel, queue open/close, notification threshold, membership management, audit-log review, and role boundary checks.
+- Patient smoke: OTP sign-in, geolocation-centered discovery, clinic/queue selection, check-in, active ticket state, refresh/revisit continuity with `QDOC_SMOKE_PATIENT_STATUS_REVISIT=passed`, notification preferences, and readable fallback states.
+- Staff smoke: OTP sign-in, authorized site selection, call/start/complete, delay/restore, cancel, queue open/close and notification threshold with `QDOC_SMOKE_STAFF_QUEUE_CONTROLS=passed`, membership management with `QDOC_SMOKE_MEMBERSHIP_AUDIT=passed`, audit-log review with `QDOC_SMOKE_AUDIT_LOG_REVIEW=passed`, and role boundary checks.
 - Worker smoke: almost-ready notification generation, outbox processing, failed-job visibility, and duplicate-delivery prevention on the deployed worker.
 
 Verification:

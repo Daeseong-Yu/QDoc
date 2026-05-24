@@ -449,6 +449,8 @@ Portfolio smoke evidence rollup:
 
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_SMOKE_PUBLIC_RELEASE_PREFLIGHT=passed \
+QDOC_SMOKE_PUBLIC_BROWSER_SMOKE=passed \
 QDOC_SMOKE_STAFF_ADMIN_DATA=passed \
 QDOC_SMOKE_STAFF_ADMIN_SIGNIN=passed \
 QDOC_SMOKE_STAFF_TESTER_AUTH=passed \

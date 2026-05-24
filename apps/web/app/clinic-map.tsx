@@ -9,7 +9,7 @@ import {
   type NearbyHealthcarePlace,
   type PatientSiteSummary,
 } from "@qdoc/contracts";
-import { Crosshair, Loader2, MapPin, Minus, Plus } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, Loader2, MapPin, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
@@ -46,6 +46,7 @@ type MapboxMap = {
   addControl: (control: unknown, position?: string) => void;
   flyTo: (options: Record<string, unknown>) => void;
   getZoom: () => number;
+  panBy: (offset: [number, number]) => void;
   remove: () => void;
   setZoom: (zoom: number) => void;
 };
@@ -71,6 +72,7 @@ type MapboxNamespace = {
 type GoogleMap = {
   fitBounds: (bounds: GoogleBounds) => void;
   getZoom: () => number | undefined;
+  panBy: (x: number, y: number) => void;
   panTo: (location: { lat: number; lng: number }) => void;
   setZoom: (zoom: number) => void;
 };
@@ -92,6 +94,7 @@ type GoogleNamespace = {
 
 type ProviderMapHandle = {
   focusPlace: (place: MapDisplayPlace) => void;
+  panBy: (x: number, y: number) => void;
   recenter: (location: BrowserLocation) => void;
   remove: () => void;
   selectPlace: (placeId: string) => void;
@@ -105,8 +108,10 @@ type FallbackViewport = {
 };
 
 type ProviderInteractionState = {
+  fallbackPanCount: number;
   fallbackRecenterCount: number;
   focusCount: number;
+  panCount: number;
   recenterCount: number;
   zoomCount: number;
 };
@@ -369,6 +374,9 @@ async function initializeProviderMap(
       focusPlace: (place: MapDisplayPlace) => {
         map.flyTo({ center: [place.longitude, place.latitude], zoom: 13, essential: true });
       },
+      panBy: (x: number, y: number) => {
+        map.panBy([x, y]);
+      },
       recenter: (location: BrowserLocation) => {
         map.flyTo({ center: [location.longitude, location.latitude], zoom: 13, essential: true });
       },
@@ -442,6 +450,9 @@ async function initializeProviderMap(
       map.panTo({ lat: place.latitude, lng: place.longitude });
       map.setZoom(13);
     },
+    panBy: (x: number, y: number) => {
+      map.panBy(x, y);
+    },
     recenter: (location: BrowserLocation) => {
       map.panTo({ lat: location.latitude, lng: location.longitude });
       map.setZoom(13);
@@ -504,6 +515,10 @@ function getInitialFallbackViewport(
   return { latitude: 43.465, longitude: -80.522, zoom: 2 };
 }
 
+function getFallbackPanOffset(viewport: FallbackViewport) {
+  return 0.01 / 2 ** (viewport.zoom - 1);
+}
+
 export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onSelectSite }: ClinicMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const providerMapRef = useRef<ProviderMapHandle | null>(null);
@@ -522,8 +537,10 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     zoom: 2,
   });
   const [providerInteraction, setProviderInteraction] = useState<ProviderInteractionState>({
+    fallbackPanCount: 0,
     fallbackRecenterCount: 0,
     focusCount: 0,
+    panCount: 0,
     recenterCount: 0,
     zoomCount: 0,
   });
@@ -618,6 +635,18 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     }));
   }, []);
 
+  const panProviderMap = useCallback((x: number, y: number) => {
+    if (!providerMapRef.current) {
+      return;
+    }
+
+    providerMapRef.current.panBy(x, y);
+    setProviderInteraction((current) => ({
+      ...current,
+      panCount: current.panCount + 1,
+    }));
+  }, []);
+
   const zoomProviderMap = useCallback((delta: number) => {
     if (!providerMapRef.current) {
       return;
@@ -627,6 +656,18 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     setProviderInteraction((current) => ({
       ...current,
       zoomCount: current.zoomCount + 1,
+    }));
+  }, []);
+
+  const panFallbackMap = useCallback((latitudeDelta: number, longitudeDelta: number) => {
+    setFallbackViewport((current) => ({
+      ...current,
+      latitude: current.latitude + latitudeDelta,
+      longitude: current.longitude + longitudeDelta,
+    }));
+    setProviderInteraction((current) => ({
+      ...current,
+      fallbackPanCount: current.fallbackPanCount + 1,
     }));
   }, []);
 
@@ -760,6 +801,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
   return (
     <section
       className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+      data-fallback-pan-count={providerInteraction.fallbackPanCount}
       data-fallback-recenter-count={providerInteraction.fallbackRecenterCount}
       data-fallback-zoom={fallbackViewport.zoom}
       data-has-user-location={userLocation ? "true" : "false"}
@@ -767,6 +809,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
       data-map-state={mapState}
       data-nearby-search-settled={isNearbySearchSettled ? "true" : "false"}
       data-provider-focus-count={providerInteraction.focusCount}
+      data-provider-pan-count={providerInteraction.panCount}
       data-provider-place-count={providerDisplayPlaces.length}
       data-provider-recenter-count={providerInteraction.recenterCount}
       data-provider-zoom-count={providerInteraction.zoomCount}
@@ -835,6 +878,46 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
                 </button>
               );
             })}
+            <div className="absolute left-3 top-3 z-20 grid w-[92px] grid-cols-3 gap-1">
+              <span />
+              <button
+                type="button"
+                onClick={() => panFallbackMap(getFallbackPanOffset(fallbackViewport), 0)}
+                className="inline-flex size-8 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+                aria-label="Pan map up"
+                data-testid="clinic-map-pan-up"
+              >
+                <ArrowUp size={15} aria-hidden="true" />
+              </button>
+              <span />
+              <button
+                type="button"
+                onClick={() => panFallbackMap(0, -getFallbackPanOffset(fallbackViewport))}
+                className="inline-flex size-8 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+                aria-label="Pan map left"
+                data-testid="clinic-map-pan-left"
+              >
+                <ArrowLeft size={15} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => panFallbackMap(-getFallbackPanOffset(fallbackViewport), 0)}
+                className="inline-flex size-8 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+                aria-label="Pan map down"
+                data-testid="clinic-map-pan-down"
+              >
+                <ArrowDown size={15} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => panFallbackMap(0, getFallbackPanOffset(fallbackViewport))}
+                className="inline-flex size-8 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+                aria-label="Pan map right"
+                data-testid="clinic-map-pan-right"
+              >
+                <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            </div>
             <div className="absolute right-3 top-3 z-20 grid gap-2">
               <button
                 type="button"
@@ -902,6 +985,48 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
             <Crosshair size={16} aria-hidden="true" />
             Current area
           </button>
+        ) : null}
+        {mapState === "ready" ? (
+          <div className="absolute left-3 top-3 z-30 grid w-[92px] grid-cols-3 gap-1">
+            <span />
+            <button
+              type="button"
+              onClick={() => panProviderMap(0, -80)}
+              className="inline-flex size-8 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+              aria-label="Pan map up"
+              data-testid="clinic-map-provider-pan-up"
+            >
+              <ArrowUp size={15} aria-hidden="true" />
+            </button>
+            <span />
+            <button
+              type="button"
+              onClick={() => panProviderMap(-80, 0)}
+              className="inline-flex size-8 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+              aria-label="Pan map left"
+              data-testid="clinic-map-provider-pan-left"
+            >
+              <ArrowLeft size={15} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => panProviderMap(0, 80)}
+              className="inline-flex size-8 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+              aria-label="Pan map down"
+              data-testid="clinic-map-provider-pan-down"
+            >
+              <ArrowDown size={15} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => panProviderMap(80, 0)}
+              className="inline-flex size-8 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+              aria-label="Pan map right"
+              data-testid="clinic-map-provider-pan-right"
+            >
+              <ArrowRight size={15} aria-hidden="true" />
+            </button>
+          </div>
         ) : null}
         {mapState === "ready" ? (
           <div className="absolute right-3 top-3 z-30 grid gap-2">

@@ -166,8 +166,16 @@ test.describe("portfolio public browser smoke", () => {
       await expect(providerSurface, "provider-backed map surface should render in a public browser").toBeVisible();
       await page.getByTestId("clinic-map-provider-container").hover();
       await page.mouse.wheel(0, -300);
+      await expect(page.getByTestId("clinic-map-provider-pan-right")).toBeVisible();
       await expect(page.getByTestId("clinic-map-provider-zoom-in")).toBeVisible();
       await expect(page.getByTestId("clinic-map-provider-zoom-out")).toBeVisible();
+      const providerPanCount = await readNumericMapAttribute(page, "data-provider-pan-count");
+      await page.getByTestId("clinic-map-provider-pan-right").click();
+      await expect
+        .poll(() => pollNumericMapAttribute(page, "data-provider-pan-count"), {
+          message: "provider pan control should call the live map",
+        })
+        .toBeGreaterThan(providerPanCount);
       const providerZoomCount = await readNumericMapAttribute(page, "data-provider-zoom-count");
       await page.getByTestId("clinic-map-provider-zoom-in").click();
       await expect
@@ -191,8 +199,16 @@ test.describe("portfolio public browser smoke", () => {
         .toBeGreaterThan(recenterCount);
     } else if ((await fallback.count()) > 0) {
       await expect(fallback).toContainText("Showing clinic locations.");
+      await expect(page.getByTestId("clinic-map-pan-right")).toBeVisible();
       await expect(page.getByTestId("clinic-map-zoom-in")).toBeVisible();
       await expect(page.getByTestId("clinic-map-zoom-out")).toBeVisible();
+      const fallbackPanCount = await readNumericMapAttribute(page, "data-fallback-pan-count");
+      await page.getByTestId("clinic-map-pan-right").click();
+      await expect
+        .poll(() => pollNumericMapAttribute(page, "data-fallback-pan-count"), {
+          message: "fallback pan control should update the map viewport",
+        })
+        .toBeGreaterThan(fallbackPanCount);
       const fallbackZoom = await readNumericMapAttribute(page, "data-fallback-zoom");
       await page.getByTestId("clinic-map-zoom-in").click();
       await expect

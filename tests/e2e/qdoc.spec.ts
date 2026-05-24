@@ -130,6 +130,9 @@ async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: bo
             getZoom() {
               return this._zoom;
             }
+            panBy(offset) {
+              window.__qdocMapboxEvents.push({ type: "panBy", offset });
+            }
             remove() {
               this._container.replaceChildren();
             }
@@ -155,6 +158,11 @@ async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: bo
               return this;
             }
             addTo(map) {
+              const markerIndex = map._container.querySelectorAll('[data-testid$="map-marker"]').length;
+              this._element.style.position = "absolute";
+              this._element.style.left = markerIndex % 2 === 0 ? "48%" : "58%";
+              this._element.style.top = markerIndex % 2 === 0 ? "48%" : "55%";
+              this._element.style.transform = "translate(-50%, -50%)";
               map._container.appendChild(this._element);
               return this;
             }
@@ -797,6 +805,13 @@ test("loads the patient map around the browser location without provider SDK whe
   await expect(page.getByTestId("clinic-map-zoom-in")).toBeVisible();
   await expect(page.getByTestId("clinic-map-zoom-out")).toBeVisible();
   await expect(page.getByTestId("clinic-map-fallback-recenter")).toBeVisible();
+  const fallbackPanCount = Number(await page.getByTestId("clinic-map-section").getAttribute("data-fallback-pan-count"));
+  await page.getByTestId("clinic-map-pan-right").click();
+  await expect
+    .poll(() =>
+      page.getByTestId("clinic-map-section").evaluate((element) => Number(element.getAttribute("data-fallback-pan-count"))),
+    )
+    .toBeGreaterThan(fallbackPanCount);
   await page.getByTestId("clinic-map-zoom-in").click();
   await page.getByTestId("clinic-map-zoom-out").click();
   await page.getByTestId("clinic-map-fallback-recenter").click();
@@ -894,6 +909,7 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
   expect(mapConfigRequests).toBeGreaterThanOrEqual(1);
   await expect(page.getByTestId("clinic-map-provider-zoom-in")).toBeVisible();
   await expect(page.getByTestId("clinic-map-provider-zoom-out")).toBeVisible();
+  await expect(page.getByTestId("clinic-map-provider-pan-right")).toBeVisible();
 
   const providerMarker = page.getByLabel("Select Provider Urgent Care");
   const qdocMarker = page.getByLabel("Select E2E Clinic");
@@ -921,6 +937,17 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
         const events = (window as Window & { __qdocMapboxEvents?: Array<{ type: string; center?: [number, number] }> })
           .__qdocMapboxEvents ?? [];
         return events.some((event) => event.type === "flyTo" && event.center?.[0] === -80.5204 && event.center?.[1] === 43.4643);
+      }),
+    )
+    .toBe(true);
+
+  await page.getByTestId("clinic-map-provider-pan-right").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocMapboxEvents?: Array<{ type: string; offset?: [number, number] }> })
+          .__qdocMapboxEvents ?? [];
+        return events.some((event) => event.type === "panBy" && event.offset?.[0] === 80 && event.offset?.[1] === 0);
       }),
     )
     .toBe(true);

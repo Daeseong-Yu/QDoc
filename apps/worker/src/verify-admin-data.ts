@@ -43,6 +43,14 @@ function completeStatusCounts(counts: Record<string, number> | undefined) {
   return Object.fromEntries(ticketStatuses.map((status) => [status, counts?.[status] ?? 0]));
 }
 
+function hasSiteAddress(site: { addressLine1: string | null; city: string | null; region: string | null; country: string | null }) {
+  return Boolean(site.addressLine1 || site.city || site.region || site.country);
+}
+
+function hasSiteCoordinates(site: { latitude: number | null; longitude: number | null }) {
+  return typeof site.latitude === "number" && typeof site.longitude === "number";
+}
+
 function check(name: string, ok: boolean, readyStatus: string, failedStatus: string, value?: number | string | boolean): AdminDataCheck {
   return {
     name,
@@ -116,7 +124,10 @@ async function main() {
 
   const ticketCountsBySite = countTicketRows(ticketRows);
   const siteIds = new Set(sites.map((site) => site.id));
+  const expectedSites = sites.filter((site) => expectedSiteIds.includes(site.id));
   const missingExpectedSiteIds = expectedSiteIds.filter((siteId) => !siteIds.has(siteId));
+  const expectedSitesWithoutAddresses = expectedSites.filter((site) => !hasSiteAddress(site)).map((site) => site.id);
+  const expectedSitesWithoutCoordinates = expectedSites.filter((site) => !hasSiteCoordinates(site)).map((site) => site.id);
   const sitesWithoutQueues = sites.filter((site) => site.queues.length === 0).map((site) => site.id);
   const sitesWithoutAdmins = sites
     .filter((site) => site.memberships.filter((membership) => membership.role === "admin").length === 0)
@@ -158,8 +169,8 @@ async function main() {
         staff: staffCount,
       },
       setup: {
-        hasAddress: Boolean(site.addressLine1 || site.city || site.region || site.country),
-        hasCoordinates: typeof site.latitude === "number" && typeof site.longitude === "number",
+        hasAddress: hasSiteAddress(site),
+        hasCoordinates: hasSiteCoordinates(site),
         notificationAheadCount: site.notificationAheadCount,
       },
       tickets: completeStatusCounts(ticketCountsBySite.get(site.id)),
@@ -175,6 +186,20 @@ async function main() {
       expectedSiteIds.length > 0 ? "ready" : "not_requested",
       "expected_sites_missing",
       missingExpectedSiteIds.length,
+    ),
+    check(
+      "expected_site_addresses",
+      expectedSitesWithoutAddresses.length === 0,
+      expectedSiteIds.length > 0 ? "ready" : "not_requested",
+      "expected_sites_without_addresses",
+      expectedSitesWithoutAddresses.length,
+    ),
+    check(
+      "expected_site_coordinates",
+      expectedSitesWithoutCoordinates.length === 0,
+      expectedSiteIds.length > 0 ? "ready" : "not_requested",
+      "expected_sites_without_coordinates",
+      expectedSitesWithoutCoordinates.length,
     ),
     check("site_queues", sitesWithoutQueues.length === 0, "ready", "sites_without_queues", sitesWithoutQueues.length),
     check("site_admins", sitesWithoutAdmins.length === 0, "ready", "sites_without_admins", sitesWithoutAdmins.length),
@@ -209,6 +234,8 @@ async function main() {
     expectations: {
       siteIds: expectedSiteIds,
       missingSiteIds: missingExpectedSiteIds,
+      sitesWithoutAddresses: expectedSitesWithoutAddresses,
+      sitesWithoutCoordinates: expectedSitesWithoutCoordinates,
       staffAdminEmails: expectedStaffAdminEmails.length,
       sitesMissingExpectedStaffAdmins,
     },

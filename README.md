@@ -189,7 +189,7 @@ pnpm e2e
 
 `pnpm verify:ops` prints safe operational JSON for outbox status counts, oldest pending job age, failed almost-ready email jobs, active ticket counts, and current map guardrail state. It exits non-zero when failed outbox jobs, stale processing jobs, failed email jobs, or enabled map guardrail misconfiguration need operator attention.
 
-`pnpm verify:admin-data` prints safe operational JSON for organization, clinic site, queue, staff membership, audit-log count, ticket-count, and map budget configuration readiness. It does not print emails, OTPs, raw database URLs, ticket IDs, audit metadata, or patient payloads. Set `QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener` to require specific launch clinic IDs, and set `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` to a real OTP-receivable staff/admin inbox to verify that each launch site has the expected admin memberships without printing the addresses. Missing expected data exits non-zero and provides a failure-path check without changing database rows.
+`pnpm verify:admin-data` prints safe operational JSON for organization, clinic site, queue, staff membership, audit-log count, ticket-count, and map budget configuration readiness. It does not print emails, OTPs, raw database URLs, ticket IDs, audit metadata, or patient payloads. Set `QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener,site-university` to require specific launch clinic IDs and their map-ready address and coordinate data, and set `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` to a real OTP-receivable staff/admin inbox to verify that each launch site has the expected admin memberships without printing the addresses. Missing expected data exits non-zero and provides a failure-path check without changing database rows.
 
 `pnpm verify:launch` prints safe launch-readiness JSON for required database and Redis configuration, session hardening, HTTPS origin settings, loopback web binding, OTP debug flags, configurable OTP abuse limits, SMTP readiness, and map-provider cost guardrails. It treats `APP_ENV=staging`, `APP_ENV=production`, and `NODE_ENV=production` as launch-like environments and exits non-zero when fail-closed settings are not ready. Nearby healthcare search is disabled by default until a server-side provider credential and a positive monthly search limit are configured.
 
@@ -266,7 +266,7 @@ Staging environment variables:
 | `QDOC_BOOTSTRAP_STAFF_SITE_IDS` | staff bootstrap | Optional comma-separated site IDs for staff bootstrap. Defaults to `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` when set, otherwise all sites. |
 | `QDOC_BOOTSTRAP_STAFF_DRY_RUN` | staff bootstrap | Optional `true` or `false`. The deploy helper defaults to `true`, unless `QDOC_BOOTSTRAP_STAFF_CONFIRM=apply` is set; package scripts still honor the explicit value. |
 | `QDOC_BOOTSTRAP_STAFF_CONFIRM` | staff bootstrap | Set to `apply` only for the approved non-dry-run staff-admin bootstrap in staging or production-like environments. Dry-run does not require it. |
-| `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` | no | Comma-separated clinic site IDs that `pnpm verify:admin-data` must find. Defaults are not required locally, but staging should set the launch clinic IDs. |
+| `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` | no | Comma-separated clinic site IDs that `pnpm verify:admin-data` must find with address and coordinate data. Defaults are not required locally, but staging should set the launch clinic IDs. |
 | `QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS` | no | Comma-separated staff/admin emails that `pnpm verify:admin-data` must find as site admins. The verifier prints counts and site IDs only, not the addresses. |
 | `EMAIL_PROVIDER` | yes | Use `smtp` for staging unless console delivery is explicitly allowed. |
 | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | yes for SMTP | SMTP sender and credentials; never print or commit secrets. |
@@ -498,18 +498,18 @@ Admin data operations:
    - Staff-admin bootstrap: `pnpm db:bootstrap-staff-admins`, `pnpm db:bootstrap-staff-admins:staging`, or `bash deploy/bootstrap-staff-admins.sh` adds or promotes real staff/admin emails on existing sites without resetting tickets, queues, map settings, or provider guardrail rows. The command prints counts and site IDs, not email addresses.
    - Application-supported: staff admins can manage site settings, notification threshold, queue open/closed state, site memberships, audit-log review, and notification health from `/staff`. Operators listed in `MAP_SETTINGS_ADMIN_EMAILS` can manage global map provider enablement, monthly map-load limits, monthly place-search limits, and hard-stop settings from the staff UI.
    - Database-admin-only: new production organization/site/queue creation, destructive record cleanup, direct restore, and emergency data correction require an approved DB-admin procedure or a reviewed script. Do not bypass staff authorization boundaries from the public API.
-2. After migrations and approved seed/bootstrap data are applied, sign in as a site admin, verify every launch clinic has the expected address or coordinates, set `notificationAheadCount`, confirm at least one queue exists, and confirm at least one real OTP-receivable admin membership per site.
+2. After migrations and approved seed/bootstrap data are applied, sign in as a site admin, verify every launch clinic has the expected address and coordinates, set `notificationAheadCount`, confirm at least one queue exists, and confirm at least one real OTP-receivable admin membership per site.
 3. Keep map providers disabled until provider console restrictions, browser credentials, monthly QDoc limit, and QDoc hard-stop settings are all configured. If a provider is enabled, `monthlyMapLoadLimit` must be positive and `hardStopEnabled` must stay true.
 4. Run the admin data verifier:
 
 ```bash
-QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener pnpm db:bootstrap-staff-admins
-QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener pnpm db:bootstrap-staff-admins
-QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener bash deploy/bootstrap-staff-admins.sh
-QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener bash deploy/bootstrap-staff-admins.sh
+QDOC_BOOTSTRAP_STAFF_DRY_RUN=true QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener,site-university pnpm db:bootstrap-staff-admins
+QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener,site-university pnpm db:bootstrap-staff-admins
+QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener,site-university bash deploy/bootstrap-staff-admins.sh
+QDOC_BOOTSTRAP_STAFF_CONFIRM=apply QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo,site-kitchener,site-university bash deploy/bootstrap-staff-admins.sh
 pnpm verify:admin-data
-QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener pnpm verify:admin-data
-QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm verify:admin-data
+QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener,site-university pnpm verify:admin-data
+QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo,site-kitchener,site-university QDOC_ADMIN_DATA_EXPECT_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL" pnpm verify:admin-data
 ```
 
 5. Exercise the failure path without mutating data:

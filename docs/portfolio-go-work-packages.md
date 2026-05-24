@@ -145,6 +145,7 @@ Implementation state:
 - Seed/bootstrap supports expected staff/admin emails.
 - Existing staging databases can add or promote real staff/admin emails with `deploy/bootstrap-staff-admins.sh` or `pnpm db:bootstrap-staff-admins:staging` without rerunning the full seed, resetting tickets, changing queues, or changing map guardrail rows.
 - Launch/admin-data verification can assert staff/admin readiness without printing addresses.
+- Launch/admin-data verification now treats expected clinic IDs as map-ready only when each expected site has address and coordinate data; this prevents stale staging data from passing while the patient map cannot show meaningful QDoc clinics.
 - Local E2E proves admin-created staff tester membership, staff-only role boundaries, admin role update/delete flows, membership audit-log visibility, and last-admin protection.
 - The staff sign-in surface now tells testers before OTP that staff tools require a staff/admin email added to a site roster, while personal emails remain limited to patient check-in until an admin adds them.
 - The staff sign-in OTP controls now keep the email, 6-digit code, and submit action in a compact responsive control group, with E2E coverage preventing the staff OTP input from expanding into a full-width row.

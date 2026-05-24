@@ -247,7 +247,7 @@ No-go criteria:
 
 - Public URL is missing or points at a different artifact/release SHA.
 - Backup restore-check has not passed for the launch database.
-- `verify:admin-data` shows missing launch clinic, queue, expected staff admin, or map guardrail records.
+- `verify:admin-data` shows missing launch clinic, missing launch clinic address/coordinates, queue, expected staff admin, or map guardrail records.
 - `verify:launch` reports console/fixed OTP enabled, missing SMTP, weak session secret, non-HTTPS app URL, public web bind, or map hard-stop misconfiguration in a launch-like environment.
 - `verify:email` reports that the API or worker would fail OTP/email delivery, SMTP values are placeholders, or approved SMTP connectivity/auth verification fails.
 

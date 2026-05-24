@@ -111,6 +111,7 @@ async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: bo
           Map: class {
             constructor(options) {
               this._container = options.container;
+              this._zoom = options.zoom;
               window.__qdocMapboxEvents.push({ type: "map", center: options.center, zoom: options.zoom });
               const surface = document.createElement("div");
               surface.dataset.testid = "mapbox-surface";
@@ -123,10 +124,18 @@ async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: bo
               window.__qdocMapboxEvents.push({ type: "addControl", position });
             }
             flyTo(options) {
+              this._zoom = options.zoom ?? this._zoom;
               window.__qdocMapboxEvents.push({ type: "flyTo", center: options.center, zoom: options.zoom });
+            }
+            getZoom() {
+              return this._zoom;
             }
             remove() {
               this._container.replaceChildren();
+            }
+            setZoom(zoom) {
+              this._zoom = zoom;
+              window.__qdocMapboxEvents.push({ type: "setZoom", zoom });
             }
           },
           Marker: class {
@@ -879,6 +888,8 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
     .toBe(true);
   expect(nearbyHealthcareRequests).toBeGreaterThanOrEqual(1);
   expect(mapConfigRequests).toBeGreaterThanOrEqual(1);
+  await expect(page.getByTestId("clinic-map-provider-zoom-in")).toBeVisible();
+  await expect(page.getByTestId("clinic-map-provider-zoom-out")).toBeVisible();
 
   const providerMarker = page.getByLabel("Select Provider Urgent Care");
   const qdocMarker = page.getByLabel("Select E2E Clinic");
@@ -909,6 +920,17 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
       }),
     )
     .toBe(true);
+
+  await page.getByTestId("clinic-map-provider-zoom-in").click();
+  await page.getByTestId("clinic-map-provider-zoom-out").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocMapboxEvents?: Array<{ type: string }> }).__qdocMapboxEvents ?? [];
+        return events.filter((event) => event.type === "setZoom").length;
+      }),
+    )
+    .toBeGreaterThanOrEqual(2);
 
   await page.getByRole("button", { name: "Recenter map to your location" }).click();
   await expect

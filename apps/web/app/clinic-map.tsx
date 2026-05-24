@@ -45,7 +45,9 @@ type MapDisplayPlace = {
 type MapboxMap = {
   addControl: (control: unknown, position?: string) => void;
   flyTo: (options: Record<string, unknown>) => void;
+  getZoom: () => number;
   remove: () => void;
+  setZoom: (zoom: number) => void;
 };
 
 type MapboxPopup = {
@@ -68,6 +70,7 @@ type MapboxNamespace = {
 
 type GoogleMap = {
   fitBounds: (bounds: GoogleBounds) => void;
+  getZoom: () => number | undefined;
   panTo: (location: { lat: number; lng: number }) => void;
   setZoom: (zoom: number) => void;
 };
@@ -92,6 +95,7 @@ type ProviderMapHandle = {
   recenter: (location: BrowserLocation) => void;
   remove: () => void;
   selectPlace: (placeId: string) => void;
+  zoomBy: (delta: number) => void;
 };
 
 type FallbackViewport = {
@@ -104,6 +108,7 @@ type ProviderInteractionState = {
   fallbackRecenterCount: number;
   focusCount: number;
   recenterCount: number;
+  zoomCount: number;
 };
 
 const scriptLoads = new Map<string, Promise<void>>();
@@ -375,6 +380,9 @@ async function initializeProviderMap(
           styleMapboxMarkerElement(marker.element, marker.place, id === placeId);
         }
       },
+      zoomBy: (delta: number) => {
+        map.setZoom(clamp(map.getZoom() + delta, 1, 18));
+      },
     };
   }
 
@@ -446,6 +454,9 @@ async function initializeProviderMap(
         marker.setIcon(getGoogleMarkerIcon(place, id === placeId));
       }
     },
+    zoomBy: (delta: number) => {
+      map.setZoom(clamp((map.getZoom() ?? 12) + delta, 1, 18));
+    },
   };
 }
 
@@ -514,6 +525,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     fallbackRecenterCount: 0,
     focusCount: 0,
     recenterCount: 0,
+    zoomCount: 0,
   });
 
   const hasLocationContext = userLocation !== null;
@@ -603,6 +615,18 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
     setProviderInteraction((current) => ({
       ...current,
       recenterCount: current.recenterCount + 1,
+    }));
+  }, []);
+
+  const zoomProviderMap = useCallback((delta: number) => {
+    if (!providerMapRef.current) {
+      return;
+    }
+
+    providerMapRef.current.zoomBy(delta);
+    setProviderInteraction((current) => ({
+      ...current,
+      zoomCount: current.zoomCount + 1,
     }));
   }, []);
 
@@ -745,6 +769,7 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
       data-provider-focus-count={providerInteraction.focusCount}
       data-provider-place-count={providerDisplayPlaces.length}
       data-provider-recenter-count={providerInteraction.recenterCount}
+      data-provider-zoom-count={providerInteraction.zoomCount}
       data-qdoc-site-count={siteDisplayPlaces.length}
       data-testid="clinic-map-section"
     >
@@ -877,6 +902,28 @@ export function ClinicMap({ sites, selectedSiteId, refreshKey, userLocation, onS
             <Crosshair size={16} aria-hidden="true" />
             Current area
           </button>
+        ) : null}
+        {mapState === "ready" ? (
+          <div className="absolute right-3 top-3 z-30 grid gap-2">
+            <button
+              type="button"
+              onClick={() => zoomProviderMap(1)}
+              className="inline-flex size-9 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+              aria-label="Zoom in map"
+              data-testid="clinic-map-provider-zoom-in"
+            >
+              <Plus size={16} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => zoomProviderMap(-1)}
+              className="inline-flex size-9 items-center justify-center rounded-md bg-white text-[#087884] shadow-sm ring-1 ring-slate-200 hover:bg-[#eefbfc]"
+              aria-label="Zoom out map"
+              data-testid="clinic-map-provider-zoom-out"
+            >
+              <Minus size={16} aria-hidden="true" />
+            </button>
+          </div>
         ) : null}
       </div>
 

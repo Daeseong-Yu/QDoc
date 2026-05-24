@@ -166,6 +166,22 @@ test.describe("portfolio public browser smoke", () => {
       await expect(providerSurface, "provider-backed map surface should render in a public browser").toBeVisible();
       await page.getByTestId("clinic-map-provider-container").hover();
       await page.mouse.wheel(0, -300);
+      await expect(page.getByTestId("clinic-map-provider-zoom-in")).toBeVisible();
+      await expect(page.getByTestId("clinic-map-provider-zoom-out")).toBeVisible();
+      const providerZoomCount = await readNumericMapAttribute(page, "data-provider-zoom-count");
+      await page.getByTestId("clinic-map-provider-zoom-in").click();
+      await expect
+        .poll(() => pollNumericMapAttribute(page, "data-provider-zoom-count"), {
+          message: "provider zoom-in control should call the live map",
+        })
+        .toBeGreaterThan(providerZoomCount);
+      const providerZoomInCount = await readNumericMapAttribute(page, "data-provider-zoom-count");
+      await page.getByTestId("clinic-map-provider-zoom-out").click();
+      await expect
+        .poll(() => pollNumericMapAttribute(page, "data-provider-zoom-count"), {
+          message: "provider zoom-out control should call the live map",
+        })
+        .toBeGreaterThan(providerZoomInCount);
       const recenterCount = await readNumericMapAttribute(page, "data-provider-recenter-count");
       await page.getByTestId("clinic-map-provider-recenter").click();
       await expect

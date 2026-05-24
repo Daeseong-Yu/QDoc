@@ -321,11 +321,19 @@ aws ssm create-document \
   --document-format YAML \
   --content file://deploy/ssm/qdoc-staging-deploy.yaml
 
-aws ssm update-document \
+QDOC_SSM_DOCUMENT_VERSION="$(
+  aws ssm update-document \
+    --name QDoc-StagingDeploy \
+    --document-version '$LATEST' \
+    --document-format YAML \
+    --content file://deploy/ssm/qdoc-staging-deploy.yaml \
+    --query 'DocumentDescription.LatestVersion' \
+    --output text
+)"
+
+aws ssm update-document-default-version \
   --name QDoc-StagingDeploy \
-  --document-version '$LATEST' \
-  --document-format YAML \
-  --content file://deploy/ssm/qdoc-staging-deploy.yaml
+  --document-version "$QDOC_SSM_DOCUMENT_VERSION"
 ```
 
 Prepare the host-side deployment directories. The EC2 instance does not need a Git checkout for deployment; GitHub Actions uploads both the app image artifact and an ops bundle containing the deploy scripts and Compose config. Keep staging secrets outside release bundles in a stable shared env file:

@@ -68,6 +68,7 @@ If staging/manual evidence cannot be collected because the candidate has not bee
 
 These rules capture the newly defined product-completion expectations for future work:
 
+- The portfolio testability contract is the completion rule for this gate: a documented patient, staff, map, OTP, queue, notification/outbox, refresh/revisit, membership, audit-log, backup, rollback, or evidence path is not complete until a visitor or invited tester can use it in the deployed environment without developer explanation, direct database edits, placeholder-only accounts, or raw implementation errors.
 - P5-A remains open until a real OTP-receivable staff/admin and tester path is proven without direct database edits. Signing in with an unrostered personal email should fail authorization; the fix is to roster that exact tester email through bootstrap or membership management.
 - P5-B remains open until the public map is proven as an interactive provider-backed experience. Seeded QDoc clinics are the check-in source of truth, but they are not enough for nearby healthcare discovery by themselves.
 - P5-C remains open until first-time staging OTP delivery, readable delivery/rate-limit/invalid/expired states, and refresh/revisit session behavior are proven against the deployed environment.
@@ -77,6 +78,8 @@ These rules capture the newly defined product-completion expectations for future
 Do not downgrade one of these requirements to an accepted risk unless the user explicitly decides that the behavior is outside the public portfolio demo.
 
 Treat tester-facing usability gaps as implementation work. A map that renders but does not pan, zoom, recenter, or synchronize selection; staff access that only works after hidden database edits; OTP failures that expose raw API codes; or smoke steps that require developer explanation are blockers in their related P5 package.
+
+Future roadmap items remain excluded from this contract unless explicitly approved. Do not use that exclusion to defer one of the documented portfolio-demo flows.
 
 ## Pre-GO Functional Completion List
 

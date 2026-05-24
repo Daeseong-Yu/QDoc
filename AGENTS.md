@@ -55,6 +55,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - `Launch` in the current task means portfolio-ready public demo. It does not mean every future roadmap item is complete, but every documented core patient, staff, map, OTP, queue, notification, and operational smoke path must be implemented, testable, and understandable without developer explanation.
 - Do not treat a successful build, deploy, or staging health check as sufficient for `GO`. The user-facing patient/staff workflows and operational recovery evidence are part of the gate.
 - Newly defined Step 5 work is product-completion work plus evidence collection. Do not treat P5-A through P5-E as optional roadmap, documentation-only work, or deployment-only validation.
+- Apply the portfolio testability contract before closing any P5 package: a documented tester-facing path is complete only when it works in the deployed portfolio environment, or fails closed with readable copy and an explicit user-approved exclusion. Rendered UI, local stubs, placeholder accounts, health checks, or successful deploys do not close a tester-facing package by themselves.
 
 ### Current Step 5 Work Board
 

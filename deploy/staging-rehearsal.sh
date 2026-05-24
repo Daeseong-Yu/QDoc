@@ -41,6 +41,13 @@ is_true() {
   esac
 }
 
+has_placeholder_value() {
+  case "$1" in
+    *replace-with* | *REPLACE-WITH* | *change-me* | *CHANGE-ME* | *example* | *EXAMPLE*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 env_file_value() {
   local key="$1"
   local line value
@@ -107,7 +114,7 @@ check_expected_app_image() {
 
   configured_image="${QDOC_APP_IMAGE:-}"
 
-  if [ -n "$configured_image" ] && [ "$configured_image" != "$EXPECTED_APP_IMAGE" ]; then
+  if [ -n "$configured_image" ] && ! has_placeholder_value "$configured_image" && [ "$configured_image" != "$EXPECTED_APP_IMAGE" ]; then
     fail "QDOC_APP_IMAGE mismatch: expected $EXPECTED_APP_IMAGE, got $configured_image"
   fi
 

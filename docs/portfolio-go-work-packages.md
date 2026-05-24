@@ -223,7 +223,7 @@ Implementation state:
 - Local automated coverage includes notification preference persistence, almost-ready notification/outbox creation, failed-job visibility, cancel flow, audit-log refresh, duplicate almost-ready prevention, core queue operations, membership role update/delete, membership audit-log visibility, and last-admin protection.
 - Read-only public release preflight catches healthy-but-stale public deployments before browser smoke, so P5-D evidence is not collected against an old artifact.
 - Read-only public browser smoke covers patient page load, Refresh usability, clinic selection, marker selection, selected-state feedback, map fallback/provider surface expectations, `/staff` sign-in surface reachability, and absence of raw internal API/error tokens in the public UI, including auth, queue, map-provider, and provider-availability codes. It does not request OTPs or prove staff authorization.
-- `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`. The helper requires separate statuses for tester membership, role boundaries, patient refresh/revisit, queue controls/notification threshold, membership management, audit-log review, notification/outbox behavior, and duplicate-delivery prevention so the GO evidence cannot hide a skipped workflow inside a coarse package status.
+- `deploy/portfolio-smoke-evidence.sh` and `pnpm verify:portfolio-smoke` provide a read-only helper for converting P5-A through P5-D manual smoke outcomes into safe package status exports for `deploy/release-evidence.sh`. The helper requires explicit public release preflight and public browser smoke statuses before P5-B or P5-D can pass. It also requires separate statuses for tester membership, role boundaries, patient refresh/revisit, queue controls/notification threshold, membership management, audit-log review, notification/outbox behavior, and duplicate-delivery prevention so the GO evidence cannot hide a skipped workflow inside a coarse package status.
 
 Remaining evidence:
 
@@ -236,7 +236,7 @@ Verification:
 - `pnpm e2e`
 - `QDOC_PUBLIC_URL=https://qdoc.example.com QDOC_EXPECTED_RELEASE_SHA=<git-sha> pnpm verify:public-release`
 - `QDOC_PUBLIC_URL=https://qdoc.example.com pnpm e2e:portfolio`
-- `pnpm verify:portfolio-smoke`
+- `QDOC_SMOKE_PUBLIC_RELEASE_PREFLIGHT=passed QDOC_SMOKE_PUBLIC_BROWSER_SMOKE=passed pnpm verify:portfolio-smoke` after the deployed candidate passes public release preflight and public browser smoke
 - staging manual patient/staff smoke
 - `pnpm verify:outbox`
 - `pnpm verify:ops`

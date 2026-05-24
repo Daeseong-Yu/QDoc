@@ -73,6 +73,8 @@ Before setting the P5-A through P5-D status variables, use the portfolio smoke h
 
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com \
+QDOC_SMOKE_PUBLIC_RELEASE_PREFLIGHT=passed \
+QDOC_SMOKE_PUBLIC_BROWSER_SMOKE=passed \
 QDOC_SMOKE_STAFF_ADMIN_DATA=passed \
 QDOC_SMOKE_STAFF_ADMIN_SIGNIN=passed \
 QDOC_SMOKE_STAFF_TESTER_AUTH=passed \
@@ -102,7 +104,7 @@ QDOC_SMOKE_STRICT=true \
 bash deploy/portfolio-smoke-evidence.sh
 ```
 
-Use `pending`, `not_run`, or `failed` for checks that are not actually proven. Do not mark a value `passed` from local tests when the check depends on real inboxes, a public browser, provider credentials, deployed worker behavior, or staging host settings. The membership, role-boundary, queue-control, patient status revisit, and audit-log values are separate because a portfolio tester must be able to prove those UI paths without relying on a developer explanation or direct database edits.
+Use `pending`, `not_run`, or `failed` for checks that are not actually proven. Do not mark a value `passed` from local tests when the check depends on real inboxes, a public browser, provider credentials, deployed worker behavior, or staging host settings. The helper includes `QDOC_SMOKE_PUBLIC_RELEASE_PREFLIGHT` and `QDOC_SMOKE_PUBLIC_BROWSER_SMOKE` in the P5-B and P5-D rollups, so stale public deployments or skipped Playwright public smoke cannot be hidden by manual package statuses. The membership, role-boundary, queue-control, patient status revisit, and audit-log values are separate because a portfolio tester must be able to prove those UI paths without relying on a developer explanation or direct database edits.
 
 Run the read-only public release preflight before browser smoke. It checks only `/api/health` and `/api/release`; use it to catch stale public deployments before collecting Playwright evidence.
 

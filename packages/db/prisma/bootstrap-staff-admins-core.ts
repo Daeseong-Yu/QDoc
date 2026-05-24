@@ -10,6 +10,40 @@ export type StaffAdminBootstrapConfig = {
   dryRun: boolean;
 };
 
+export type StaffAdminBootstrapMembership = {
+  id: string;
+  role: string;
+  user: {
+    email: string;
+  };
+};
+
+export type StaffAdminBootstrapSite = {
+  id: string;
+  memberships: StaffAdminBootstrapMembership[];
+};
+
+export type StaffAdminBootstrapPlanItem = {
+  siteId: string;
+  created: number;
+  promoted: number;
+  unchanged: number;
+};
+
+export type StaffAdminBootstrapSuccessOutput = {
+  ok: true;
+  dryRun: boolean;
+  emailCount: number;
+  siteCount: number;
+  requestedSiteCount: number;
+  changes: {
+    created: number;
+    promoted: number;
+    unchanged: number;
+  };
+  sites: StaffAdminBootstrapPlanItem[];
+};
+
 export class BootstrapInputError extends Error {
   constructor(public readonly status: string) {
     super(status);
@@ -86,5 +120,58 @@ export function resolveStaffAdminBootstrapConfig(env: StaffAdminBootstrapEnv = p
     emails,
     requestedSiteIds,
     dryRun,
+  };
+}
+
+export function indexStaffAdminMembershipsBySiteAndEmail(sites: StaffAdminBootstrapSite[]) {
+  const existingBySiteAndEmail = new Map<string, { id: string; role: string }>();
+
+  for (const site of sites) {
+    for (const membership of site.memberships) {
+      existingBySiteAndEmail.set(`${site.id}:${membership.user.email.toLowerCase()}`, {
+        id: membership.id,
+        role: membership.role,
+      });
+    }
+  }
+
+  return existingBySiteAndEmail;
+}
+
+export function buildStaffAdminBootstrapPlan(sites: StaffAdminBootstrapSite[], emails: string[]) {
+  const existingBySiteAndEmail = indexStaffAdminMembershipsBySiteAndEmail(sites);
+
+  return sites.map((site) => {
+    const created = emails.filter((email) => !existingBySiteAndEmail.has(`${site.id}:${email}`)).length;
+    const promoted = emails.filter((email) => existingBySiteAndEmail.get(`${site.id}:${email}`)?.role === "staff").length;
+    const unchanged = emails.filter((email) => existingBySiteAndEmail.get(`${site.id}:${email}`)?.role === "admin").length;
+
+    return {
+      siteId: site.id,
+      created,
+      promoted,
+      unchanged,
+    };
+  });
+}
+
+export function buildStaffAdminBootstrapSuccessOutput(input: {
+  dryRun: boolean;
+  emailCount: number;
+  requestedSiteCount: number;
+  plan: StaffAdminBootstrapPlanItem[];
+}): StaffAdminBootstrapSuccessOutput {
+  return {
+    ok: true,
+    dryRun: input.dryRun,
+    emailCount: input.emailCount,
+    siteCount: input.plan.length,
+    requestedSiteCount: input.requestedSiteCount,
+    changes: {
+      created: input.plan.reduce((total, item) => total + item.created, 0),
+      promoted: input.plan.reduce((total, item) => total + item.promoted, 0),
+      unchanged: input.plan.reduce((total, item) => total + item.unchanged, 0),
+    },
+    sites: input.plan,
   };
 }

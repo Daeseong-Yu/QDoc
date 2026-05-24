@@ -1,6 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 
-import { BootstrapInputError, resolveStaffAdminBootstrapConfig } from "./bootstrap-staff-admins-core.js";
+import {
+  BootstrapInputError,
+  buildStaffAdminBootstrapPlan,
+  buildStaffAdminBootstrapSuccessOutput,
+  indexStaffAdminMembershipsBySiteAndEmail,
+  resolveStaffAdminBootstrapConfig,
+} from "./bootstrap-staff-admins-core.js";
 
 const prisma = new PrismaClient();
 
@@ -52,29 +58,8 @@ async function main() {
     return;
   }
 
-  const existingBySiteAndEmail = new Map<string, { id: string; role: string }>();
-
-  for (const site of sites) {
-    for (const membership of site.memberships) {
-      existingBySiteAndEmail.set(`${site.id}:${membership.user.email.toLowerCase()}`, {
-        id: membership.id,
-        role: membership.role,
-      });
-    }
-  }
-
-  const plan = sites.map((site) => {
-    const created = emails.filter((email) => !existingBySiteAndEmail.has(`${site.id}:${email}`)).length;
-    const promoted = emails.filter((email) => existingBySiteAndEmail.get(`${site.id}:${email}`)?.role === "staff").length;
-    const unchanged = emails.filter((email) => existingBySiteAndEmail.get(`${site.id}:${email}`)?.role === "admin").length;
-
-    return {
-      siteId: site.id,
-      created,
-      promoted,
-      unchanged,
-    };
-  });
+  const existingBySiteAndEmail = indexStaffAdminMembershipsBySiteAndEmail(sites);
+  const plan = buildStaffAdminBootstrapPlan(sites, emails);
 
   if (!dryRun) {
     await prisma.$transaction(async (tx) => {
@@ -125,19 +110,12 @@ async function main() {
 
   console.log(
     JSON.stringify(
-      {
-        ok: true,
+      buildStaffAdminBootstrapSuccessOutput({
         dryRun,
         emailCount: emails.length,
-        siteCount: sites.length,
         requestedSiteCount: requestedSiteIds.length,
-        changes: {
-          created: plan.reduce((total, item) => total + item.created, 0),
-          promoted: plan.reduce((total, item) => total + item.promoted, 0),
-          unchanged: plan.reduce((total, item) => total + item.unchanged, 0),
-        },
-        sites: plan,
-      },
+        plan,
+      }),
       null,
       2,
     ),

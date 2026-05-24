@@ -158,7 +158,7 @@ Implementation state:
 
 - Seed/bootstrap supports expected staff/admin emails.
 - Existing staging databases can add or promote real staff/admin emails with `deploy/bootstrap-staff-admins.sh` or `pnpm db:bootstrap-staff-admins:staging` without rerunning the full seed, resetting tickets, changing queues, or changing map guardrail rows.
-- `pnpm verify:staff-bootstrap` runs a DB-free staff bootstrap policy self-test for required email input, invalid email rejection, staging/production placeholder rejection, production-like apply confirmation, dry-run behavior, and site-ID fallback/override parsing.
+- `pnpm verify:staff-bootstrap` runs a DB-free staff bootstrap policy self-test for required email input, invalid email rejection, staging/production placeholder rejection, production-like apply confirmation, dry-run behavior, site-ID fallback/override parsing, bootstrap plan counts, and safe summary output that omits real email addresses.
 - Launch/admin-data verification can assert staff/admin readiness without printing addresses.
 - Launch/admin-data verification now treats expected clinic IDs as map-ready only when each expected site has address and coordinate data; this prevents stale staging data from passing while the patient map cannot show meaningful QDoc clinics.
 - Local E2E proves admin-created staff tester membership, staff-only role boundaries, admin role update/delete flows, membership audit-log visibility, and last-admin protection.

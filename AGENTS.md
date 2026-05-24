@@ -19,6 +19,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - Current task, if present: `.ai/execution/current.md`
 - Portfolio GO work-package handoff: `docs/portfolio-go-work-packages.md`
 - Local workflow mirror for portfolio GO handoff: `.ai/docs/portfolio-go-work-packages.md`
+- Portfolio release evidence checklist: `docs/release-go-no-go.md`
 
 ## Stack
 
@@ -44,6 +45,7 @@ This repository is the source of truth for QDoc implementation, deployment autom
 - Record newly approved portfolio-readiness blockers in `.ai/execution/current.md` and the active `.ai/phases/{task}/step*.md` before implementation, so future work does not depend on chat history.
 - Record newly approved P5-A through P5-E portfolio work-package changes in committed `docs/portfolio-go-work-packages.md` as the canonical handoff, mirror them in `.ai/docs/portfolio-go-work-packages.md`, then sync `.ai/execution/current.md` and the active Step 5 file.
 - Keep documentation ownership clear for the newly defined work: `.ai/core` is durable product/architecture/ADR context, `.ai/phases` and `.ai/execution/current.md` are active workflow state, `docs/portfolio-go-work-packages.md` is the committed package handoff, `.ai/docs/portfolio-go-work-packages.md` is its local workflow mirror, and `AGENTS.md` is only for future-session rules.
+- Use `docs/release-go-no-go.md` for operator-facing release evidence procedure changes; do not bury staging, backup, rollback, or GO/NO-GO evidence rules only in chat or ignored `.ai` state.
 - Treat `.ai/` as local workflow state unless the user explicitly asks to force-add it. Before committing any ignored `.ai` file, review for local absolute paths, private host details, secrets, OTP values, provider/account identifiers, private operational evidence, and other data that should not enter Git.
 - EC2 deployment must keep build work off the low-resource host; GitHub Actions should produce the deployable artifact.
 

@@ -8,6 +8,16 @@ const productionLikeEnvironments = new Set(["staging", "production"]);
 const allowedMapProviders = new Set(["mapbox", "google"]);
 const placeholderPatterns = [/replace-with/i, /change-me/i, /example/i];
 const smtpRequiredEnv = ["EMAIL_FROM", "SMTP_HOST", "SMTP_USER", "SMTP_PASS"];
+const otpRateLimitDefaults = new Map<string, number>([
+  ["OTP_REQUEST_PAIR_LIMIT_PER_MINUTE", 1],
+  ["OTP_REQUEST_EMAIL_LIMIT_PER_HOUR", 5],
+  ["OTP_REQUEST_EMAIL_LIMIT_PER_DAY", 20],
+  ["OTP_REQUEST_IP_LIMIT_PER_MINUTE", 10],
+  ["OTP_REQUEST_IP_LIMIT_PER_HOUR", 100],
+  ["OTP_VERIFY_PAIR_LIMIT_PER_MINUTE", 5],
+  ["OTP_VERIFY_EMAIL_LIMIT_PER_HOUR", 30],
+  ["OTP_VERIFY_IP_LIMIT_PER_HOUR", 120],
+]);
 
 function env(name: string) {
   return process.env[name]?.trim() ?? "";
@@ -35,6 +45,17 @@ function hasPlaceholderEnv(names: string[]) {
 
 function getPositiveInteger(name: string) {
   const parsed = Number.parseInt(env(name), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function getPositiveIntegerWithDefault(name: string, fallback: number) {
+  const value = env(name);
+
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
 }
 
@@ -71,6 +92,9 @@ function getChecks(): LaunchCheck[] {
   const staffDemoExpectationsOk = !productionLike || (expectedStaffAdmins.length > 0 && !hasPlaceholderValue(expectedStaffAdmins));
   const smtpShapeOk = emailProvider !== "smtp" || (hasRequiredEnv(smtpRequiredEnv) && isValidPort("SMTP_PORT"));
   const smtpPlaceholderOk = emailProvider !== "smtp" || !productionLike || !hasPlaceholderEnv(smtpRequiredEnv);
+  const otpRateLimitsOk = [...otpRateLimitDefaults].every(([name, fallback]) => {
+    return getPositiveIntegerWithDefault(name, fallback) > 0;
+  });
 
   return [
     check("database_url", env("DATABASE_URL").length > 0, "configured", "missing_database_url"),
@@ -101,6 +125,7 @@ function getChecks(): LaunchCheck[] {
       productionLike ? "disabled" : "non_launch_env_allows_debug_flags",
       "otp_debug_flags_enabled",
     ),
+    check("otp_rate_limits", otpRateLimitsOk, "configured", "otp_rate_limits_invalid"),
     check(
       "email_provider",
       !productionLike || emailProvider === "smtp",

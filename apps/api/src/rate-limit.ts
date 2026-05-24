@@ -386,31 +386,31 @@ export async function checkOtpRequestRateLimit(email: string, requesterKey: stri
       {
         name: "otp_request_pair_minute",
         key: `qdoc:rate:otp-request:v2:pair:${pairKey}:60`,
-        limit: 1,
+        limit: getPositiveIntegerEnv("OTP_REQUEST_PAIR_LIMIT_PER_MINUTE", 1),
         windowSeconds: 60,
       },
       {
         name: "otp_request_email_hour",
         key: `qdoc:rate:otp-request:v2:email:${emailKey}:3600`,
-        limit: 5,
+        limit: getPositiveIntegerEnv("OTP_REQUEST_EMAIL_LIMIT_PER_HOUR", 5),
         windowSeconds: 3600,
       },
       {
         name: "otp_request_email_day",
         key: `qdoc:rate:otp-request:v2:email:${emailKey}:86400`,
-        limit: 20,
+        limit: getPositiveIntegerEnv("OTP_REQUEST_EMAIL_LIMIT_PER_DAY", 20),
         windowSeconds: 86400,
       },
       {
         name: "otp_request_ip_minute",
         key: `qdoc:rate:otp-request:v2:ip:${requesterKeyPart}:60`,
-        limit: 10,
+        limit: getPositiveIntegerEnv("OTP_REQUEST_IP_LIMIT_PER_MINUTE", 10),
         windowSeconds: 60,
       },
       {
         name: "otp_request_ip_hour",
         key: `qdoc:rate:otp-request:v2:ip:${requesterKeyPart}:3600`,
-        limit: 100,
+        limit: getPositiveIntegerEnv("OTP_REQUEST_IP_LIMIT_PER_HOUR", 100),
         windowSeconds: 3600,
       },
     ]);
@@ -433,19 +433,19 @@ export async function checkOtpVerifyRateLimit(email: string, requesterKey: strin
       {
         name: "otp_verify_pair_minute",
         key: `qdoc:rate:otp-verify:pair:${pairKey}:60`,
-        limit: 5,
+        limit: getPositiveIntegerEnv("OTP_VERIFY_PAIR_LIMIT_PER_MINUTE", 5),
         windowSeconds: 60,
       },
       {
         name: "otp_verify_email_hour",
         key: `qdoc:rate:otp-verify:email:${emailKey}:3600`,
-        limit: 30,
+        limit: getPositiveIntegerEnv("OTP_VERIFY_EMAIL_LIMIT_PER_HOUR", 30),
         windowSeconds: 3600,
       },
       {
         name: "otp_verify_ip_hour",
         key: `qdoc:rate:otp-verify:ip:${requesterKeyPart}:3600`,
-        limit: 120,
+        limit: getPositiveIntegerEnv("OTP_VERIFY_IP_LIMIT_PER_HOUR", 120),
         windowSeconds: 3600,
       },
     ]);

@@ -187,10 +187,12 @@ Implementation state:
 - Session continuity across refresh/revisit is covered locally.
 - `pnpm verify:email` safely checks API OTP delivery policy, worker provider policy, SMTP config shape, placeholder SMTP values, and optional SMTP connectivity/auth without sending email or printing provider diagnostics.
 - `deploy/verify-staging.sh` can run the same check from the staging worker image with `QDOC_VERIFY_EMAIL=true`; `QDOC_VERIFY_SMTP_CONNECTIVITY=true` adds an approved live SMTP `verify()` connection.
+- OTP request/verify rate limits are environment-configurable with conservative defaults matching the original policy. The API still reserves counters before SMTP delivery so repeated failed delivery attempts cannot hammer the email provider; this means a delivery-unavailable attempt can be followed by a short `rate_limited` response until the configured window clears.
 
 Remaining evidence:
 
 - Verify first-time OTP delivery with staging SMTP settings.
+- Confirm the deployed OTP limit variables are positive with `pnpm verify:launch`; relax them only temporarily for approved staging smoke if needed.
 - Verify `pnpm verify:email` or `QDOC_VERIFY_EMAIL=true bash deploy/verify-staging.sh` passes with the deployed staging env, and use `QDOC_VERIFY_SMTP_CONNECTIVITY=true` when SMTP connectivity/auth should be tested before requesting a real OTP.
 - Verify real inbox receipt for patient and staff paths.
 - Verify delivery-unavailable behavior without leaking SMTP/provider diagnostics.

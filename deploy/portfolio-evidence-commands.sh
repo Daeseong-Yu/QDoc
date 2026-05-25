@@ -70,9 +70,17 @@ Release identity:
 
 Prerequisite:
   Sync the default SSM deploy document, push the candidate, wait for the staging workflow to deploy it, then confirm /api/release matches the same SHA.
+  If the SSM document does not exist yet, run the one-time create command below instead of the normal sync command.
 
 0. SSM deploy document sync before staging workflow rerun
 
+AWS_REGION=$(quote "$AWS_REGION_VALUE") \\
+QDOC_SSM_DOCUMENT_NAME=$(quote "$SSM_DOCUMENT_NAME") \\
+pnpm deploy:sync-ssm-document
+
+0a. One-time SSM deploy document create if step 0 reports that the document does not exist
+
+QDOC_SSM_CREATE_DOCUMENT=true \\
 AWS_REGION=$(quote "$AWS_REGION_VALUE") \\
 QDOC_SSM_DOCUMENT_NAME=$(quote "$SSM_DOCUMENT_NAME") \\
 pnpm deploy:sync-ssm-document

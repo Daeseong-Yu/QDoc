@@ -71,15 +71,18 @@ Release identity:
 Prerequisite:
   Sync the default SSM deploy document, push the candidate, wait for the staging workflow to deploy it, then confirm /api/release matches the same SHA.
   If the SSM document does not exist yet, run the one-time create command below instead of the normal sync command.
+  Run local pnpm steps from the QDoc repository checkout. Deployed-host steps below explicitly change to /opt/qdoc/current.
 
 0. SSM deploy document sync before staging workflow rerun
 
+cd "\$(git rev-parse --show-toplevel)"
 AWS_REGION=$(quote "$AWS_REGION_VALUE") \\
 QDOC_SSM_DOCUMENT_NAME=$(quote "$SSM_DOCUMENT_NAME") \\
 pnpm deploy:sync-ssm-document
 
 0a. One-time SSM deploy document create if step 0 reports that the document does not exist
 
+cd "\$(git rev-parse --show-toplevel)"
 QDOC_SSM_CREATE_DOCUMENT=true \\
 AWS_REGION=$(quote "$AWS_REGION_VALUE") \\
 QDOC_SSM_DOCUMENT_NAME=$(quote "$SSM_DOCUMENT_NAME") \\
@@ -87,12 +90,14 @@ pnpm deploy:sync-ssm-document
 
 1. Public release preflight
 
+cd "\$(git rev-parse --show-toplevel)"
 QDOC_PUBLIC_URL=$(quote "$PUBLIC_URL") \\
 QDOC_EXPECTED_RELEASE_SHA=$(quote "$CANDIDATE_SHA") \\
 pnpm verify:public-release
 
 2. Public browser portfolio smoke
 
+cd "\$(git rev-parse --show-toplevel)"
 QDOC_PUBLIC_URL=$(quote "$PUBLIC_URL") \\
 QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=$(quote "$CANDIDATE_SHA") \\
 QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=$(quote "$REQUIRE_PROVIDER_MAP") \\
@@ -155,6 +160,7 @@ sudo env \\
 
 8. Portfolio smoke evidence rollup after manual browser/inbox checks
 
+cd "\$(git rev-parse --show-toplevel)"
 QDOC_PUBLIC_URL=$(quote "$PUBLIC_URL") \\
 QDOC_SMOKE_PUBLIC_RELEASE_PREFLIGHT=passed \\
 QDOC_SMOKE_PUBLIC_BROWSER_SMOKE=passed \\
@@ -189,6 +195,7 @@ pnpm verify:portfolio-smoke
 9. Release evidence preflight
 
 # Fill artifact/checksum/SSM/backup/rollback values from the successful deploy and rehearsal.
+cd "\$(git rev-parse --show-toplevel)"
 QDOC_PUBLIC_URL=$(quote "$PUBLIC_URL") \\
 QDOC_EXPECTED_RELEASE_SHA=$(quote "$CANDIDATE_SHA") \\
 QDOC_EXPECTED_APP_IMAGE=$(quote "${IMAGE_NAME}:$CANDIDATE_SHA") \\

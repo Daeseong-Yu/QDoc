@@ -312,15 +312,17 @@ One-time AWS setup for S3 + Systems Manager deployment:
 - Register the custom SSM command document from `deploy/ssm/qdoc-staging-deploy.yaml`. The workflow uses `QDoc-StagingDeploy` by default.
 - Add GitHub environment secrets `AWS_DEPLOY_ROLE_ARN`, `QDOC_DEPLOY_BUCKET`, and `QDOC_STAGING_INSTANCE_ID`; add environment variables `AWS_REGION` and optionally `QDOC_SSM_DOCUMENT_NAME`.
 
-Create the SSM document once, then update it when `deploy/ssm/qdoc-staging-deploy.yaml` changes. The workflow checks the default SSM document before uploading artifacts, so a stale default version fails early instead of failing inside the EC2 command. The helper resolves the document path from the repository, so it does not depend on the current shell directory:
+Create the SSM document once, then update it when `deploy/ssm/qdoc-staging-deploy.yaml` changes. The workflow checks the default SSM document before uploading artifacts, so a stale default version fails early instead of failing inside the EC2 command. Run the local helper from the QDoc Git checkout; the helper resolves the document path from the repository, so it does not depend on a relative AWS CLI `file://deploy/...` path:
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 AWS_REGION=us-east-1 pnpm deploy:sync-ssm-document
 ```
 
 The caller that runs the normal sync/update helper needs scoped SSM document permissions for `ssm:DescribeDocument`, `ssm:GetDocument`, `ssm:UpdateDocument`, and `ssm:UpdateDocumentDefaultVersion`. The one-time first-create path also needs `ssm:CreateDocument` for the configured document name. If the document has not been created yet, prefer setting `QDOC_SSM_CREATE_DOCUMENT=true` on the helper. The direct AWS CLI fallback must run from a checkout that contains `deploy/ssm/qdoc-staging-deploy.yaml`; the example below resolves the document to an absolute `file://` URI and fails early if the file is missing:
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 QDOC_SSM_CREATE_DOCUMENT=true AWS_REGION=us-east-1 pnpm deploy:sync-ssm-document
 
 QDOC_SSM_DOCUMENT_PATH="$(pwd)/deploy/ssm/qdoc-staging-deploy.yaml"
@@ -440,10 +442,11 @@ Use the 40-character candidate Git SHA in both `QDOC_EXPECTED_RELEASE_SHA` and `
 To print the exact evidence commands for the current candidate without contacting staging, SMTP, AWS, Docker, or a map provider:
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 QDOC_PUBLIC_URL=https://qdoc.example.com pnpm portfolio:evidence-commands
 ```
 
-The command plan fills the candidate SHA from `git rev-parse HEAD` when available, carries `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` into the staging verifier and staff bootstrap examples, warns when the local branch is still ahead of its upstream, and prints the ordered SSM deploy-document sync, one-time SSM document create fallback, public release preflight, browser smoke, staging verifier, staff bootstrap, staff/admin expectation verifier, rehearsal, smoke rollup, and release evidence preflight commands. It is read-only; it does not replace synchronizing the default SSM document, pushing the candidate, waiting for the staging deploy, or proving `/api/release` matches the same SHA.
+The command plan fills the candidate SHA from `git rev-parse HEAD` when available, carries `QDOC_ADMIN_DATA_EXPECT_SITE_IDS` into the staging verifier and staff bootstrap examples, warns when the local branch is still ahead of its upstream, and prints the ordered SSM deploy-document sync, one-time SSM document create fallback, public release preflight, browser smoke, staging verifier, staff bootstrap, staff/admin expectation verifier, rehearsal, smoke rollup, and release evidence preflight commands. It also marks local `pnpm` commands as repository-checkout commands and deployed-host commands as `/opt/qdoc/current` commands, reducing shell-directory mistakes. It is read-only; it does not replace synchronizing the default SSM document, pushing the candidate, waiting for the staging deploy, or proving `/api/release` matches the same SHA.
 
 Validate the command-plan helper locally without contacting external services:
 

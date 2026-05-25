@@ -78,6 +78,8 @@ assert_contains "$(case_stdout "default_site_ids")" "Launch site IDs: site-water
 assert_contains "$(case_stdout "default_site_ids")" "SSM deploy document: QDoc-StagingDeploy" "default command plan"
 assert_contains "$(case_stdout "default_site_ids")" 'AWS_REGION=\<aws-region\>' "default command plan"
 assert_contains "$(case_stdout "default_site_ids")" "pnpm deploy:sync-ssm-document" "default command plan"
+assert_contains "$(case_stdout "default_site_ids")" "Run local pnpm steps from the QDoc repository checkout." "default command plan"
+assert_occurs "$(case_stdout "default_site_ids")" 'cd "$(git rev-parse --show-toplevel)"' 6 "default command plan"
 assert_contains "$(case_stdout "default_site_ids")" "QDOC_SSM_CREATE_DOCUMENT=true" "default command plan"
 assert_contains "$(case_stdout "default_site_ids")" "0a. One-time SSM deploy document create" "default command plan"
 assert_occurs "$(case_stdout "default_site_ids")" "QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo\\,site-kitchener\\,site-university" 2 "default command plan"

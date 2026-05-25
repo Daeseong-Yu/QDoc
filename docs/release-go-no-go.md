@@ -54,7 +54,7 @@ To generate the ordered command plan for the current candidate without contactin
 QDOC_PUBLIC_URL=https://qdoc.example.com pnpm portfolio:evidence-commands
 ```
 
-The helper fills the candidate SHA from `git rev-parse HEAD` when available, prints the SSM deploy-document sync prerequisite, and warns if the local branch is still ahead of its upstream. Use it to avoid copying the literal `<git-sha>` placeholder into rehearsal, public release preflight, or release evidence commands.
+The helper fills the candidate SHA from `git rev-parse HEAD` when available, prints both the normal SSM deploy-document sync prerequisite and the one-time SSM document create fallback, and warns if the local branch is still ahead of its upstream. Use it to avoid copying the literal `<git-sha>` placeholder into rehearsal, public release preflight, or release evidence commands, and prefer the printed `QDOC_SSM_CREATE_DOCUMENT=true` helper command over hand-written relative `file://deploy/ssm/...` AWS CLI commands when the document is missing.
 
 Before copying this section into the final decision record, run the read-only evidence preflight. It does not call AWS, Docker, SMTP, map providers, or the public site; it only checks provided identifiers and prints a commit-safe decision-record block with private operational identifiers redacted by default after blocking validation passes.
 

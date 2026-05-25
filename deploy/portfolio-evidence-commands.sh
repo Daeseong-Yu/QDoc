@@ -29,6 +29,10 @@ git_ahead_summary() {
   git status --short --branch 2>/dev/null | sed -n '1p' || true
 }
 
+git_worktree_status() {
+  git status --porcelain 2>/dev/null || true
+}
+
 if [ -z "$CANDIDATE_SHA" ]; then
   CANDIDATE_SHA="$(current_git_sha)"
 fi
@@ -57,6 +61,10 @@ case "$branch_summary" in
     warn "Local branch is ahead of its upstream. Push and wait for staging deploy before public evidence."
     ;;
 esac
+
+if [ -n "$(git_worktree_status)" ]; then
+  warn "Worktree has uncommitted changes. Commit or intentionally discard them before using HEAD as release evidence."
+fi
 
 cat <<EOF
 QDoc portfolio evidence command plan

@@ -414,6 +414,9 @@ async function initializeProviderMap(
   }
 
   if (config.provider === "mapbox") {
+    const reservation = await reserveMapLoad();
+    const publicToken = reservation.publicToken;
+
     loadMapboxCss();
     await loadScript("qdoc-mapbox-gl", "https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js", () =>
       Boolean(getWindowMaps().mapboxgl),
@@ -424,9 +427,6 @@ async function initializeProviderMap(
     if (!mapboxgl) {
       throw new Error("mapbox_unavailable");
     }
-
-    const reservation = await reserveMapLoad();
-    const publicToken = reservation.publicToken;
 
     mapboxgl.accessToken = publicToken;
     const map = new mapboxgl.Map({

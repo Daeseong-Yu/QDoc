@@ -106,4 +106,18 @@ assert_occurs "$(case_stdout "custom_site_ids")" "QDOC_BOOTSTRAP_STAFF_SITE_IDS=
 assert_not_contains "$(case_stderr "custom_site_ids")" "QDOC_PUBLIC_URL is not set" "custom command plan stderr"
 assert_not_contains "$(case_stderr "custom_site_ids")" "AWS_REGION is not set" "custom command plan stderr"
 
+dirty_repo="$TMP_DIR/dirty-repo"
+mkdir "$dirty_repo"
+(
+  cd "$dirty_repo"
+  git init -q
+  printf 'pending change\n' > pending.txt
+  env \
+    QDOC_PUBLIC_URL=https://qdoc.example.invalid \
+    QDOC_EXPECTED_RELEASE_SHA="$FAKE_SHA" \
+    bash "$PORTFOLIO_EVIDENCE_COMMANDS"
+) >"$(case_stdout "dirty_worktree")" 2>"$(case_stderr "dirty_worktree")"
+assert_contains "$(case_stderr "dirty_worktree")" "Worktree has uncommitted changes" "dirty worktree command plan stderr"
+assert_contains "$(case_stdout "dirty_worktree")" "Candidate SHA: $FAKE_SHA" "dirty worktree command plan"
+
 printf 'portfolio evidence command plan self-test: passed\n'

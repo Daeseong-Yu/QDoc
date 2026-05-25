@@ -37,6 +37,7 @@ let e2eEmail = "e2e.staff@example.com";
 const e2eOtpCode = "123456";
 const almostReadyMessage = "Your turn is coming up. Please stay nearby.";
 const notificationOutboxTypes = ["ticket.status_changed", "ticket.almost_ready_email"];
+const mapProviders = ["mapbox", "google"] as const;
 
 function getE2eEmail(testInfo: TestInfo) {
   const slug = `${testInfo.project.name}-${testInfo.title}`
@@ -87,8 +88,9 @@ function getMapSearchQueryKey(provider: "mapbox", latitude: number, longitude: n
     .digest("hex");
 }
 
-async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: boolean } = {}) {
+async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: boolean; sdkOrder?: string[] } = {}) {
   await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css", async (route) => {
+    options.sdkOrder?.push("css");
     await route.fulfill({
       contentType: "text/css",
       headers: { "cache-control": "no-store" },
@@ -97,6 +99,7 @@ async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: bo
   });
   let shouldFailScriptLoad = options.failFirstScriptLoad ?? false;
   await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js*", async (route) => {
+    options.sdkOrder?.push("script");
     if (shouldFailScriptLoad) {
       shouldFailScriptLoad = false;
       await route.abort("failed");
@@ -181,6 +184,107 @@ async function installMapboxStub(page: Page, options: { failFirstScriptLoad?: bo
   });
 }
 
+async function installGoogleMapsStub(page: Page, requestOrder?: string[]) {
+  await page.route("https://maps.googleapis.com/maps/api/js*", async (route) => {
+    requestOrder?.push("script");
+    await route.fulfill({
+      contentType: "application/javascript",
+      headers: { "cache-control": "no-store" },
+      body: `
+        window.__qdocGoogleMapEvents = [];
+        window.google = {
+          maps: {
+            Map: class {
+              constructor(element, options) {
+                this._container = element;
+                this._zoom = options.zoom || 12;
+                window.__qdocGoogleMapEvents.push({ type: "map", center: options.center, zoom: options.zoom });
+                const surface = document.createElement("div");
+                surface.dataset.testid = "google-map-surface";
+                surface.style.position = "absolute";
+                surface.style.inset = "0";
+                surface.style.pointerEvents = "none";
+                this._container.appendChild(surface);
+              }
+              fitBounds() {
+                window.__qdocGoogleMapEvents.push({ type: "fitBounds" });
+              }
+              getZoom() {
+                return this._zoom;
+              }
+              panBy(x, y) {
+                window.__qdocGoogleMapEvents.push({ type: "panBy", x, y });
+              }
+              panTo(position) {
+                window.__qdocGoogleMapEvents.push({ type: "panTo", position });
+              }
+              setZoom(zoom) {
+                this._zoom = zoom;
+                window.__qdocGoogleMapEvents.push({ type: "setZoom", zoom });
+              }
+            },
+            LatLngBounds: class {
+              constructor() {
+                this._positions = [];
+              }
+              extend(position) {
+                this._positions.push(position);
+              }
+            },
+            Marker: class {
+              constructor(options) {
+                this._options = options;
+                this._listeners = {};
+                if (options.map?._container && options.title !== "Your location") {
+                  const markerIndex = options.map._container.querySelectorAll('[data-testid="google-map-marker"]').length;
+                  const markerPosition =
+                    options.title && options.title.includes("Provider")
+                      ? { left: "58%", top: "55%" }
+                      : options.title && options.title.includes("E2E Clinic")
+                        ? { left: "48%", top: "48%" }
+                        : {
+                            left: String(34 + (markerIndex % 4) * 8) + "%",
+                            top: String(34 + Math.floor(markerIndex / 4) * 8) + "%",
+                          };
+                  this._element = document.createElement("button");
+                  this._element.type = "button";
+                  this._element.dataset.testid = "google-map-marker";
+                  this._element.setAttribute("aria-label", "Select " + options.title);
+                  this._element.style.position = "absolute";
+                  this._element.style.left = markerPosition.left;
+                  this._element.style.top = markerPosition.top;
+                  this._element.style.width = "28px";
+                  this._element.style.height = "28px";
+                  this._element.style.border = "2px solid white";
+                  this._element.style.borderRadius = "9999px";
+                  this._element.style.background = "#475569";
+                  this._element.style.pointerEvents = "auto";
+                  options.map._container.appendChild(this._element);
+                }
+                window.__qdocGoogleMapEvents.push({
+                  type: "marker",
+                  title: options.title,
+                  position: options.position,
+                });
+              }
+              addListener(type, callback) {
+                this._listeners[type] = callback;
+                if (type === "click" && this._element) {
+                  this._element.addEventListener("click", callback);
+                }
+              }
+              setIcon(icon) {
+                this._icon = icon;
+                window.__qdocGoogleMapEvents.push({ type: "setIcon", title: this._options.title });
+              }
+            },
+          },
+        };
+      `,
+    });
+  });
+}
+
 async function resetE2eData() {
   const user = await prisma.user.findUnique({
     where: { email: e2eEmail },
@@ -221,10 +325,10 @@ async function resetE2eData() {
     await prisma.auditLog.deleteMany({ where: { actorId: user.id } });
   }
 
-  await prisma.mapUsagePeriod.deleteMany({ where: { provider: "mapbox" } });
-  await prisma.mapSearchCache.deleteMany({ where: { provider: "mapbox" } });
+  await prisma.mapUsagePeriod.deleteMany({ where: { provider: { in: mapProviders } } });
+  await prisma.mapSearchCache.deleteMany({ where: { provider: { in: mapProviders } } });
   await prisma.mapProviderConfigAudit.deleteMany({
-    where: { provider: "mapbox" },
+    where: { provider: { in: mapProviders } },
   });
   await prisma.otpChallenge.deleteMany({
     where: { email: { in: [e2eEmail, getE2eMemberEmail()] } },
@@ -281,34 +385,70 @@ async function resetE2eData() {
     update: {
       isEnabled: true,
       monthlyMapLoadLimit: 1,
+      monthlyPlacesSearchLimit: 0,
       hardStopEnabled: true,
     },
     create: {
       provider: "mapbox",
       isEnabled: true,
       monthlyMapLoadLimit: 1,
+      monthlyPlacesSearchLimit: 0,
+      hardStopEnabled: true,
+    },
+  });
+  await prisma.mapProviderConfig.upsert({
+    where: { provider: "google" },
+    update: {
+      isEnabled: false,
+      monthlyMapLoadLimit: 0,
+      monthlyPlacesSearchLimit: 0,
+      hardStopEnabled: true,
+    },
+    create: {
+      provider: "google",
+      isEnabled: false,
+      monthlyMapLoadLimit: 0,
+      monthlyPlacesSearchLimit: 0,
       hardStopEnabled: true,
     },
   });
 }
 
 async function resetMapGuardrailsAfterE2e() {
-  await prisma.mapUsagePeriod.deleteMany({ where: { provider: "mapbox" } });
-  await prisma.mapSearchCache.deleteMany({ where: { provider: "mapbox" } });
+  await prisma.mapUsagePeriod.deleteMany({ where: { provider: { in: mapProviders } } });
+  await prisma.mapSearchCache.deleteMany({ where: { provider: { in: mapProviders } } });
   await prisma.mapProviderConfigAudit.deleteMany({
-    where: { provider: "mapbox" },
+    where: { provider: { in: mapProviders } },
   });
   await prisma.mapProviderConfig.upsert({
     where: { provider: "mapbox" },
     update: {
       isEnabled: false,
       monthlyMapLoadLimit: 0,
+      monthlyPlacesSearchLimit: 0,
       hardStopEnabled: true,
     },
     create: {
       provider: "mapbox",
       isEnabled: false,
       monthlyMapLoadLimit: 0,
+      monthlyPlacesSearchLimit: 0,
+      hardStopEnabled: true,
+    },
+  });
+  await prisma.mapProviderConfig.upsert({
+    where: { provider: "google" },
+    update: {
+      isEnabled: false,
+      monthlyMapLoadLimit: 0,
+      monthlyPlacesSearchLimit: 0,
+      hardStopEnabled: true,
+    },
+    create: {
+      provider: "google",
+      isEnabled: false,
+      monthlyMapLoadLimit: 0,
+      monthlyPlacesSearchLimit: 0,
       hardStopEnabled: true,
     },
   });
@@ -770,6 +910,60 @@ test("enforces the monthly map load guard before exposing provider usage", async
   });
 });
 
+test("enforces the Google map load guard when Google is configured", async ({
+  request,
+}) => {
+  test.skip(process.env.MAP_PROVIDER !== "google", "requires the API server to run with MAP_PROVIDER=google");
+
+  await prisma.mapUsagePeriod.deleteMany({ where: { provider: "google" } });
+  await prisma.mapProviderConfig.upsert({
+    where: { provider: "google" },
+    update: {
+      isEnabled: true,
+      monthlyMapLoadLimit: 1,
+      monthlyPlacesSearchLimit: 0,
+      hardStopEnabled: true,
+    },
+    create: {
+      provider: "google",
+      isEnabled: true,
+      monthlyMapLoadLimit: 1,
+      monthlyPlacesSearchLimit: 0,
+      hardStopEnabled: true,
+    },
+  });
+
+  const initialConfig = await request.get("/api/maps/config");
+  await expect(initialConfig).toBeOK();
+  await expect(initialConfig.json()).resolves.toMatchObject({
+    provider: "google",
+    canLoad: true,
+    publicToken: null,
+    remainingMapLoads: 1,
+    reason: "available",
+  });
+
+  const acceptedUsage = await request.post("/api/maps/usage", {
+    data: { usageType: "map_load" },
+  });
+  await expect(acceptedUsage).toBeOK();
+  await expect(acceptedUsage.json()).resolves.toMatchObject({
+    provider: "google",
+    usageType: "map_load",
+    accepted: true,
+    publicToken: "qdoc-e2e-google-browser-key",
+    remainingMapLoads: 0,
+  });
+
+  const rejectedUsage = await request.post("/api/maps/usage", {
+    data: { usageType: "map_load" },
+  });
+  expect(rejectedUsage.status()).toBe(409);
+  await expect(rejectedUsage.json()).resolves.toMatchObject({
+    error: "map_budget_exhausted",
+  });
+});
+
 test("loads the patient map around the browser location without provider SDK when guarded off", async ({
   page,
   context,
@@ -822,6 +1016,280 @@ test("loads the patient map around the browser location without provider SDK whe
     .filter({ has: page.getByRole("heading", { name: e2eSiteName }) });
   await expect(clinicCard).toContainText("0.2 km");
   expect(providerRequests).toHaveLength(0);
+});
+
+test("does not request the Mapbox SDK when map-load reservation is rejected", async ({
+  page,
+  context,
+}) => {
+  await prisma.mapProviderConfig.update({
+    where: { provider: "mapbox" },
+    data: {
+      isEnabled: true,
+      monthlyMapLoadLimit: 5,
+      monthlyPlacesSearchLimit: 0,
+      hardStopEnabled: true,
+    },
+  });
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({
+    latitude: 43.465,
+    longitude: -80.522,
+  });
+
+  const providerRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = request.url();
+
+    if (url.includes("api.mapbox.com") || url.includes("maps.googleapis.com")) {
+      providerRequests.push(url);
+    }
+  });
+  await page.route("**/api/maps/usage", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      status: 409,
+      body: JSON.stringify({ error: "map_budget_exhausted" }),
+    });
+  });
+  await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css", async (route) => {
+    providerRequests.push(route.request().url());
+    await route.fulfill({
+      contentType: "text/css",
+      body: "",
+    });
+  });
+  await page.route("https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js*", async (route) => {
+    providerRequests.push(route.request().url());
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: "window.mapboxgl = {};",
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByTestId("clinic-map-fallback")).toBeVisible();
+  await expect(page.getByTestId("mapbox-surface")).toHaveCount(0);
+  await expect(page.getByText("Showing clinic locations.")).toBeVisible();
+  expect(providerRequests).toHaveLength(0);
+});
+
+test("does not request the Google SDK when map-load reservation is rejected", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({
+    latitude: 43.465,
+    longitude: -80.522,
+  });
+
+  const resetAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const providerRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = request.url();
+
+    if (url.includes("api.mapbox.com") || url.includes("maps.googleapis.com")) {
+      providerRequests.push(url);
+    }
+  });
+  await page.route("**/api/maps/config", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        provider: "google",
+        isEnabled: true,
+        canLoad: true,
+        publicToken: null,
+        remainingMapLoads: 5,
+        resetAt,
+        reason: "available",
+      }),
+    });
+  });
+  await page.route("**/api/maps/usage", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      status: 409,
+      body: JSON.stringify({ error: "map_budget_exhausted" }),
+    });
+  });
+  await page.route("https://maps.googleapis.com/maps/api/js*", async (route) => {
+    providerRequests.push(route.request().url());
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: "window.google = { maps: {} };",
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByTestId("clinic-map-fallback")).toBeVisible();
+  await expect(page.getByTestId("google-map-surface")).toHaveCount(0);
+  await expect(page.getByText("Showing clinic locations.")).toBeVisible();
+  expect(providerRequests).toHaveLength(0);
+});
+
+test("loads the Google provider SDK after map-load reservation", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({
+    latitude: 43.465,
+    longitude: -80.522,
+  });
+
+  const resetAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const sdkOrder: string[] = [];
+  await page.route("**/api/maps/config", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        provider: "google",
+        isEnabled: true,
+        canLoad: true,
+        publicToken: null,
+        remainingMapLoads: 5,
+        resetAt,
+        reason: "available",
+      }),
+    });
+  });
+  await page.route("**/api/maps/usage", async (route) => {
+    sdkOrder.push("usage");
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        provider: "google",
+        usageType: "map_load",
+        accepted: true,
+        publicToken: "qdoc-google-browser-key",
+        remainingMapLoads: 4,
+        resetAt,
+      }),
+    });
+  });
+  await page.route("**/api/maps/nearby-healthcare*", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        provider: "google",
+        places: [
+          {
+            id: "google:e2e-provider-care",
+            providerPlaceId: "e2e-provider-care",
+            name: "Google Provider Care",
+            address: "22 Google Way, Waterloo, ON",
+            latitude: 43.466,
+            longitude: -80.523,
+            qdocSiteId: null,
+          },
+        ],
+        source: "provider",
+        radiusMeters: 5000,
+      }),
+    });
+  });
+  await installGoogleMapsStub(page, sdkOrder);
+
+  await page.goto("/");
+  await expect(page.getByTestId("google-map-surface")).toBeVisible();
+  await expect(page.getByText("Showing clinic locations.")).toHaveCount(0);
+
+  const usageIndex = sdkOrder.indexOf("usage");
+  const scriptIndex = sdkOrder.indexOf("script");
+  expect(usageIndex).toBeGreaterThanOrEqual(0);
+  expect(scriptIndex).toBeGreaterThanOrEqual(0);
+  expect(usageIndex).toBeLessThan(scriptIndex);
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocGoogleMapEvents?: Array<{ type: string; title?: string }> })
+          .__qdocGoogleMapEvents ?? [];
+        return events.some((event) => event.type === "marker" && event.title === "Google Provider Care");
+      }),
+    )
+    .toBe(true);
+
+  const providerMarker = page.getByLabel("Select Google Provider Care");
+  await expect(providerMarker).toBeVisible();
+  await providerMarker.click();
+  await expect(page.getByTestId("clinic-map-selected-label")).toContainText("Google Provider Care");
+  await expect(page.getByTestId("clinic-map-selected-address")).toContainText("22 Google Way, Waterloo, ON");
+
+  const qdocMarker = page.getByLabel("Select E2E Clinic");
+  await expect(qdocMarker).toBeVisible();
+  await qdocMarker.click();
+  await expect(page.getByTestId("clinic-map-selected-label")).toContainText("E2E Clinic");
+  await expect(page.getByTestId("clinic-map-selected-address")).toContainText("1 E2E Way");
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocGoogleMapEvents?: Array<{ type: string; position?: { lat: number; lng: number } }> })
+          .__qdocGoogleMapEvents ?? [];
+        return events.some(
+          (event) => event.type === "panTo" && event.position?.lat === 43.4643 && event.position?.lng === -80.5204,
+        );
+      }),
+    )
+    .toBe(true);
+
+  const mapSection = page.getByTestId("clinic-map-section");
+  const dragCountBefore = Number((await mapSection.getAttribute("data-provider-drag-gesture-count")) ?? "0");
+  const providerContainer = page.getByTestId("clinic-map-provider-container");
+  const providerContainerBox = await providerContainer.boundingBox();
+  expect(providerContainerBox).not.toBeNull();
+
+  if (providerContainerBox) {
+    await page.mouse.move(providerContainerBox.x + providerContainerBox.width / 2, providerContainerBox.y + providerContainerBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      providerContainerBox.x + providerContainerBox.width / 2 + 36,
+      providerContainerBox.y + providerContainerBox.height / 2 + 4,
+      { steps: 4 },
+    );
+    await page.mouse.up();
+  }
+
+  await expect
+    .poll(async () => Number((await mapSection.getAttribute("data-provider-drag-gesture-count")) ?? "0"))
+    .toBeGreaterThan(dragCountBefore);
+
+  await page.getByTestId("clinic-map-provider-pan-right").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocGoogleMapEvents?: Array<{ type: string; x?: number; y?: number }> })
+          .__qdocGoogleMapEvents ?? [];
+        return events.some((event) => event.type === "panBy" && event.x === 80 && event.y === 0);
+      }),
+    )
+    .toBe(true);
+
+  await page.getByTestId("clinic-map-provider-zoom-in").click();
+  await page.getByTestId("clinic-map-provider-zoom-out").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocGoogleMapEvents?: Array<{ type: string }> }).__qdocGoogleMapEvents ?? [];
+        return events.filter((event) => event.type === "setZoom").length;
+      }),
+    )
+    .toBeGreaterThanOrEqual(2);
+
+  await page.getByRole("button", { name: "Recenter map to your location" }).click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const events = (window as Window & { __qdocGoogleMapEvents?: Array<{ type: string; position?: { lat: number; lng: number } }> })
+          .__qdocGoogleMapEvents ?? [];
+        return events.some(
+          (event) => event.type === "panTo" && event.position?.lat === 43.465 && event.position?.lng === -80.522,
+        );
+      }),
+    )
+    .toBe(true);
 });
 
 test("loads the provider map and keeps marker, clinic, and refresh selection in sync", async ({
@@ -880,7 +1348,13 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
     latitude: 43.465,
     longitude: -80.522,
   });
-  await installMapboxStub(page);
+  const sdkOrder: string[] = [];
+  await page.route("**/api/maps/usage", async (route) => {
+    const response = await route.fetch();
+    sdkOrder.push("usage-ok");
+    await route.fulfill({ response });
+  });
+  await installMapboxStub(page, { sdkOrder });
   let mapConfigRequests = 0;
   let nearbyHealthcareRequests = 0;
   page.on("request", (request) => {
@@ -897,6 +1371,11 @@ test("loads the provider map and keeps marker, clinic, and refresh selection in 
 
   await page.goto("/");
   await expect(page.getByTestId("mapbox-surface")).toBeVisible();
+  expect(sdkOrder.indexOf("usage-ok")).toBeGreaterThanOrEqual(0);
+  expect(sdkOrder.indexOf("css")).toBeGreaterThanOrEqual(0);
+  expect(sdkOrder.indexOf("script")).toBeGreaterThanOrEqual(0);
+  expect(sdkOrder.indexOf("usage-ok")).toBeLessThan(sdkOrder.indexOf("css"));
+  expect(sdkOrder.indexOf("usage-ok")).toBeLessThan(sdkOrder.indexOf("script"));
   await expect(page.getByText("Showing clinic locations.")).toHaveCount(0);
   await expect
     .poll(async () =>
@@ -1065,12 +1544,13 @@ test("retries provider map SDK loading after a failed script request", async ({
   });
 
   await page.goto("/");
+  await expect.poll(() => scriptRequests).toBeGreaterThanOrEqual(1);
   await expect(page.getByTestId("clinic-map-fallback")).toBeVisible();
   await expect(page.getByTestId("mapbox-surface")).toHaveCount(0);
-  await page.getByRole("button", { name: "Refresh" }).click();
+  await page.getByTestId("patient-refresh-button").click();
+  await expect.poll(() => scriptRequests).toBeGreaterThanOrEqual(2);
   await expect(page.getByTestId("mapbox-surface")).toBeVisible();
   await expect(page.getByLabel("Select Provider Urgent Care")).toBeVisible();
-  await expect.poll(() => scriptRequests).toBeGreaterThanOrEqual(2);
 });
 
 test("lets staff close a queue and blocks patient check-ins", async ({

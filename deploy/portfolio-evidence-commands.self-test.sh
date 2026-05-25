@@ -75,6 +75,9 @@ run_case "default_site_ids"
 assert_contains "$(case_stdout "default_site_ids")" "Candidate SHA: $FAKE_SHA" "default command plan"
 assert_contains "$(case_stdout "default_site_ids")" "Expected app image: qdoc-app:$FAKE_SHA" "default command plan"
 assert_contains "$(case_stdout "default_site_ids")" "Launch site IDs: site-waterloo,site-kitchener,site-university" "default command plan"
+assert_contains "$(case_stdout "default_site_ids")" "SSM deploy document: QDoc-StagingDeploy" "default command plan"
+assert_contains "$(case_stdout "default_site_ids")" 'AWS_REGION=\<aws-region\>' "default command plan"
+assert_contains "$(case_stdout "default_site_ids")" "pnpm deploy:sync-ssm-document" "default command plan"
 assert_occurs "$(case_stdout "default_site_ids")" "QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-waterloo\\,site-kitchener\\,site-university" 2 "default command plan"
 assert_occurs "$(case_stdout "default_site_ids")" "QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-waterloo\\,site-kitchener\\,site-university" 2 "default command plan"
 assert_contains "$(case_stdout "default_site_ids")" 'QDOC_BOOTSTRAP_STAFF_ADMIN_EMAILS="$REAL_STAFF_EMAIL"' "default command plan"
@@ -82,14 +85,20 @@ assert_not_contains "$(case_stdout "default_site_ids")" "<40-character-git-sha>"
 assert_not_contains "$(case_stderr "default_site_ids")" "Candidate SHA should be" "default command plan stderr"
 
 run_case "custom_site_ids" \
+  AWS_REGION=us-east-1 \
+  QDOC_SSM_DOCUMENT_NAME=QDoc-CustomDeploy \
   QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-alpha,site-beta \
   QDOC_IMAGE_NAME=qdoc-custom \
   QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=false
 assert_contains "$(case_stdout "custom_site_ids")" "Expected app image: qdoc-custom:$FAKE_SHA" "custom command plan"
 assert_contains "$(case_stdout "custom_site_ids")" "QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP=false" "custom command plan"
 assert_contains "$(case_stdout "custom_site_ids")" "Launch site IDs: site-alpha,site-beta" "custom command plan"
+assert_contains "$(case_stdout "custom_site_ids")" "SSM deploy document: QDoc-CustomDeploy" "custom command plan"
+assert_contains "$(case_stdout "custom_site_ids")" "AWS_REGION=us-east-1" "custom command plan"
+assert_contains "$(case_stdout "custom_site_ids")" "QDOC_SSM_DOCUMENT_NAME=QDoc-CustomDeploy" "custom command plan"
 assert_occurs "$(case_stdout "custom_site_ids")" "QDOC_ADMIN_DATA_EXPECT_SITE_IDS=site-alpha\\,site-beta" 2 "custom command plan"
 assert_occurs "$(case_stdout "custom_site_ids")" "QDOC_BOOTSTRAP_STAFF_SITE_IDS=site-alpha\\,site-beta" 2 "custom command plan"
 assert_not_contains "$(case_stderr "custom_site_ids")" "QDOC_PUBLIC_URL is not set" "custom command plan stderr"
+assert_not_contains "$(case_stderr "custom_site_ids")" "AWS_REGION is not set" "custom command plan stderr"
 
 printf 'portfolio evidence command plan self-test: passed\n'

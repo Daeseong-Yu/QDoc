@@ -202,7 +202,7 @@ pnpm e2e
 
 `pnpm verify:release-evidence:self-test` exercises the release evidence guard with fake identifiers only. It proves that a `GO` decision cannot be generated with pending P5 or evidence statuses, that a `NO-GO` record can still be produced with warnings, and that private S3 bucket names and backup paths stay redacted in the generated block.
 
-`pnpm portfolio:evidence-commands:self-test` exercises the evidence command-plan helper with fake identifiers only. It proves candidate SHA/image rendering, default and custom launch site IDs, staff email placeholder safety, and provider-map expectation propagation without contacting staging, AWS, Docker, SMTP, map providers, the public URL, or the database.
+`pnpm portfolio:evidence-commands:self-test` exercises the evidence command-plan helper with fake identifiers only. It proves candidate SHA/image rendering, SSM document sync command rendering, default and custom launch site IDs, staff email placeholder safety, and provider-map expectation propagation without contacting staging, AWS, Docker, SMTP, map providers, the public URL, or the database.
 
 `pnpm verify:public-release` checks a deployed public URL before browser smoke by calling only `/api/health` and `/api/release`. Set `QDOC_PUBLIC_URL=https://qdoc.example.com` and `QDOC_EXPECTED_RELEASE_SHA=<40-character-git-sha>` to fail early when staging is healthy but still serving an old artifact. This is read-only, redacts the public URL by default, and does not call AWS, Docker, SMTP, map providers, or OTP endpoints.
 

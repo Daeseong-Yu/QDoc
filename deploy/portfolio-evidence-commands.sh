@@ -7,6 +7,8 @@ IMAGE_NAME="${QDOC_IMAGE_NAME:-qdoc-app}"
 BACKUP_DIR="${QDOC_BACKUP_DIR:-/opt/qdoc/backups}"
 REQUIRE_PROVIDER_MAP="${QDOC_PORTFOLIO_EXPECT_PROVIDER_MAP:-true}"
 LAUNCH_SITE_IDS="${QDOC_ADMIN_DATA_EXPECT_SITE_IDS:-site-waterloo,site-kitchener,site-university}"
+AWS_REGION_VALUE="${AWS_REGION:-${QDOC_AWS_REGION:-}}"
+SSM_DOCUMENT_NAME="${QDOC_SSM_DOCUMENT_NAME:-QDoc-StagingDeploy}"
 
 warnings=0
 
@@ -44,6 +46,11 @@ if [ "$PUBLIC_URL" = "https://qdoc.example.com" ]; then
   warn "QDOC_PUBLIC_URL is not set; commands below use the documentation placeholder"
 fi
 
+if [ -z "$AWS_REGION_VALUE" ]; then
+  AWS_REGION_VALUE="<aws-region>"
+  warn "AWS_REGION is not set; SSM document sync command below uses the documentation placeholder"
+fi
+
 branch_summary="$(git_ahead_summary)"
 case "$branch_summary" in
   *"[ahead "*)
@@ -59,9 +66,16 @@ Release identity:
   Expected app image: ${IMAGE_NAME}:$CANDIDATE_SHA
   Public URL: $PUBLIC_URL
   Launch site IDs: $LAUNCH_SITE_IDS
+  SSM deploy document: $SSM_DOCUMENT_NAME
 
 Prerequisite:
-  Push the candidate, wait for the staging workflow to deploy it, then confirm /api/release matches the same SHA.
+  Sync the default SSM deploy document, push the candidate, wait for the staging workflow to deploy it, then confirm /api/release matches the same SHA.
+
+0. SSM deploy document sync before staging workflow rerun
+
+AWS_REGION=$(quote "$AWS_REGION_VALUE") \\
+QDOC_SSM_DOCUMENT_NAME=$(quote "$SSM_DOCUMENT_NAME") \\
+pnpm deploy:sync-ssm-document
 
 1. Public release preflight
 

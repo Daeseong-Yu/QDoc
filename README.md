@@ -308,18 +308,31 @@ One-time AWS setup for S3 + Systems Manager deployment:
 - Attach an EC2 instance profile with `AmazonSSMManagedInstanceCore` and scoped `s3:GetObject` permission for the deployment artifact prefix.
 - Confirm SSM Agent is running on the instance and the instance appears as a managed node in Systems Manager.
 - Install Docker, Docker Compose, Git, gzip, sha256sum, flock, AWS CLI, and Caddy on the EC2 host. Use a Docker Compose version that supports `up --wait`.
-- Create a GitHub Actions OIDC IAM role scoped to this repository and branch. Grant it only the permissions required to upload the artifact and send/read the SSM command for the staging instance.
+- Create a GitHub Actions OIDC IAM role scoped to this repository and branch. Grant it only the permissions required to upload the artifact, read the deploy SSM document, and send/read the SSM command for the staging instance.
 - Register the custom SSM command document from `deploy/ssm/qdoc-staging-deploy.yaml`. The workflow uses `QDoc-StagingDeploy` by default.
 - Add GitHub environment secrets `AWS_DEPLOY_ROLE_ARN`, `QDOC_DEPLOY_BUCKET`, and `QDOC_STAGING_INSTANCE_ID`; add environment variables `AWS_REGION` and optionally `QDOC_SSM_DOCUMENT_NAME`.
 
-Create the SSM document once, then update it when `deploy/ssm/qdoc-staging-deploy.yaml` changes:
+Create the SSM document once, then update it when `deploy/ssm/qdoc-staging-deploy.yaml` changes. The workflow checks the default SSM document before uploading artifacts, so a stale default version fails early instead of failing inside the EC2 command. The helper resolves the document path from the repository, so it does not depend on the current shell directory:
 
 ```bash
+AWS_REGION=us-east-1 pnpm deploy:sync-ssm-document
+```
+
+The caller that runs the helper needs scoped SSM document permissions for `ssm:DescribeDocument`, `ssm:GetDocument`, `ssm:UpdateDocument`, and `ssm:UpdateDocumentDefaultVersion`. If the document has not been created yet, either set `QDOC_SSM_CREATE_DOCUMENT=true` on the helper or create it explicitly from the repository root:
+
+```bash
+QDOC_SSM_CREATE_DOCUMENT=true AWS_REGION=us-east-1 pnpm deploy:sync-ssm-document
+
 aws ssm create-document \
   --name QDoc-StagingDeploy \
   --document-type Command \
   --document-format YAML \
   --content file://deploy/ssm/qdoc-staging-deploy.yaml
+```
+
+The equivalent manual update sequence is:
+
+```bash
 
 QDOC_SSM_DOCUMENT_VERSION="$(
   aws ssm update-document \

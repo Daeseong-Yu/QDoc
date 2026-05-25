@@ -103,6 +103,9 @@ jobs:
       id-token: write
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
       - name: Download build artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
@@ -134,6 +137,33 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           role-session-name: qdoc-${{ github.run_id }}
           mask-aws-account-id: true
+
+      - name: Verify SSM document default version
+        run: |
+          set -euo pipefail
+          LOCAL_DOCUMENT_PATH="deploy/ssm/qdoc-staging-deploy.yaml"
+          REMOTE_DOCUMENT_PATH="$(mktemp)"
+
+          if ! aws ssm get-document \
+            --name "${QDOC_SSM_DOCUMENT_NAME}" \
+            --document-version '$DEFAULT' \
+            --query Content \
+            --output text > "$REMOTE_DOCUMENT_PATH" 2>/tmp/qdoc-ssm-document.err; then
+            echo "::error::Could not read the default SSM deploy document. Grant ssm:GetDocument to the deploy role, then sync ${QDOC_SSM_DOCUMENT_NAME} from ${LOCAL_DOCUMENT_PATH}."
+            exit 1
+          fi
+
+          for required_member in \
+            deploy/bootstrap-staff-admins.self-test.sh \
+            deploy/sync-ssm-document.sh
+          do
+            if ! grep -Fq "$required_member" "$REMOTE_DOCUMENT_PATH"; then
+              echo "::error::The default SSM deploy document is missing ${required_member}. Run pnpm deploy:sync-ssm-document with valid AWS credentials before redeploying."
+              exit 1
+            fi
+          done
+
+          echo "SSM deploy document is current."
 
       - name: Upload artifact to S3
         run: |

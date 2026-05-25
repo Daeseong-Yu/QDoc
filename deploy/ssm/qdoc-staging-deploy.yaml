@@ -103,6 +103,7 @@ mainSteps:
                 deploy/release-evidence.self-test.sh | \
                 deploy/release-evidence.sh | \
                 deploy/staging-rehearsal.sh | \
+                deploy/sync-ssm-document.sh | \
                 deploy/verify-public-release.mjs | \
                 deploy/verify-staging.sh | \
                 deploy/ssm/ | \

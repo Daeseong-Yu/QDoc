@@ -20,6 +20,8 @@ Do not mark a package complete from local tests alone when it depends on real in
 
 Before using this checklist for final evidence, confirm the release candidate is the one being served publicly: read the SHA with `git rev-parse HEAD`, ensure that commit has been pushed and deployed, and require `/api/release` to match it. If that prerequisite is missing, leave the relevant package evidence as `pending` and do not replace it with local-only proof.
 
+Before rerunning staging deploy after a change under `deploy/` or `compose.staging.yaml`, synchronize the default SSM deploy document with `AWS_REGION=<region> pnpm deploy:sync-ssm-document`. A stale default SSM document can reject a newer ops bundle before the EC2 command reaches the app deploy script.
+
 If any evidence step shows that a visitor or invited tester cannot complete a documented workflow from the UI and checklist alone, stop treating the release as evidence-only work. Return to the relevant P5 package, fix the implementation or documentation gap, and rerun the affected checks before recording a GO/NO-GO decision.
 
 ## Work Package Evidence

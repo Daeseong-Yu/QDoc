@@ -318,7 +318,7 @@ Create the SSM document once, then update it when `deploy/ssm/qdoc-staging-deplo
 AWS_REGION=us-east-1 pnpm deploy:sync-ssm-document
 ```
 
-The caller that runs the helper needs scoped SSM document permissions for `ssm:DescribeDocument`, `ssm:GetDocument`, `ssm:UpdateDocument`, and `ssm:UpdateDocumentDefaultVersion`. If the document has not been created yet, prefer setting `QDOC_SSM_CREATE_DOCUMENT=true` on the helper. The direct AWS CLI fallback must run from a checkout that contains `deploy/ssm/qdoc-staging-deploy.yaml`; the example below resolves the document to an absolute `file://` URI and fails early if the file is missing:
+The caller that runs the normal sync/update helper needs scoped SSM document permissions for `ssm:DescribeDocument`, `ssm:GetDocument`, `ssm:UpdateDocument`, and `ssm:UpdateDocumentDefaultVersion`. The one-time first-create path also needs `ssm:CreateDocument` for the configured document name. If the document has not been created yet, prefer setting `QDOC_SSM_CREATE_DOCUMENT=true` on the helper. The direct AWS CLI fallback must run from a checkout that contains `deploy/ssm/qdoc-staging-deploy.yaml`; the example below resolves the document to an absolute `file://` URI and fails early if the file is missing:
 
 ```bash
 QDOC_SSM_CREATE_DOCUMENT=true AWS_REGION=us-east-1 pnpm deploy:sync-ssm-document

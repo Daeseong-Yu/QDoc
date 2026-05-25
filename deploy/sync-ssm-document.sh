@@ -43,9 +43,11 @@ need_command mktemp
 
 [ -f "$DOCUMENT_PATH" ] || fail "SSM document file not found: $DOCUMENT_PATH"
 
+CREATE_ERROR_PATH=""
 UPDATE_ERROR_PATH=""
 REMOTE_DOCUMENT_PATH=""
 cleanup() {
+  [ -z "$CREATE_ERROR_PATH" ] || rm -f "$CREATE_ERROR_PATH"
   [ -z "$UPDATE_ERROR_PATH" ] || rm -f "$UPDATE_ERROR_PATH"
   [ -z "$REMOTE_DOCUMENT_PATH" ] || rm -f "$REMOTE_DOCUMENT_PATH"
 }
@@ -64,11 +66,14 @@ if ! describe_document_version LatestVersion >/dev/null 2>&1; then
   fi
 
   log "Creating SSM document"
-  aws_ssm create-document \
+  CREATE_ERROR_PATH="$(mktemp)"
+  if ! aws_ssm create-document \
     --name "$DOCUMENT_NAME" \
     --document-type Command \
     --document-format YAML \
-    --content "file://$DOCUMENT_PATH" >/dev/null
+    --content "file://$DOCUMENT_PATH" >/dev/null 2>"$CREATE_ERROR_PATH"; then
+    fail "SSM document create failed. Check AWS credentials, region, and ssm:CreateDocument permission."
+  fi
 fi
 
 log "Updating SSM document content"

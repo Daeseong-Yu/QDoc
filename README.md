@@ -318,28 +318,31 @@ Create the SSM document once, then update it when `deploy/ssm/qdoc-staging-deplo
 AWS_REGION=us-east-1 pnpm deploy:sync-ssm-document
 ```
 
-The caller that runs the helper needs scoped SSM document permissions for `ssm:DescribeDocument`, `ssm:GetDocument`, `ssm:UpdateDocument`, and `ssm:UpdateDocumentDefaultVersion`. If the document has not been created yet, either set `QDOC_SSM_CREATE_DOCUMENT=true` on the helper or create it explicitly from the repository root:
+The caller that runs the helper needs scoped SSM document permissions for `ssm:DescribeDocument`, `ssm:GetDocument`, `ssm:UpdateDocument`, and `ssm:UpdateDocumentDefaultVersion`. If the document has not been created yet, prefer setting `QDOC_SSM_CREATE_DOCUMENT=true` on the helper. The direct AWS CLI fallback must run from a checkout that contains `deploy/ssm/qdoc-staging-deploy.yaml`; the example below resolves the document to an absolute `file://` URI and fails early if the file is missing:
 
 ```bash
 QDOC_SSM_CREATE_DOCUMENT=true AWS_REGION=us-east-1 pnpm deploy:sync-ssm-document
 
+QDOC_SSM_DOCUMENT_PATH="$(pwd)/deploy/ssm/qdoc-staging-deploy.yaml"
+test -f "$QDOC_SSM_DOCUMENT_PATH"
 aws ssm create-document \
   --name QDoc-StagingDeploy \
   --document-type Command \
   --document-format YAML \
-  --content file://deploy/ssm/qdoc-staging-deploy.yaml
+  --content "file://$QDOC_SSM_DOCUMENT_PATH"
 ```
 
 The equivalent manual update sequence is:
 
 ```bash
-
+QDOC_SSM_DOCUMENT_PATH="$(pwd)/deploy/ssm/qdoc-staging-deploy.yaml"
+test -f "$QDOC_SSM_DOCUMENT_PATH"
 QDOC_SSM_DOCUMENT_VERSION="$(
   aws ssm update-document \
     --name QDoc-StagingDeploy \
     --document-version '$LATEST' \
     --document-format YAML \
-    --content file://deploy/ssm/qdoc-staging-deploy.yaml \
+    --content "file://$QDOC_SSM_DOCUMENT_PATH" \
     --query 'DocumentDescription.LatestVersion' \
     --output text
 )"

@@ -140,6 +140,22 @@ pnpm verify:public-release
 
 Run the read-only public browser smoke against the deployed URL before marking P5-B or P5-D browser checks complete. Use provider strict mode only when the map provider should be live for the candidate. In strict provider mode, the smoke requires granted browser geolocation, a ready provider map, at least one QDoc clinic marker, at least one provider nearby discovery place, a direct drag gesture on the ready provider map surface, and app-level provider pan/zoom/recenter responses; if the chosen coordinates have no provider results, use `QDOC_PORTFOLIO_GEO_LATITUDE` and `QDOC_PORTFOLIO_GEO_LONGITUDE` for a known service area.
 
+The approved staging portfolio provider is Mapbox. Configure the following non-secret values in `/opt/qdoc/shared/.env.staging`; add the distinct restricted browser token and server-only search token through the same protected operator path, never through Git, chat, command output, or release evidence:
+
+```dotenv
+MAP_PROVIDER=mapbox
+MAP_PROVIDER_ENABLED=true
+MAP_MONTHLY_MAP_LOAD_LIMIT=5000
+MAP_MONTHLY_PLACES_SEARCH_LIMIT=1000
+MAP_USAGE_RATE_LIMIT_PER_MINUTE=30
+MAP_USAGE_RATE_LIMIT_PER_HOUR=300
+MAP_SEARCH_RATE_LIMIT_PER_MINUTE=10
+MAP_SEARCH_RATE_LIMIT_PER_HOUR=100
+MAP_SEARCH_CACHE_TTL_SECONDS=600
+```
+
+After the environment is updated and the candidate is redeployed, an authorized map-settings admin must set the database-backed Mapbox row to enabled with monthly limits `5000` and `1000` and `hardStopEnabled=true`. The seeded database row remains disabled by design and takes precedence over the environment fallback. Use the audited `/staff` map-settings flow after P5-A staff bootstrap; do not apply a hidden direct database edit. Then run strict provider smoke and verify both the ready provider path and fail-closed cost controls.
+
 ```bash
 QDOC_PUBLIC_URL=https://qdoc.example.com \
 QDOC_PORTFOLIO_EXPECT_RELEASE_SHA=<git-sha> \

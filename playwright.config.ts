@@ -50,6 +50,8 @@ const sharedEnv = {
   MAP_PROVIDER: process.env.MAP_PROVIDER ?? "mapbox",
   MAPBOX_PUBLIC_TOKEN:
     process.env.MAPBOX_PUBLIC_TOKEN ?? "pk.qdoc-e2e-mapbox-public-token",
+  GOOGLE_MAPS_BROWSER_KEY:
+    process.env.GOOGLE_MAPS_BROWSER_KEY ?? "qdoc-e2e-google-browser-key",
   MAP_MONTHLY_MAP_LOAD_LIMIT: process.env.MAP_MONTHLY_MAP_LOAD_LIMIT ?? "1",
   MAP_SETTINGS_ADMIN_EMAILS: process.env.MAP_SETTINGS_ADMIN_EMAILS ?? e2eEmail,
 };
